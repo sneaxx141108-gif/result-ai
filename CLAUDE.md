@@ -141,7 +141,15 @@ Design, Übergänge, Animationen.
 5. **Design-Details:** Typo-Skala und Abstände nachschärfen, Spiel-Karte edler (Farbübergang, Wappen groß), Ergebnis-Karte
    als echte Matrix-Grafik, einheitliche Icons, Startseite mit mehr Charakter (z. B. großes Live-Beispiel als Blickfang),
    Dunkelmodus genauso hochwertig.
-6. **Jede Runde auf Niklas' iPhone prüfen lassen** – am PC sieht man iPhone-Ruckeln nicht. iPhone-12-Regeln oben einhalten.
+6. **Treffsicherheit überarbeiten – das Prinzip und die Seite** (Niklas, 03.11.2026 abends: „die Treffsicherheit muss
+   geupdatet werden, das Prinzip und so“). Zuerst mit Niklas klären, was genau ihn stört. Mögliche Punkte:
+   - Die Seite ist am Anfang leer (es zählen nur eigene, schon beendete Scans) → wenig Wert. Idee: zusätzlich eine ehrliche
+     Bilanz aus vergangenen Spielen (Backtest, z. B. „in 5.000 Spielen lag Result AI so oft richtig“). **Achtung:** Niklas
+     hatte „jeder nur seine eigenen Scans“ gewählt – das nur nach Rückfrage ändern.
+   - Verständlicher und visueller: eine große Trefferquote, die letzten Scans mit ✓/✗, Serien, nach Ligen, „Ehrlichkeit“
+     einfacher erklärt (Diagramm nur, wenn genug Spiele da sind).
+   - Ergebnis nach Spielende automatisch prüfen und den Scan im Verlauf als richtig/falsch markieren.
+7. **Jede Runde auf Niklas' iPhone prüfen lassen** – am PC sieht man iPhone-Ruckeln nicht. iPhone-12-Regeln oben einhalten.
 
 ### Danach (Reihenfolge)
 
