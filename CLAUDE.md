@@ -99,25 +99,54 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
 - Keine Passwörter, Logins oder API-Schlüssel im Chat oder im Code. Konten (Cloudflare, KI-Anbieter) legt Niklas selbst an.
 - Auf einem fremden Laptop: nichts speichern lassen, am Ende bei Claude und GitHub abmelden.
 
-## Stand (03.11.2026)
+## Stand (Ende 03.11.2026) – morgen genau hier weitermachen
 
 - Erledigt: Idee und alle Entscheidungen oben mit Niklas geklärt; Repository `result-ai` angelegt; Vorlagen aus der BVB-App
   kopiert (`vorlage-bvb/`).
-- **App-Grundgerüst steht (03.11.2026):** `web/` = die App (wird per `.github/workflows/pages.yml` auf GitHub Pages gelegt,
-  vorher laufen die Tests). `web/engine.js` = Rechen-Kern (exakt, ohne Zufall: Sieg/Remis/Niederlage, Top-Ergebnisse,
-  Ergebnis-Karte, Über/Unter, beide treffen, Doppelchance, Halbzeit, nächstes Tor + Zeitpunkt, live mit Minute/Spielstand/
-  roten Karten, Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera),
-  Scan (ehrlicher Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel).
-  Design „Clean“ (siehe Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder
-  App-Änderung `SHELL` hochzählen.
+- **App-Grundgerüst steht und ist online:** https://sneaxx141108-gif.github.io/result-ai/ – Niklas hat sie am iPhone als App
+  auf den Home-Bildschirm gelegt und getestet.
+  `web/` = die App (wird per `.github/workflows/pages.yml` auf GitHub Pages gelegt, vorher laufen die Tests).
+  `web/engine.js` = Rechen-Kern (exakt, ohne Zufall: Sieg/Remis/Niederlage, Top-Ergebnisse, Ergebnis-Karte, Über/Unter,
+  beide treffen, Doppelchance, Halbzeit, nächstes Tor + Zeitpunkt, live mit Minute/Spielstand/roten Karten,
+  Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
+  Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
+  Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
+  hochzählen (zuletzt `ra-shell-v3`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
-  Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumentevb09` bleibt auf Niklas' Laptop.
-- **Als Nächstes (Reihenfolge):**
-  1. Niklas: Cloudflare-Konto anlegen; Gemini-Schlüssel aus AI Studio bereithalten (alter Schlüssel), ggf. neuen Groq-Schlüssel.
-  2. **Design „Clean“ auf dem iPhone prüfen** (Niklas) und Feedback einbauen.
-  3. ~~Rechen-Kern in JavaScript + Tests~~ – erledigt (`web/engine.js`, `tests/engine.test.js`).
-  4. **Täglicher Stärken-Rechner** mit 30+ Ligen + Backtest.
-  5. **Cloudflare Worker:** Scan (Gemini Vision), Internet-Recherche, Cache, Einladungscode, Schutz vor Überlastung.
-  6. **App komplett:** Scan-Ablauf, Ergebnis-Seite mit Wow-Animationen, alle Extras, Verlauf & Treffsicherheit.
-  7. **Test auf Niklas' iPhone 12**, Feinschliff, Freunde einladen.
+  Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
+
+### Niklas' Urteil nach dem iPhone-Test (03.11.2026, abends)
+
+> „Das Prinzip der App finde ich gut, aber es braucht Verbesserungen, was das Design angeht, und Übergänge, Animationen etc.
+> Sieht vom Prinzip gut aus, die Richtung muss aber noch viel besser werden – in allem.“
+
+→ Die Richtung (weiß/clean, Vorbilder Apple Sports, FotMob, Revolut) bleibt. Die **Qualität muss in allem deutlich hoch**:
+Design, Übergänge, Animationen.
+
+### Morgen als Erstes: Design-Runde 2 (vor Server und KI)
+
+1. **Kurz mit Niklas klären**, was ihn am meisten stört (konkrete Stellen; gern Screenshots von Apps, die er schön findet).
+   Dann **zeigen statt beschreiben** – Varianten direkt auf seinem iPhone ausprobieren lassen.
+2. **Echte Vereinswappen statt Buchstaben-Kreisen** – größter Qualitätssprung (Quelle klären, z. B. ESPN-/TheSportsDB-Logos,
+   Nutzungsbedingungen/robots.txt beachten; Fallback: Kreis mit Kürzel).
+3. **Übergänge wie in einer iPhone-App:** Detailseite schiebt sich von rechts rein und beim Zurück wieder raus (nur
+   `transform` auf **einem** Seiten-Container – keine View Transitions, die gaben bei der BVB-App schwarzes Ruckeln);
+   Beispiel-Karte „wächst“ in die Spiel-Karte (Shared Element per FLIP, nur transform/opacity); Blätter mit Federung;
+   vom linken Rand wischen zum Zurückgehen.
+4. **Animationen mit Gefühl:** Ergebnis-Auftritt als kleine Inszenierung (Karte → Zahl zählt → Balken → Liste), Zahlen
+   rollen statt springen, Scan-Animation hochwertiger (z. B. Raster/Linien über dem Screenshot, gefundene Teams werden
+   markiert), Lade-Skelette, haptisches Feedback (iOS-Schalter-Trick aus der BVB-App: `hapLabel` in `docs/app.js` des archivierten
+   Repositorys `bvb09`, lokal `Dokumente/bvb09`).
+5. **Design-Details:** Typo-Skala und Abstände nachschärfen, Spiel-Karte edler (Farbübergang, Wappen groß), Ergebnis-Karte
+   als echte Matrix-Grafik, einheitliche Icons, Startseite mit mehr Charakter (z. B. großes Live-Beispiel als Blickfang),
+   Dunkelmodus genauso hochwertig.
+6. **Jede Runde auf Niklas' iPhone prüfen lassen** – am PC sieht man iPhone-Ruckeln nicht. iPhone-12-Regeln oben einhalten.
+
+### Danach (Reihenfolge)
+
+1. Niklas: Cloudflare-Konto anlegen; Gemini-Schlüssel aus AI Studio bereithalten (alter Schlüssel), ggf. neuen Groq-Schlüssel.
+2. **Täglicher Stärken-Rechner** mit 30+ Ligen + Backtest.
+3. **Cloudflare Worker:** Scan (Gemini Vision), Internet-Recherche, Cache, Einladungscode, Schutz vor Überlastung.
+4. **App komplett:** echter Scan-Ablauf, Verlauf & Treffsicherheit mit echten Ergebnissen, Live mitrechnen.
+5. **Test auf Niklas' iPhone 12**, Feinschliff, Freunde einladen.
