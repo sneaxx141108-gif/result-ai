@@ -9,6 +9,7 @@ weitermachen.** Ohne Installation (z. B. fremder Laptop): im Browser **claude.ai
 - **Result AI:** Man wirft einen **Screenshot eines Fußballspiels** in die App. Sie rechnet aus, **zu wie viel Prozent wer
   gewinnt** und **welche Ergebnisse mit wie viel Prozent am wahrscheinlichsten sind** – und noch viel mehr (siehe Extras).
 - Sehr hochwertig, mit Animationen und „Wow-Effekt“, gebaut für Niklas' **iPhone 12** (Web-App/PWA auf GitHub Pages).
+  Adresse: **https://sneaxx141108-gif.github.io/result-ai/** (Pages-Quelle „GitHub Actions“, seit 03.11.2026).
   Niklas teilt sie **mit Freunden per Link**.
 - Besitzer: **Niklas** (GitHub `sneaxx141108-gif`) – Fan, kein Entwickler. Antworten auf **Deutsch**, locker, verständlich,
   ohne Fachchinesisch. Fragen stellen, wenn etwas unklar ist (Niklas: „frag mich wenn nötig zu allem noch mehr“).
