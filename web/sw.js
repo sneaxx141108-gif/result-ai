@@ -1,6 +1,6 @@
 /* Result AI – Service Worker: App startet auch ohne Netz, Updates kommen beim ersten Öffnen an.
    Bei jeder App-Änderung SHELL hochzählen. */
-const SHELL = 'ra-shell-v1';
+const SHELL = 'ra-shell-v3';
 const FILES = ['./', 'index.html', 'app.css', 'app.js', 'engine.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 // Beim Installieren am Browser-Zwischenspeicher vorbei laden, sonst landet evtl. noch eine alte Datei im Cache

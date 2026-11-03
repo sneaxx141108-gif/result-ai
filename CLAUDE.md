@@ -36,6 +36,10 @@ weitermachen.** Ohne Installation (z. B. fremder Laptop): im Browser **claude.ai
   jedes Nutzers (auf seinem Handy). Anzeige: Favorit gewonnen in X von Y Spielen, exaktes Ergebnis unter den Top 3 in X %,
   und vor allem die **Ehrlichkeit** (Kalibrierung): Wenn die App 70 % sagt, passiert es auch in etwa 70 % der Fälle?
 - **Design:** „schon clean, aber auch nicht langweilig – es soll schon krass mit Wow-Effekt sein.“
+  Erster Entwurf (Neon, Farbverläufe, drei Looks) gefiel Niklas **gar nicht** („sieht billig aus, wie Vorlage, zu bunt“).
+  **Jetzt gilt (03.11.2026):** **weißer Hintergrund** als Standard, **Dunkelmodus** in den Einstellungen; Vorbilder
+  **Apple Sports, FotMob/Sofascore, Revolut**; schwarze SF-Schrift, Farbe **nur von den Teams** (Spiel-Karte in
+  Vereinsfarben), riesige Zahlen, gruppierte Listen wie iOS, schwarzer Haupt-Knopf. Kein Neon, keine Deko-Verläufe.
 - **PFLICHT – gleiches Spiel, gleiches Ergebnis:** Scannt man am selben Tag zweimal dasselbe Spiel, muss **exakt dasselbe**
   herauskommen. (Ausnahme, gewollt: ein laufendes Spiel zu einer späteren Minute bzw. mit anderem Spielstand.)
 - **KI-Schlüssel:** die **alten Schlüssel der BVB-App weiterverwenden** (Gemini, Groq) – „und so, dass es noch besser ist“
@@ -103,16 +107,15 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   vorher laufen die Tests). `web/engine.js` = Rechen-Kern (exakt, ohne Zufall: Sieg/Remis/Niederlage, Top-Ergebnisse,
   Ergebnis-Karte, Über/Unter, beide treffen, Doppelchance, Halbzeit, nächstes Tor + Zeitpunkt, live mit Minute/Spielstand/
   roten Karten, Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera),
-  Scan (ehrlicher Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Look-Auswahl. **Drei Looks zum
-  Aussuchen** (`data-look`: `nova` dunkel/futuristisch, `pure` clean wie Apple, `arena` TV-Grafik) – Niklas wählt einen,
-  die anderen fliegen dann raus. Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder
+  Scan (ehrlicher Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel).
+  Design „Clean“ (siehe Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder
   App-Änderung `SHELL` hochzählen.
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumentevb09` bleibt auf Niklas' Laptop.
 - **Als Nächstes (Reihenfolge):**
   1. Niklas: Cloudflare-Konto anlegen; Gemini-Schlüssel aus AI Studio bereithalten (alter Schlüssel), ggf. neuen Groq-Schlüssel.
-  2. **Look aussuchen** (Niklas probiert Nova/Pure/Arena auf dem iPhone, Knopf „Look“ oben rechts) und Feedback einbauen.
+  2. **Design „Clean“ auf dem iPhone prüfen** (Niklas) und Feedback einbauen.
   3. ~~Rechen-Kern in JavaScript + Tests~~ – erledigt (`web/engine.js`, `tests/engine.test.js`).
   4. **Täglicher Stärken-Rechner** mit 30+ Ligen + Backtest.
   5. **Cloudflare Worker:** Scan (Gemini Vision), Internet-Recherche, Cache, Einladungscode, Schutz vor Überlastung.
