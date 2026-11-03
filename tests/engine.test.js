@@ -1,0 +1,58 @@
+// Tests für den Rechen-Kern: node tests/engine.test.js
+const RE = require('../web/engine.js');
+let fails = 0;
+const ok = (cond, msg) => { if (!cond) { fails++; console.log('FEHLER:', msg); } else console.log('ok  ', msg); };
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
+const pct = (x) => (100 * x).toFixed(1) + ' %';
+
+// 1) Summen = 100 %
+const a = RE.analyze({ lh: 1.6, la: 1.1 });
+const sum = a.probs.home + a.probs.draw + a.probs.away;
+ok(near(sum, 1, 1e-9), 'Sieg+Remis+Niederlage = 100 % (' + sum + ')');
+ok(near(a.double['1X'] + a.probs.away, 1, 1e-9), 'Doppelchance 1X + Auswärtssieg = 100 %');
+console.log('     vor dem Spiel 1,6 : 1,1 ->', pct(a.probs.home), pct(a.probs.draw), pct(a.probs.away), '| top', a.top.slice(0, 3).map((s) => s.h + ':' + s.a + ' ' + pct(s.p)).join(', '));
+
+// 2) zweimal gleich (Pflicht!)
+const b = RE.analyze({ lh: 1.6, la: 1.1 });
+ok(JSON.stringify(a) === JSON.stringify(b), 'zweimal dieselbe Eingabe -> exakt dasselbe Ergebnis');
+
+// 3) gleich starke Teams: Remis ~ 25-29 %, Heim = Gast
+const e = RE.analyze({ lh: 1.35, la: 1.35 });
+ok(near(e.probs.home, e.probs.away, 1e-9) && e.probs.draw > 0.24 && e.probs.draw < 0.30, 'gleich stark: Remis ' + pct(e.probs.draw));
+
+// 4) Live: 2:0 in der 85. Minute -> Heimsieg sehr wahrscheinlich
+const l = RE.analyze({ lh: 1.4, la: 1.4, minute: 85, score: [2, 0] });
+ok(l.probs.home > 0.95, 'live 2:0 (85.) -> Heimsieg ' + pct(l.probs.home));
+ok(l.top[0].h === 2 && l.top[0].a === 0, 'live 2:0 (85.) -> wahrscheinlichstes Ergebnis 2:0');
+
+// 5) Live 0:0 zur Halbzeit: Remis wahrscheinlicher als vor dem Spiel
+const h = RE.analyze({ lh: 1.4, la: 1.4, minute: 45, half: 'ht', score: [0, 0] });
+ok(h.probs.draw > e.probs.draw, 'live 0:0 (HZ): Remis ' + pct(h.probs.draw) + ' > vorher ' + pct(e.probs.draw));
+ok(h.ht === null, 'zur Halbzeit keine Halbzeit-Prognose mehr');
+
+// 6) Rote Karte gegen Heim: Heimsieg-Chance sinkt
+const r0 = RE.analyze({ lh: 1.5, la: 1.2, minute: 30, score: [0, 0] });
+const r1 = RE.analyze({ lh: 1.5, la: 1.2, minute: 30, score: [0, 0], reds: [1, 0] });
+ok(r1.probs.home < r0.probs.home, 'rote Karte Heim: ' + pct(r0.probs.home) + ' -> ' + pct(r1.probs.home));
+
+// 7) Quoten -> Tor-Erwartung -> wieder dieselben Wahrscheinlichkeiten (ohne Buchmacher-Marge)
+const q = RE.fromOdds({ home: 2.10, draw: 3.60, away: 3.30, line: 2.5, over: 1.85, under: 1.95 });
+const qa = RE.analyze({ lh: q.lh, la: q.la });
+ok(near(qa.probs.home - qa.probs.away, q.market.home - q.market.away, 0.002), 'Quoten zurückgerechnet: Heim ' + pct(qa.probs.home) + ' (Markt ' + pct(q.market.home) + ')');
+const po = (1 / 1.85) / (1 / 1.85 + 1 / 1.95);
+const o25 = qa.over.find((x) => x.line === 2.5).over;
+ok(near(o25, po, 0.003), 'Über 2,5 passt zur Quote: ' + pct(o25) + ' (Markt ' + pct(po) + ')');
+console.log('     Tor-Erwartung aus Quoten:', q.lh.toFixed(2), ':', q.la.toFixed(2), '| Marge', pct(q.market.margin));
+
+// 8) Nächstes Tor + Summen
+const n = RE.analyze({ lh: 1.6, la: 1.1, minute: 60, score: [1, 1] });
+ok(near(n.next.home + n.next.away + n.next.none, 1, 1e-9), 'nächstes Tor: Heim+Gast+keins = 100 %');
+ok(n.next.in10 < n.next.in20 && n.next.in20 < n.next.in30, 'Tor in 10 < 20 < 30 Min.');
+console.log('     1:1 (60.): nächstes Tor Heim', pct(n.next.home), 'Gast', pct(n.next.away), 'keins', pct(n.next.none), '| in 10 Min.', pct(n.next.in10), '| Median-Minute', n.next.median);
+
+// 9) Abgepfiffen: Endstand steht fest
+const f = RE.analyze({ lh: 1.6, la: 1.1, finished: true, minute: 90, score: [3, 1] });
+ok(near(f.probs.home, 1, 1e-9) && f.top[0].h === 3 && f.top[0].a === 1, 'abgepfiffen 3:1 -> 100 % Heimsieg');
+
+console.log(fails ? fails + ' Test(s) fehlgeschlagen' : 'ALLE TESTS OK');
+process.exit(fails ? 1 : 0);

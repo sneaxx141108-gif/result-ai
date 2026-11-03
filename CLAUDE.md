@@ -98,12 +98,21 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
 
 - Erledigt: Idee und alle Entscheidungen oben mit Niklas geklärt; Repository `result-ai` angelegt; Vorlagen aus der BVB-App
   kopiert (`vorlage-bvb/`).
+- **App-Grundgerüst steht (03.11.2026):** `web/` = die App (wird per `.github/workflows/pages.yml` auf GitHub Pages gelegt,
+  vorher laufen die Tests). `web/engine.js` = Rechen-Kern (exakt, ohne Zufall: Sieg/Remis/Niederlage, Top-Ergebnisse,
+  Ergebnis-Karte, Über/Unter, beide treffen, Doppelchance, Halbzeit, nächstes Tor + Zeitpunkt, live mit Minute/Spielstand/
+  roten Karten, Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera),
+  Scan (ehrlicher Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Look-Auswahl. **Drei Looks zum
+  Aussuchen** (`data-look`: `nova` dunkel/futuristisch, `pure` clean wie Apple, `arena` TV-Grafik) – Niklas wählt einen,
+  die anderen fliegen dann raus. Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder
+  App-Änderung `SHELL` hochzählen.
+- Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumentevb09` bleibt auf Niklas' Laptop.
 - **Als Nächstes (Reihenfolge):**
   1. Niklas: Cloudflare-Konto anlegen; Gemini-Schlüssel aus AI Studio bereithalten (alter Schlüssel), ggf. neuen Groq-Schlüssel.
-  2. **Design-Entwürfe** (2–3) als Live-Demo zum Ausprobieren auf dem iPhone → Niklas wählt.
-  3. **Rechen-Kern** in JavaScript + Tests mit bekannten Spielen (inkl. „zweimal gleich“-Test).
+  2. **Look aussuchen** (Niklas probiert Nova/Pure/Arena auf dem iPhone, Knopf „Look“ oben rechts) und Feedback einbauen.
+  3. ~~Rechen-Kern in JavaScript + Tests~~ – erledigt (`web/engine.js`, `tests/engine.test.js`).
   4. **Täglicher Stärken-Rechner** mit 30+ Ligen + Backtest.
   5. **Cloudflare Worker:** Scan (Gemini Vision), Internet-Recherche, Cache, Einladungscode, Schutz vor Überlastung.
   6. **App komplett:** Scan-Ablauf, Ergebnis-Seite mit Wow-Animationen, alle Extras, Verlauf & Treffsicherheit.
