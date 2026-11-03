@@ -98,8 +98,8 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
 
 - Erledigt: Idee und alle Entscheidungen oben mit Niklas geklärt; Repository `result-ai` angelegt; Vorlagen aus der BVB-App
   kopiert (`vorlage-bvb/`).
-- BVB-App (`bvb09`): Niklas will sie **abschalten & archivieren** (Website offline, keine automatischen Updates/KI mehr,
-  Repository privat ins Archiv) – nachdem alles hierher umgezogen ist.
+- BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
+  Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumentevb09` bleibt auf Niklas' Laptop.
 - **Als Nächstes (Reihenfolge):**
   1. Niklas: Cloudflare-Konto anlegen; Gemini-Schlüssel aus AI Studio bereithalten (alter Schlüssel), ggf. neuen Groq-Schlüssel.
   2. **Design-Entwürfe** (2–3) als Live-Demo zum Ausprobieren auf dem iPhone → Niklas wählt.
