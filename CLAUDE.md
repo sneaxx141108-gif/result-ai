@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v3`).
+  hochzählen (zuletzt `ra-shell-v4`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -124,7 +124,26 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
 → Die Richtung (weiß/clean, Vorbilder Apple Sports, FotMob, Revolut) bleibt. Die **Qualität muss in allem deutlich hoch**:
 Design, Übergänge, Animationen.
 
-### Morgen als Erstes: Design-Runde 2 (vor Server und KI)
+### Design-Runde 2 umgesetzt (04.11.2026)
+
+- **Echte Vereinswappen** (ESPN, verkleinert über `a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/<id>.png&w=..&h=..`,
+  im Dunkelmodus `500-dark`); Team-IDs und Vereinsfarben in `TEAMS` (`web/app.js`). Lädt ein Wappen nicht: Kreis mit Kürzel.
+  Der Service Worker speichert Wappen dauerhaft (`ra-img-v1`). Auf Vereinsfarbe stehen Wappen auf weißen Plaketten.
+- **Seiten wie in einer iPhone-App:** Seiten-Stapel (`.stack > .page`, jede Seite scrollt selbst, Scrollstand bleibt erhalten);
+  neue Seite schiebt sich von rechts herein, alte rückt nach links und wird leicht abgedunkelt (Web Animations, nur
+  `transform`/`opacity`). **Sicherung `settle`:** hakt das Handy oder geht die App in den Hintergrund, wird jeder Wechsel
+  nach spätestens ~1 s zu Ende gebracht. **Vom linken Rand wischen = zurück** (folgt dem Finger, schnappt zurück, wenn zu kurz).
+  Direktlink (z. B. `#/r/pre`): Startseite liegt unsichtbar darunter, „Zurück“ führt dorthin.
+- **Kopfleiste ohne Glas-Unschärfe** (backdrop-filter bricht in verschobenen Ebenen): oben unsichtbar, beim Scrollen feine
+  Linie + kleiner Titel (wie iOS).
+- **Ergebnis-Auftritt:** Karte → große Zahl rollt wie ein Zählwerk (Ziffern-Rollen, nur `transform`) → Balken → Liste.
+- **Haptik:** leichtes Tick beim Antippen, beim Zurückwischen und beim Umschalten (iOS-Schalter-Trick, iOS 18+).
+- **Startseite:** schwarze Scan-Karte (Fotos/Kamera), Beispiel-Karten in Vereinsfarben mit Wappen; Einstellungen als Blatt
+  mit Federung, zum Schließen nach unten ziehen; Scan-Ansicht mit Sucher-Ecken, Raster und Lade-Kreisel.
+- **Testen am PC:** im Browser-Fenster von Claude (Maße stimmen). Bilder aus Headless Chrome sind auf diesem Laptop
+  unbrauchbar (Windows-Skalierung vergrößert die App). Echte Prüfung bleibt Niklas' iPhone.
+
+### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 
 1. **Kurz mit Niklas klären**, was ihn am meisten stört (konkrete Stellen; gern Screenshots von Apps, die er schön findet).
    Dann **zeigen statt beschreiben** – Varianten direkt auf seinem iPhone ausprobieren lassen.
