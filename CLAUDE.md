@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v5`).
+  hochzählen (zuletzt `ra-shell-v6`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -156,6 +156,28 @@ Design, Übergänge, Animationen.
 - **Tore im Spiel:** Balkendiagramm 0–6+ Tore (Rechen-Kern: `totals`), Kacheln Über 1,5/2,5/3,5 + beide treffen.
 - **Nächstes Tor:** wer trifft + **Tor-Kurve** (Chance auf ein Tor bis Minute x, Rechen-Kern: `next.curve`), 10/20/30 Min.
 - **„So kommt die Zahl zustande“:** erwartete Tore je Team mit Wappen + Text.
+
+### Täglicher Stärken-Rechner (04.11.2026, gebaut während Niklas' Essenspause)
+
+- `scripts/ratings.py` (nur Standardbibliothek, ohne KI) rechnet **jeden Morgen um 3:30 UTC** (`.github/workflows/ratings.yml`,
+  danach wird die App mit veröffentlicht) die Stärken von **~770 Teams aus 38 Ligen** + Europapokal → `web/data/ratings.json`
+  (~170 KB). Modell = `scripts/forecast.py` aus der BVB-App (Poisson, Halbwertszeit 180 Tage, xG halb gemischt, Quoten ×2,
+  Europapokal ×3, Zeitfenster 450 Tage). Gleicher Tag = gleiche Stärken = gleiche Zahlen.
+- Quellen: football-data.co.uk (22 europäische Ligen inkl. 2.–5. Liga England, Schottland 1–4, je zwei Saison-Dateien mit xG +
+  16 weitere Ligen aus `/new/<Land>.csv`), ESPN (Tabellen für die Team-Zuordnung, alle CL/EL/ECL-Spiele).
+  football-data erlaubt normale Programme (robots.txt sperrt nur KI-Trainings-Crawler) – der Rechner meldet sich ehrlich als
+  `ResultAI-Stats/1.0`, nie als Browser verkleiden.
+- **Team-Zuordnung:** football-data-Name → ESPN-Team-ID (Name + Bilanz; sonst Europapokal-Team mit sehr ähnlichem Namen);
+  ein Name gilt landesweit (Auf-/Absteiger verbinden 1. und 2. Liga). Je Team: `id`, `name`, `short`, `abbr`, `alias` (für
+  die Zuordnung der Screenshots), `lg`, `att`, `def`, `logo`, `n` (Spiel-Gewicht), `grp`. Lücken: Finnland, Irland, Polen
+  (ESPN-Tabelle fehlt), Rumänien, Schweiz nur teilweise mit Wappen (Fallback Kreis mit Kürzel).
+- **Inseln (`grp`):** Teams sind nur vergleichbar, wenn sie über Spiele verbunden sind. Gruppe 0 = alle 31 europäischen Ligen
+  (über den Europapokal verbunden); Argentinien, MLS, Brasilien, Japan, Mexiko, Russland, China sind eigene Gruppen.
+  **Spiele zwischen Gruppen nicht aus den Stärken rechnen** → Quoten bzw. KI-Recherche (ehrlich „k. A.“, wenn nichts da).
+- Tor-Erwartung (App, noch einzubauen): `exp(mu + h + att[heim] - def[gast])` bzw. `exp(mu + att[gast] - def[heim])`
+  (`h` = 0 bei neutralem Platz). Danach rechnet `web/engine.js` wie gehabt.
+- Noch offen: Rechner in die App einbauen (Name aus dem Screenshot → Team → Tor-Erwartung), Backtest der 38 Ligen
+  (Treffsicherheit des Modells gegen die Schlussquoten), weitere Ligen/Länderspiele.
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 

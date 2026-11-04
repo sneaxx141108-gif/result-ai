@@ -1,0 +1,48 @@
+name: Stärken neu rechnen
+
+# Jeden Morgen: Ergebnisse, xG und Quoten aus 38 Ligen + Europapokal holen, Stärken aller Teams neu schätzen
+# (scripts/ratings.py, ohne KI) und mit der App zusammen veröffentlichen. Die Werte gelten dann den ganzen Tag.
+on:
+  schedule:
+    - cron: '30 3 * * *'   # 3:30 Uhr UTC = 4:30 Uhr (Winter) bzw. 5:30 Uhr (Sommer) deutscher Zeit
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ratings
+  cancel-in-progress: false
+
+jobs:
+  ratings:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stärken rechnen (38 Ligen + Europapokal)
+        run: python3 scripts/ratings.py
+      - name: Speichern
+        run: |
+          git config user.name "result-ai-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/data/ratings.json
+          if git diff --cached --quiet; then
+            echo "Keine Änderung"
+          else
+            git commit -m "Stärken $(TZ=Europe/Berlin date '+%d.%m.%Y')"
+            git pull --rebase -X theirs origin main
+            git push
+          fi
+      - name: Rechen-Kern testen
+        run: node tests/engine.test.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

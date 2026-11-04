@@ -1,6 +1,6 @@
 /* Result AI – Service Worker: App startet auch ohne Netz, Updates kommen beim ersten Öffnen an.
    Bei jeder App-Änderung SHELL hochzählen. */
-const SHELL = 'ra-shell-v5';
+const SHELL = 'ra-shell-v6';
 const IMG = 'ra-img-v1'; // Vereinswappen (ESPN), bleiben gespeichert
 const FILES = ['./', 'index.html', 'app.css', 'app.js', 'engine.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
@@ -20,6 +20,20 @@ async function staleWhileRevalidate(req) {
   return hit || net;
 }
 
+// Daten (z. B. Team-Stärken): immer frisch vom Server, ohne Netz die zuletzt geladene Fassung
+async function networkFirst(req) {
+  const cache = await caches.open(SHELL);
+  try {
+    const res = await fetch(req, { cache: 'no-cache' });
+    if (res.ok) cache.put(req.url.split('?')[0], res.clone());
+    return res;
+  } catch (err) {
+    const hit = await cache.match(req.url.split('?')[0]);
+    if (hit) return hit;
+    throw err;
+  }
+}
+
 // Wappen: einmal laden, danach sofort aus dem Speicher (auch ohne Netz)
 async function cacheFirst(req) {
   const cache = await caches.open(IMG);
@@ -35,5 +49,6 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.hostname === 'a.espncdn.com') e.respondWith(cacheFirst(req));
+  else if (url.origin === self.location.origin && url.pathname.includes('/data/')) e.respondWith(networkFirst(req));
   else if (url.origin === self.location.origin || /fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) e.respondWith(staleWhileRevalidate(req));
 });
