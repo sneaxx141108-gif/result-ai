@@ -26,6 +26,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Stärken rechnen (38 Ligen + Europapokal)
         run: python3 scripts/ratings.py
+      - name: Stärken prüfen (bei Fehlern bleibt die alte Version online)
+        run: node tests/ratings.test.js
       - name: Speichern
         run: |
           git config user.name "result-ai-bot"

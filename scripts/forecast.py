@@ -141,7 +141,7 @@ def market_lambdas(od, quick=False):
             else:
                 hi = mid
         return (lo + hi) / 2
-    total = 2.75
+    total = od.get('total') or 2.75  # ohne Über/Unter-Quote: Tor-Schnitt der Liga (ratings.py), sonst pauschal 2,75
     if quick and od.get('line') and od.get('pover'):
         total = total_from_pover(od['line'], od['pover'])
     elif od.get('line') and od.get('pover'):

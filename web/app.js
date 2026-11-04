@@ -445,6 +445,12 @@
       R.loading = fetch('data/ratings.json', { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then((d) => {
         d.teams.forEach((t) => { R.byId[t.id] = t; t._k = [DE[t.name], t.name, t.short, t.abbr].concat(t.alias || []).filter(Boolean).map(norm); });
         (d.leagues || []).forEach((l) => { R.leagues[l.id] = l; });
+        // eindeutige Anzeigenamen: Kurzname → bei Doppelung voller Name → sonst mit Land („Santos (Mexiko)“)
+        const count = (f) => d.teams.reduce((c, t) => { const k = f(t); c[k] = (c[k] || 0) + 1; return c; }, {});
+        const c1 = count(baseName);
+        const lvl2 = (t) => (c1[baseName(t)] > 1 && !DE[t.name] ? t.name : baseName(t));
+        const c2 = count(lvl2);
+        d.teams.forEach((t) => { t._d = c2[lvl2(t)] > 1 ? `${lvl2(t)} (${R.leagues[t.lg] ? R.leagues[t.lg].country : 'Europapokal'})` : lvl2(t); });
         R.data = d;
         return d;
       }).catch((e) => { R.loading = null; throw e; });
@@ -452,7 +458,8 @@
     return R.loading;
   }
   // Anzeigename: deutsch, sonst der kurze Name – außer ESPN-Kürzeln wie „D Dresden“, „C Palace“ oder „Nottm Forest“
-  const tName = (t) => DE[t.name] || (t.short && !/^[A-Z] |Nottm/.test(t.short) ? t.short : t.name);
+  const baseName = (t) => DE[t.name] || (t.short && !/^[A-Z] |Nottm/.test(t.short) ? t.short : t.name);
+  const tName = (t) => t._d || baseName(t);
   const lgName = (lg) => (R.leagues[lg] ? `${R.leagues[lg].name} · ${R.leagues[lg].country}` : 'Europapokal');
   const reg = (t) => { REG[tName(t)] = { logo: t.logo, color: t.color }; return tName(t); };
   // Suche: exakter Name > Anfang > alle Wörter enthalten; bei Gleichstand das Team mit mehr Spielen (größerer Verein)

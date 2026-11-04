@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v7`).
+  hochzählen (zuletzt `ra-shell-v8`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -161,19 +161,35 @@ Design, Übergänge, Animationen.
 
 - `scripts/ratings.py` (nur Standardbibliothek, ohne KI) rechnet **jeden Morgen um 3:30 UTC** (`.github/workflows/ratings.yml`,
   danach wird die App mit veröffentlicht) die Stärken von **~770 Teams aus 38 Ligen** + Europapokal → `web/data/ratings.json`
-  (~170 KB). Modell = `scripts/forecast.py` aus der BVB-App (Poisson, xG halb gemischt, Europapokal ×3, Zeitfenster 450 Tage).
+  (~180 KB). Modell = `scripts/forecast.py` aus der BVB-App (Poisson, xG halb gemischt, Europapokal ×3, Zeitfenster 450 Tage).
   Gleicher Tag = gleiche Stärken = gleiche Zahlen.
 - **Einstellungen per Backtest** (`scripts/backtest.py`, 04.11.2026: Stärken bis vor 28/56 Tagen, dann 1.406/2.246 echte Spiele
   aller 38 Ligen vorhergesagt): Quoten ×8, Zug zur Mitte 1,5, Halbwertszeit 120 Tage, Stärke-Unterschiede ×1,25 (`SPREAD`).
   Ergebnis 28 Tage: **Favorit richtig 54,0 %** (Buchmacher-Schlussquoten 56,2 %, Raten 33 %), Log-Loss 0,994 → **0,984**
   (Buchmacher 0,964); vorher war das Modell bei klaren Favoriten zu vorsichtig. Nur nach erneutem Backtest ändern.
   Folgerung: Wo Quoten zu einem Spiel bekannt sind, sind sie genauer als die Stärken → in der App bevorzugen.
+- **Tor-Prüfung (04.11.2026, abends):** Result AI sagte insgesamt zu wenige Tore voraus (2,83 statt echt 3,05 pro Spiel), vor
+  allem in den 16 Ligen ohne Über/Unter-Quoten (Norwegen −0,9, Schweiz −0,8, USA −0,6): dort nahm das Modell für die Quoten
+  pauschal 2,75 Tore an (mit Gewicht 8). Jetzt: **Tor-Schnitt der Liga** (zeitgewichtet) statt 2,75. Ergebnis (Backtest 28/56
+  Tage): Über 2,5 Log-Loss 0,6774 → 0,6714, genaues Ergebnis 3,0506 → 3,0428, Tor-Verteilung 1,8382 → 1,8308. Offizieller
+  Backtest danach (28 Tage, mit neuer Team-Zuordnung): **Favorit richtig 54,3 %** (vorher 54,0 %), Log-Loss **0,9825** (0,9841).
+  Getestet und verworfen: `SPREAD` nur auf den Abstand statt auf Angriff/Abwehr (nicht besser, genaue Ergebnisse schlechter)
+  – die 4,1 Tore bei Dortmund–Bayern kommen von Bayerns echtem Angriff (Ø ~3,5 Tore), nicht von einem Rechenfehler.
+- **Prüfung vor jeder Veröffentlichung:** `node tests/ratings.test.js` (Teamzahl, Zahlen endlich, IDs eindeutig, Stichproben
+  Dortmund/Bayern/Arsenal/Real/Barça/West Ham, „West Ham“ nicht bei einem fremden Verein, Ligagrößen). Schlägt sie fehl,
+  wird nichts gespeichert und die alte Version bleibt online (`ratings.yml`, `pages.yml`).
 - Quellen: football-data.co.uk (22 europäische Ligen inkl. 2.–5. Liga England, Schottland 1–4, je zwei Saison-Dateien mit xG +
   16 weitere Ligen aus `/new/<Land>.csv`), ESPN (Tabellen für die Team-Zuordnung, alle CL/EL/ECL-Spiele).
   football-data erlaubt normale Programme (robots.txt sperrt nur KI-Trainings-Crawler) – der Rechner meldet sich ehrlich als
   `ResultAI-Stats/1.0`, nie als Browser verkleiden.
-- **Team-Zuordnung:** football-data-Name → ESPN-Team-ID (Name + Bilanz; sonst Europapokal-Team mit sehr ähnlichem Namen);
-  ein Name gilt landesweit (Auf-/Absteiger verbinden 1. und 2. Liga). Je Team: `id`, `name`, `short`, `abbr`, `alias` (für
+- **Team-Zuordnung:** football-data-Name → ESPN-Team-ID, **zwei Durchgänge**: erst je Liga die ESPN-Tabelle (Name +
+  Bilanz) und, wo die fehlt, die ESPN-Teamliste derselben Liga (nur Name, `name_sim` ≥ 0,75 – so kamen Rumänien 0→13/16 und
+  die Schweiz 5→11/12 dazu); danach für den Rest Europapokal-Teams mit sehr ähnlichem vollen Namen (keine Kürzel – „HAM“
+  machte aus West Ham Hamrun Spartans, behoben 04.11.2026); umbenannte Vereine (gleiches Land, nie gleichzeitig gespielt,
+  sehr ähnlicher Name) werden zusammengelegt. Ein Name gilt landesweit (Auf-/Absteiger verbinden 1. und 2. Liga);
+  `lg` = Liga des letzten Spiels. Polen, Finnland, Irland: ESPN hat dort weder Tabelle noch Teamliste (nur Europapokal-Teams
+  mit Wappen); kleine rumänische Vereine haben bei ESPN kein Wappen → Kreis mit Kürzel. In der App sind Anzeigenamen
+  eindeutig (`_d`: Kurzname → voller Name → „Santos (Mexiko)“). Je Team: `id`, `name`, `short`, `abbr`, `alias` (für
   die Zuordnung der Screenshots), `lg`, `att`, `def`, `logo`, `n` (Spiel-Gewicht), `grp`. Lücken: Finnland, Irland, Polen
   (ESPN-Tabelle fehlt), Rumänien, Schweiz nur teilweise mit Wappen (Fallback Kreis mit Kürzel).
 - **Inseln (`grp`):** Teams sind nur vergleichbar, wenn sie über Spiele verbunden sind. Gruppe 0 = alle 31 europäischen Ligen

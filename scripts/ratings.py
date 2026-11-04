@@ -207,15 +207,34 @@ def espn_table(lg):
     return rows
 
 
-def espn_colors(lg):
-    """Vereinsfarben aller Teams einer ESPN-Liga: {id: (Hauptfarbe, Zweitfarbe)} als Hex ohne #."""
+def espn_teams(lg):
+    """Alle Teams einer ESPN-Liga – gibt es auch, wo die Tabelle fehlt (Rumänien, Schweiz):
+    {id: {'id','names','display','short','abbr','logo','color': (Hauptfarbe, Zweitfarbe) als Hex ohne #}}."""
     d = json.loads(get('%s/%s/teams' % (ESPN, lg), timeout=30))
     out = {}
     for x in ((d.get('sports') or [{}])[0].get('leagues') or [{}])[0].get('teams') or []:
         t = x.get('team') or {}
         if t.get('id'):
-            out[str(t['id'])] = (t.get('color'), t.get('alternateColor'))
+            tid = str(t['id'])
+            out[tid] = {'id': tid, 'names': [n for n in (t.get('displayName'), t.get('shortDisplayName'), t.get('name'), t.get('location'),
+                                                     t.get('abbreviation')) if n],
+                        'display': t.get('displayName') or t.get('name'), 'short': t.get('shortDisplayName'), 'abbr': t.get('abbreviation'),
+                        'logo': ((t.get('logos') or [{}])[0]).get('href'), 'color': (t.get('color'), t.get('alternateColor'))}
     return out
+
+
+def name_sim(n, names, abbr=None):
+    """Ähnlichkeit eines football-data-Namens zu einem ESPN-Team ohne Bilanz-Abgleich: gleicher Name = 1, sonst zählen nur
+    volle Namen – Kürzel wie „HAM“ passen zu vielen Vereinen („West Ham“ ≠ Hamrun Spartans)."""
+    n = FD_ALIAS.get(n, n)
+    best = 0.0
+    for x in names:
+        if slug(x) == slug(n):
+            return 1.0
+        if x == abbr or (x.isupper() and len(x) <= 4):
+            continue
+        best = max(best, sim(n, x))
+    return best
 
 
 def pick_color(c1, c2):
@@ -293,9 +312,11 @@ def load(quick=False):
                                                        'abbr': s.get('abbr'), 'logo': s.get('logo'), 'color': s.get('color')})
                     c['names'].update(n for n in (s['name'], s.get('short'), s.get('abbr')) if n)
 
-    # 2) Ligen laden und jedes football-data-Team einer ESPN-ID zuordnen: über die ESPN-Tabelle (Name + Bilanz),
-    #    sonst über die Europapokal-Teams (nur bei sehr ähnlichem Namen)
-    loaded, cmap = [], {}
+    # 2) Ligen laden und jedes football-data-Team einer ESPN-ID zuordnen – in zwei Durchgängen: erst über die ESPN-Tabellen
+    #    ALLER Ligen (Name + Bilanz), danach für den Rest über die Europapokal-Teams (nur sehr ähnlicher voller Name, keine
+    #    Kürzel). Auf-/Absteiger stehen nur in der Tabelle ihrer neuen Liga (West Ham 2026/27: Championship) – früher griff für
+    #    sie in der alten Liga schon der Europapokal-Notweg und machte aus „West Ham“ über das Kürzel „HAM“ Hamrun Spartans.
+    loaded, cmap, seen = [], {}, {}
     for code, (lg, lname, country) in list(MAIN.items()) + list(NEW.items()):
         if quick and code not in QUICK:
             continue
@@ -324,27 +345,57 @@ def load(quick=False):
             log('  ESPN %s: %s' % (lg, e))
             emap = {}
         try:
-            cols = espn_colors(lg)
+            eteams = espn_teams(lg)
         except Exception as e:
-            log('  Farben %s: %s' % (lg, e))
-            cols = {}
+            log('  Teams %s: %s' % (lg, e))
+            eteams = {}
         for r in emap.values():
-            r['color'] = cols.get(r['id'])
-        used = {r['id'] for r in emap.values()}
-        names = {g['home'] for g in games} | {g['away'] for g in games}
-        for n in sorted(names - set(emap)):  # Rest: Europapokal-Teams mit sehr ähnlichem Namen
-            best = max(((max(sim(FD_ALIAS.get(n, n), x) for x in c['names']), c) for c in cup_teams.values() if c['id'] not in used),
-                       key=lambda bc: bc[0], default=(0, None))
-            if best[0] >= 0.85:
-                c = best[1]
-                emap[n] = {'id': c['id'], 'names': sorted(c['names']), 'display': c['display'], 'short': c['short'], 'abbr': c['abbr'],
-                           'logo': c['logo'], 'color': c.get('color')}
-                used.add(c['id'])
+            r['color'] = (eteams.get(r['id']) or {}).get('color')
+        # ohne (vollständige) Tabelle: nur über den Namen – aber nur gegen die Teams DIESER Liga und jedes Team nur einmal
+        used_l = {r['id'] for r in emap.values()}
+        cands = sorted(((name_sim(n, r['names'], r['abbr']), n, r) for n in stats if n not in emap for r in eteams.values()
+                        if r['id'] not in used_l), key=lambda c: -c[0])
+        for sc, n, r in cands:
+            if sc >= 0.75 and n not in emap and r['id'] not in used_l:
+                emap[n] = r
+                used_l.add(r['id'])
+                log('  %s: „%s“ = %s (Teamliste der Liga)' % (lg, n, r['display']))
         cm = cmap.setdefault(country, {})
         for n, r in emap.items():
             cm.setdefault(n, r)  # ein Name = ein Team im ganzen Land (Auf-/Absteiger verbinden die Ligen)
+        span = seen.setdefault(country, {})  # je Name: erstes und letztes Spiel (für umbenannte Vereine)
+        for g in games:
+            for n in (g['home'], g['away']):
+                f, l = span.get(n, (g['t'], g['t']))
+                span[n] = (min(f, g['t']), max(l, g['t']))
         loaded.append((code, lg, lname, country, games, stats))
         time.sleep(0.3)
+
+    # 2b) Rest über die Europapokal-Teams: nur volle Namen (Kürzel wie „HAM“ passen zu vielen), jede ESPN-ID nur einmal
+    used = {r['id'] for cm in cmap.values() for r in cm.values()}
+    for country, span in seen.items():
+        cm = cmap.setdefault(country, {})
+        for n in sorted(set(span) - set(cm)):
+            best = max(((name_sim(n, c['names'], c.get('abbr')), c) for c in cup_teams.values() if c['id'] not in used),
+                       key=lambda bc: bc[0], default=(0, None))
+            if best[0] >= 0.85:
+                c = best[1]
+                cm[n] = {'id': c['id'], 'names': sorted(c['names']), 'display': c['display'], 'short': c['short'], 'abbr': c['abbr'],
+                         'logo': c['logo'], 'color': c.get('color')}
+                used.add(c['id'])
+                log('  %s: „%s“ = %s (über den Europapokal)' % (country, n, c['display']))
+    # 2c) umbenannte Vereine (football-data schreibt manchmal je Saison anders, z. B. „Din. Bucuresti“ → „Dinamo Bucuresti“):
+    #     sehr ähnlicher Name im selben Land, der NIE gleichzeitig gespielt hat → dasselbe Team (der neuere Name zählt)
+    for country, span in seen.items():
+        cm = cmap.setdefault(country, {})
+        for n in sorted(set(span) - set(cm), key=lambda x: span[x][1]):
+            f, l = span[n]
+            cands = [(sim(n, m), m) for m in span if m != n and (span[m][0] > l or span[m][1] < f) and span[m][1] > l]
+            s_best, m = max(cands, default=(0, None))
+            if s_best >= 0.85:
+                cm[n] = cm.get(m) or {'id': 'fd:%s:%s' % (country, m), 'names': [m], 'display': None, 'short': None, 'abbr': None,
+                                      'logo': None, 'color': None}
+                log('  %s: „%s“ = „%s“ (umbenannt)' % (country, n, m))
 
     return {'cup_events': cup_events, 'cup_teams': cup_teams, 'loaded': loaded, 'cmap': cmap}
 
@@ -353,13 +404,13 @@ def build(data, now, upto=None):
     """Beobachtungen fürs Modell; upto = nur Spiele vor diesem Zeitpunkt (für den Backtest)."""
     obs, info, leagues = [], {}, []
 
-    def team(tid, name=None, lg=None, row=None, logo=None):
-        """Merkt Namen, Liga und Wappen je Team (für die Zuordnung der Screenshots in der App)."""
+    def team(tid, name=None, lg=None, row=None, logo=None, when=None):
+        """Merkt Namen, Liga (mit dem Datum des letzten Spiels dort) und Wappen je Team (für die Suche in der App)."""
         t = info.setdefault(tid, {'names': set(), 'lg': {}, 'logo': None, 'display': None, 'short': None, 'abbr': None, 'w': 0.0})
         if name:
             t['names'].add(name)
-        if lg:
-            t['lg'][lg] = t['lg'].get(lg, 0) + 1
+        if lg and when:
+            t['lg'][lg] = max(t['lg'].get(lg, when), when)
         if row:
             t['names'].update(row['names'])
             t['display'] = t['display'] or row['display']
@@ -376,11 +427,20 @@ def build(data, now, upto=None):
     for code, lg, lname, country, games, stats in data['loaded']:
         cm = data['cmap'].get(country, {})
         key = lambda n: cm[n]['id'] if n in cm else 'fd:%s:%s' % (country, n)  # noqa: E731
+        # Tor-Schnitt der Liga (frische Spiele zählen mehr): für Quoten ohne Über/Unter-Linie. Vorher galt pauschal 2,75 –
+        # Backtest 04.11.2026: Norwegen, Schweiz, USA, Österreich … lagen dadurch 0,5–1 Tor pro Spiel zu tief.
+        sw = st = 0.0
+        for g in games:
+            if g['hg'] is not None and g['ag'] is not None and not (upto and g['t'] >= upto):
+                w = fc.decay((now - g['t']).total_seconds() / 86400.0)
+                sw += w
+                st += w * (g['hg'] + g['ag'])
+        avg_total = st / sw if sw >= 5 else None
         played = 0
         for g in games:
             h, a = key(g['home']), key(g['away'])
-            team(h, g['home'], lg, cm.get(g['home']))
-            team(a, g['away'], lg, cm.get(g['away']))
+            team(h, g['home'], lg, cm.get(g['home']), when=g['t'])
+            team(a, g['away'], lg, cm.get(g['away']), when=g['t'])
             if upto and g['t'] >= upto:
                 continue
             w = fc.decay((now - g['t']).total_seconds() / 86400.0)
@@ -393,7 +453,8 @@ def build(data, now, upto=None):
                 info[a]['w'] += w
                 played += 1
             if g['odds']:
-                lh, la = fc.market_lambdas(g['odds'], quick=True)
+                od = g['odds'] if g['odds'].get('line') else dict(g['odds'], total=avg_total)
+                lh, la = fc.market_lambdas(od, quick=True)
                 obs.append((h, a, lh, la, fc.W_MARKET * w, False))
         leagues.append({'id': lg, 'code': code, 'name': lname, 'country': country, 'matches': played,
                         'teams': len(stats), 'mapped': sum(1 for n in stats if n in cm)})
@@ -448,7 +509,7 @@ def main(quick=False):
     for tid, t in info.items():
         if tid not in fit['att'] or t['w'] < 0.5 and not tid.isdigit():
             continue
-        lg = max(t['lg'], key=t['lg'].get) if t['lg'] else None
+        lg = max(t['lg'], key=t['lg'].get) if t['lg'] else None  # Liga des letzten Spiels (Auf-/Absteiger)
         names = sorted({n for n in t['names'] if n}, key=len)
         disp = t['display'] or (names[-1] if names else tid)
         teams.append({'id': tid, 'name': disp, 'short': t['short'] or None, 'abbr': t['abbr'] or None,

@@ -25,6 +25,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Rechen-Kern testen
         run: node tests/engine.test.js
+      - name: Stärken-Datei prüfen
+        run: node tests/ratings.test.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
