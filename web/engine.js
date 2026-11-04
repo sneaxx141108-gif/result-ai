@@ -134,6 +134,17 @@
       const m1 = shift(scoreMatrix(lh * restH1 * fh, la * restH1 * fa, !live), score[0] || 0, score[1] || 0);
       ht = Object.assign(outcome(m1), { top: topScores(m1, 3) });
     }
+    // Gesamttore am Ende: 0, 1, …, 5 und „6 oder mehr“
+    const totals = new Array(7).fill(0);
+    fin.forEach((row, x) => row.forEach((v, y) => { totals[Math.min(6, x + y)] += v; }));
+    // Tor-Kurve: Wahrscheinlichkeit, dass bis zur Minute m (noch) ein Tor fällt – in 5-Minuten-Schritten bis Abpfiff
+    const rate = lh * fh + la * fa; // Tore je ganzes Spiel bei aktueller Spielerzahl
+    const shareNow = goalShareUntil(t);
+    const curve = [];
+    for (let m = live ? Math.ceil(((input.minute || 0) + 0.5) / 5) * 5 : 0; m <= 90; m += 5) {
+      curve.push({ m, p: 1 - Math.exp(-rate * Math.max(0, goalShareUntil(clock(m, m > 45 ? 2 : 1)) - shareNow)) });
+    }
+    curve.push({ m: 95, p: 1 - pNone }); // inkl. Nachspielzeit
     return {
       live,
       minute: input.minute || 0,
@@ -155,7 +166,9 @@
         in30: within(30),
         // Minute, bis zu der das nächste Tor mit 50 % gefallen ist (null = eher kein Tor mehr)
         median: pNone < 0.5 ? Math.round((input.minute || 0) + Math.log(2) / perMin) : null,
+        curve,
       },
+      totals,
       ht,
     };
   }

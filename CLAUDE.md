@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v4`).
+  hochzählen (zuletzt `ra-shell-v5`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -142,6 +142,20 @@ Design, Übergänge, Animationen.
   mit Federung, zum Schließen nach unten ziehen; Scan-Ansicht mit Sucher-Ecken, Raster und Lade-Kreisel.
 - **Testen am PC:** im Browser-Fenster von Claude (Maße stimmen). Bilder aus Headless Chrome sind auf diesem Laptop
   unbrauchbar (Windows-Skalierung vergrößert die App). Echte Prüfung bleibt Niklas' iPhone.
+
+### Design-Runde 3 (04.11.2026, Niklas: „Die Richtung ist super! Nur bitte upgrade das Design deutlich“)
+
+- **Weiße Karten schweben auf ganz hellem Grau** (`--bg: #F2F2F7`, Karten `#FFFFFF` mit weichem Schatten; dunkel: schwarz +
+  `#1C1C1E`) – wie Revolut/FotMob/Apple. Ergebnis-Seite ist eine Folge von Karten, die nacheinander aufsteigen.
+- **Spiel-Karten wie eine TV-Grafik** (`.teamcard`): scharfer Schnitt zwischen den Vereinsfarben mit heller Naht, große
+  Wappen als Wasserzeichen, leichter Glanz; Spielstand auf dunkler Kapsel über der Naht; Wappen gleiten beim Öffnen herein.
+- **Prognose-Karte:** große rollende Zahl + Abzeichen in Vereinsfarbe („Klarer Favorit“ / „Favorit“ / „Leicht vorne“ /
+  „Offenes Spiel“), Balken, Legende mit Wappen.
+- **Top-Ergebnis als Anzeigetafel** mit Wappen und „etwa jedes 10. Spiel endet so“, darunter die nächsten 5.
+- **Ergebnis-Karte in Teamfarben** (Heimsieg = Heimfarbe, Auswärtssieg = Gastfarbe, Remis = Grau).
+- **Tore im Spiel:** Balkendiagramm 0–6+ Tore (Rechen-Kern: `totals`), Kacheln Über 1,5/2,5/3,5 + beide treffen.
+- **Nächstes Tor:** wer trifft + **Tor-Kurve** (Chance auf ein Tor bis Minute x, Rechen-Kern: `next.curve`), 10/20/30 Min.
+- **„So kommt die Zahl zustande“:** erwartete Tore je Team mit Wappen + Text.
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 

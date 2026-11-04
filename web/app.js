@@ -99,7 +99,12 @@
     return `<span class="crest fb" style="--s:${s}px;background:${c};color:${onColor(c)}" aria-hidden="true">${esc(initials(name))}</span>`;
   }
   const plate = (name, p) => `<span class="plate" style="--p:${p}px">${crest(name, Math.round(p * 0.66), true)}</span>`;
-  const teamBg = (m) => `linear-gradient(110deg, ${teamColor(m.home)} 0%, ${teamColor(m.home)} 40%, ${teamColor(m.away)} 60%, ${teamColor(m.away)} 100%)`;
+  // Spiel-Karte: scharfer Schnitt zwischen den Vereinsfarben mit feiner heller Naht (wie eine TV-Grafik)
+  const teamBg = (m) => {
+    const h = teamColor(m.home);
+    const w = teamColor(m.away);
+    return `linear-gradient(102deg, ${h} 0%, ${h} 49.7%, rgba(255,255,255,.6) 49.7%, rgba(255,255,255,.6) 50.2%, ${w} 50.2%, ${w} 100%)`;
+  };
   // Wappen lädt nicht (z. B. offline) → Kreis mit Kürzel in Vereinsfarbe
   document.addEventListener('error', (e) => {
     const im = e.target;
@@ -157,11 +162,11 @@
       const a = analyze(m);
       const [k, p] = lead(m, a);
       const short = (n) => esc(n.length > 11 ? n.split(' ').pop() : n);
-      return `<a class="gcard" href="#/r/${m.id}" style="background:${teamBg(m)}">
+      return `<a class="gcard teamcard" href="#/r/${m.id}" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
         <div class="gt"><span>${esc(m.comp)}</span>${m.kind === 'live' ? `<span class="chip live">${m.minute}'</span>` : `<span class="chip glass">${esc(m.kind === 'odds' ? 'Quoten' : m.when)}</span>`}</div>
         <div class="gv">${plate(m.home, 54)}<div class="gm">${m.score ? `${m.score[0]}:${m.score[1]}` : 'VS'}<small>${short(m.home)} – ${short(m.away)}</small></div>${plate(m.away, 54)}</div>
         <div><div class="gf"><b>${Math.round(p * 100)} %</b><span>${k === 'draw' ? 'Remis' : 'Sieg ' + esc(k === 'home' ? m.home : m.away)}</span></div>
-        <div class="wbar" style="margin-top:10px"><i style="flex:${a.probs.home};background:#fff"></i><i style="flex:${a.probs.draw};background:rgba(255,255,255,.4)"></i><i style="flex:${a.probs.away};background:rgba(255,255,255,.72)"></i></div></div></a>`;
+        <div class="wbar"><i style="flex:${a.probs.home};background:#fff"></i><i style="flex:${a.probs.draw};background:rgba(255,255,255,.4)"></i><i style="flex:${a.probs.away};background:rgba(255,255,255,.72)"></i></div></div></a>`;
     };
     const mdCard = `<a class="gcard md" href="#/md"><div class="gt"><span class="muted">${esc(MD.comp.split(' · ')[0])}</span><span class="chip">${MD.games.length} Spiele</span></div>
       <div class="mdl">${MD.games.slice(0, 3).map((g) => `<div>${crest(g.home, 24)}${esc(g.home)} <span class="faint">–</span> ${esc(g.away)}</div>`).join('')}</div>
@@ -213,7 +218,17 @@
   function roller(n) {
     const ds = String(n).split('');
     const strip = '01234567890123456789'.split('').map((x) => `<span>${x}</span>`).join('');
-    return `<span class="roll" aria-hidden="true">${ds.map((d, i) => `<span class="rc"><span class="rs" style="--to:${10 + +d};--dl:${(i * 0.1).toFixed(2)}s">${strip}</span></span>`).join('')}</span><span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">${n} Prozent</span>`;
+    return `<span class="roll" aria-hidden="true">${ds.map((d, i) => `<span class="rc"><span class="rs" style="--to:${10 + +d};--dl:${(i * 0.1).toFixed(2)}s">${strip}</span></span>`).join('')}</span><span class="sr">${n} Prozent</span>`;
+  }
+  // großes Wappen als Wasserzeichen auf der Spiel-Karte
+  const wm = (name, side) => (TEAMS[name] ? `<span class="wm ${side}" aria-hidden="true"><img src="${logoUrl(TEAMS[name][0], false, 200)}" alt="" decoding="async" crossorigin="anonymous"></span>` : '');
+  const oneIn = (p) => { const n = Math.round(1 / Math.max(p, 1e-6)); return n <= 1 ? 'fast jedes Spiel' : `etwa jedes ${n}. Spiel`; };
+  // kleine Dreier-Aufteilung mit Balken (Halbzeit, nächstes Tor)
+  function mini(title, note, ps, c, names) {
+    const rr = round100(ps);
+    return `<div class="mini"><div class="lab"><b>${title}</b><span>${note}</span></div>
+      <div class="split"><i style="flex:${ps[0]};background:${c.h}"></i><i style="flex:${ps[1]};background:var(--draw)"></i><i style="flex:${ps[2]};background:${c.a}"></i></div>
+      <div class="nums"><span>${rr[0]} % <span class="m">${esc(names[0])}</span></span><span>${rr[1]} % <span class="m">${esc(names[1])}</span></span><span>${rr[2]} % <span class="m">${esc(names[2])}</span></span></div></div>`;
   }
   function vResult(id) {
     const m = findMatch(id);
@@ -224,83 +239,140 @@
     const [k, , label] = lead(m, a);
     const kIdx = { home: 0, draw: 1, away: 2 }[k];
     const live = m.kind === 'live';
-    let out = `<div class="res"><section class="match" style="background:${teamBg(m)}">
+    const favHome = a.probs.home >= a.probs.away;
+    const favP = Math.max(a.probs.home, a.probs.away);
+    const favCol = favHome ? c.h : c.a;
+    const badge = k === 'draw' ? ['Offenes Spiel', 'var(--fill)', 'var(--text)']
+      : favP > 0.7 ? ['Klarer Favorit', favCol, onColor(favCol)] : favP > 0.5 ? ['Favorit', favCol, onColor(favCol)] : ['Leicht vorne', favCol, onColor(favCol)];
+    let out = `<div class="res"><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
       <div class="match-top">${live ? `<span class="chip live">LIVE ${m.minute}'</span>` : `<span class="chip glass">${m.kind === 'odds' ? 'Quoten' : 'Vor dem Spiel'}</span>`}<span class="chip glass">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
-      <div class="versus"><div class="side">${plate(m.home, 78)}<span class="nm">${esc(m.home)}</span></div>
+      <div class="versus"><div class="side">${plate(m.home, 80)}<span class="nm">${esc(m.home)}</span></div>
         <div class="mid">${live ? `<div class="sc">${m.score[0]}:${m.score[1]}</div><div class="sub">${m.minute}. Minute</div>` : '<div class="vs">VS</div>'}</div>
-        <div class="side">${plate(m.away, 78)}<span class="nm">${esc(m.away)}</span></div></div></section>
-      <section class="big"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
-        <div class="big-l">${esc(label)}</div>
-        <div class="big-s">Wahrscheinlichstes Ergebnis: ${a.top[0].h}:${a.top[0].a} (${pct1(a.top[0].p)})</div>
-        <div class="split" role="img" aria-label="Sieg ${esc(m.home)} ${r[0]} Prozent, Remis ${r[1]} Prozent, Sieg ${esc(m.away)} ${r[2]} Prozent">
-          <i style="flex:${a.probs.home};background:${c.h}"></i><i style="flex:${a.probs.draw};background:var(--draw)"></i><i style="flex:${a.probs.away};background:${c.a}"></i></div>
-        <div class="legend"><div><b>${r[0]} %</b><span><i class="dot" style="background:${c.h}"></i>${esc(m.home)}</span></div>
-          <div><b>${r[1]} %</b><span><i class="dot" style="background:var(--draw)"></i>Remis</span></div>
-          <div><b>${r[2]} %</b><span>${esc(m.away)}<i class="dot" style="background:${c.a}"></i></span></div></div></section>`;
+        <div class="side">${plate(m.away, 80)}<span class="nm">${esc(m.away)}</span></div></div></section>
+      <div class="cards" style="margin-top:14px">`;
 
-    const maxP = a.top[0].p;
+    // 1) Prognose mit der großen Zahl
+    out += `<section class="card prob big" style="--i:0"><div class="top"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
+        <span class="badge" style="background:${badge[1]};color:${badge[2]}">${badge[0]}</span></div>
+      <div class="big-l">${esc(label)}</div><div class="big-s">${live ? `beim Stand von ${m.score[0]}:${m.score[1]} in der ${m.minute}. Minute` : 'vor dem Anpfiff'}</div>
+      <div class="split" role="img" aria-label="Sieg ${esc(m.home)} ${r[0]} Prozent, Remis ${r[1]} Prozent, Sieg ${esc(m.away)} ${r[2]} Prozent">
+        <i style="flex:${a.probs.home};background:${c.h}"></i><i style="flex:${a.probs.draw};background:var(--draw)"></i><i style="flex:${a.probs.away};background:${c.a}"></i></div>
+      <div class="legend3"><div class="it">${crest(m.home, 24)}<div class="tx"><b>${r[0]} %</b><span>${esc(m.home)}</span></div></div>
+        <div class="it"><span class="dot">X</span><div class="tx"><b>${r[1]} %</b><span>Remis</span></div></div>
+        <div class="it"><div class="tx"><b>${r[2]} %</b><span>${esc(m.away)}</span></div>${crest(m.away, 24)}</div></div></section>`;
+
+    // 2) Wahrscheinlichstes Ergebnis als Anzeigetafel, darunter die nächsten
+    const t0 = a.top[0];
     const sCol = (s) => (s.h > s.a ? c.h : s.h < s.a ? c.a : 'var(--draw)');
-    out += `<section class="sec"><div class="sec-h"><h2>Wahrscheinlichste Ergebnisse</h2></div><div class="group">
-      ${a.top.map((s, i) => `<div class="row score-row ${i === 0 ? 'best' : ''}"><span class="r">${s.h}:${s.a}</span><span class="mbar"><i style="width:${(s.p / maxP * 100).toFixed(1)}%;background:${sCol(s)}"></i></span><span class="v">${pct1(s.p)}</span></div>`).join('')}</div></section>`;
-    out += `<section class="sec"><div class="sec-h"><h2>Alle Ergebnisse</h2><span class="note">in %</span></div><div class="group">${heatmap(a, m)}</div></section>`;
-    if (m.kind === 'odds') out += oddsBlock(m, a);
-    const rowBar = (l, p, txt) => `<div class="row stack"><div class="line"><span>${l}</span><span class="v">${txt || pct0(p)}</span></div><div class="pbar"><i style="width:${(p * 100).toFixed(1)}%"></i></div></div>`;
-    out += `<section class="sec"><div class="sec-h"><h2>Tore</h2></div><div class="group">
-      ${a.over.map((o) => rowBar(`Über ${nf1.format(o.line)} Tore`, o.over)).join('')}
-      ${rowBar('Beide Teams treffen', a.btts, a.btts > 0.9995 ? '✓ schon passiert' : null)}</div></section>`;
-    out += `<section class="sec"><div class="sec-h"><h2>Doppelchance</h2></div><div class="three">
-      <div><b>${pct0(a.double['1X'])}</b><span>${esc(m.home)} o. Remis</span></div><div><b>${pct0(a.double['12'])}</b><span>kein Remis</span></div><div><b>${pct0(a.double.X2)}</b><span>${esc(m.away)} o. Remis</span></div></div></section>`;
-    if (a.ht) {
-      out += `<section class="sec"><div class="sec-h"><h2>Halbzeit</h2><span class="note">am ehesten ${a.ht.top[0].h}:${a.ht.top[0].a}</span></div><div class="three">
-        <div><b style="color:${c.h}">${pct0(a.ht.home)}</b><span>${esc(m.home)} führt</span></div><div><b>${pct0(a.ht.draw)}</b><span>Unentschieden</span></div><div><b style="color:${c.a}">${pct0(a.ht.away)}</b><span>${esc(m.away)} führt</span></div></div></section>`;
-    }
+    out += `<section class="card tip" style="--i:1"><div class="eyebrow">Wahrscheinlichstes Ergebnis</div>
+      <div class="board">${crest(m.home, 42)}<b>${t0.h}</b><span class="colon">:</span><b>${t0.a}</b>${crest(m.away, 42)}</div>
+      <div class="meta"><span class="chip">${pct1(t0.p)}</span><span>${oneIn(t0.p)} endet so</span></div>
+      <div class="scores">${a.top.slice(1).map((s) => `<div class="row srow"><span class="r">${s.h}:${s.a}</span><span class="mbar"><i style="width:${(s.p / t0.p * 100).toFixed(1)}%;background:${sCol(s)}"></i></span><span class="v">${pct1(s.p)}</span></div>`).join('')}</div></section>`;
+
+    // 3) Alle Ergebnisse als Karte in Teamfarben
+    out += `<section class="card" style="--i:2"><div class="card-h"><h3>Alle Ergebnisse</h3><span class="note">Chance in %</span></div>${heatmap(a, m, c)}</section>`;
+
+    // 4) Quoten: Markt gegen eigene Rechnung
+    if (m.kind === 'odds') out += oddsBlock(m, a, 3);
+
+    // 5) Tore
+    out += goalsCard(a, 4);
+
+    // 6) Halbzeit & Doppelchance
+    out += `<section class="card" style="--i:5"><div class="card-h"><h3>${a.ht ? 'Halbzeit & Doppelchance' : 'Doppelchance'}</h3></div>
+      ${a.ht ? mini('Stand zur Halbzeit', `am ehesten ${a.ht.top[0].h}:${a.ht.top[0].a}`, [a.ht.home, a.ht.draw, a.ht.away], c, [m.home, 'Remis', m.away]) : ''}
+      <div class="tiles t3" style="${a.ht ? '' : 'margin-top:0'}"><div class="tile"><span>${esc(m.home)} oder Remis</span><b>${pct0(a.double['1X'])}</b></div>
+        <div class="tile"><span>kein Remis</span><b>${pct0(a.double['12'])}</b></div><div class="tile"><span>${esc(m.away)} oder Remis</span><b>${pct0(a.double.X2)}</b></div></div></section>`;
+
+    // 7) Nächstes Tor: wer, und wann (Kurve)
     const nx = a.next;
-    out += `<section class="sec"><div class="sec-h"><h2>Nächstes Tor</h2><span class="note">${live ? `ab der ${m.minute}. Minute` : 'ab Anpfiff'}</span></div>
-      <div class="three"><div><b style="color:${c.h}">${pct0(nx.home)}</b><span>${esc(m.home)}</span></div><div><b>${pct0(nx.none)}</b><span>kein Tor mehr</span></div><div><b style="color:${c.a}">${pct0(nx.away)}</b><span>${esc(m.away)}</span></div></div>
-      <div class="group" style="margin-top:10px"><div class="row"><span class="grow">Tor in den nächsten 10 Min.</span><span class="v">${pct0(nx.in10)}</span></div>
-        <div class="row"><span class="grow">in den nächsten 20 Min.</span><span class="v">${pct0(nx.in20)}</span></div>
-        <div class="row"><span class="grow">in den nächsten 30 Min.</span><span class="v">${pct0(nx.in30)}</span></div>
-        <div class="row"><span class="grow">50:50-Marke fürs nächste Tor</span><span class="v">${nx.median != null ? `${nx.median}. Min.` : 'eher keins'}</span></div></div></section>`;
-    out += `<section class="sec"><div class="sec-h"><h2>Erklärung</h2></div><div class="text-card">${explain(m, a)}</div></section>`;
-    out += `<p class="foot">${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
+    out += `<section class="card" style="--i:6"><div class="card-h"><h3>Nächstes Tor</h3><span class="note">${live ? `ab der ${m.minute}. Minute` : 'ab Anpfiff'}</span></div>
+      ${mini('Wer trifft als Nächstes?', '', [nx.home, nx.none, nx.away], c, [m.home, 'keins', m.away])}
+      ${curveSvg(nx, live ? m.minute : 0)}
+      <div class="tiles t3 short"><div class="tile"><span>in 10 Min.</span><b>${pct0(nx.in10)}</b></div><div class="tile"><span>in 20 Min.</span><b>${pct0(nx.in20)}</b></div><div class="tile"><span>in 30 Min.</span><b>${pct0(nx.in30)}</b></div></div>
+      <p class="muted" style="font-size:13px;margin-top:12px">${nx.median != null ? `50:50-Marke: Bis zur ${nx.median}. Minute ist mit halber Chance ein Tor gefallen.` : 'Eher fällt in diesem Spiel kein Tor mehr.'}</p></section>`;
+
+    // 8) Erklärung
+    out += `<section class="card explain" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
+    out += `</div><p class="foot">${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
     return out;
   }
-  function heatmap(a, m) {
+  function heatmap(a, m, c) {
     const mx = Math.max(...a.matrix.flat());
-    let h = '<div class="heat"><span class="ax"></span>' + [0, 1, 2, 3, 4, 5].map((y) => `<span class="ax">${y}</span>`).join('');
+    const tint = (x, y) => (x > y ? c.h : x < y ? c.a : '#8E8E93');
+    let h = '<div class="heat"><span class="corner-cell"></span>' + [0, 1, 2, 3, 4, 5].map((y) => `<span class="ax">${y}</span>`).join('');
     for (let x = 0; x <= 5; x++) {
       h += `<span class="ax">${x}</span>`;
       for (let y = 0; y <= 5; y++) {
         const p = (a.matrix[x] || [])[y] || 0;
         const k = p / mx;
-        h += `<span class="c"><i style="opacity:${(0.04 + 0.96 * k).toFixed(3)}"></i><em style="color:${k > 0.5 ? 'var(--bg)' : 'var(--text)'}">${p >= 0.005 ? Math.round(p * 100) : ''}</em></span>`;
+        const col = tint(x, y);
+        h += `<span class="c"><i style="background:${col};opacity:${(0.1 + 0.9 * k).toFixed(3)}"></i><em style="color:${k > 0.55 ? onColor(col) : 'var(--text)'}">${p >= 0.005 ? Math.round(p * 100) : ''}</em></span>`;
       }
     }
-    return h + `</div><div class="heat-cap"><span>↓ Tore ${esc(m.home)}</span><span>Tore ${esc(m.away)} →</span></div>`;
+    return h + `</div><div class="heat-cap"><span>${crest(m.home, 18)}↓ Tore ${esc(m.home)}</span><span>Tore ${esc(m.away)} →${crest(m.away, 18)}</span></div>`;
   }
-  function oddsBlock(m, a) {
+  // Tore im Spiel: Balken für 0, 1, … 6+ Tore, dazu Über/Unter und „beide treffen“
+  function goalsCard(a, i) {
+    const mx = Math.max(...a.totals);
+    const cols = a.totals.map((p, n) => `<div class="col ${p === mx ? 'max' : ''}"><span class="pv">${p < 0.0005 ? '–' : pct0(p)}</span><i style="height:${Math.max(4, Math.round(p / mx * 108))}px"></i><span class="lb">${n === 6 ? '6+' : n}</span></div>`).join('');
+    const ov = a.over.length > 3 ? a.over.slice(1, 4) : a.over.slice(0, 3); // „über 0,5“ sagt wenig – lieber 1,5 bis 3,5
+    const tiles = ov.map((o) => `<div class="tile"><span>Über ${nf1.format(o.line)} Tore</span><b>${pct0(o.over)}</b></div>`).join('')
+      + `<div class="tile"><span>Beide treffen</span><b>${a.btts > 0.9995 ? '✓' : pct0(a.btts)}</b></div>`;
+    return `<section class="card" style="--i:${i}"><div class="card-h"><h3>Tore im Spiel</h3><span class="note">insgesamt am Ende</span></div>
+      <div class="bars7" role="img" aria-label="Wahrscheinlichkeit für die Gesamtzahl der Tore">${cols}</div><div class="tiles">${tiles}</div></section>`;
+  }
+  // Kurve: Chance, dass bis zur Minute x (noch) ein Tor fällt
+  function curveSvg(nx, from) {
+    const pts = nx.curve || [];
+    if (!pts.length) return '';
+    const W = 330;
+    const H = 132;
+    const L = 34;
+    const R = 12;
+    const T = 14;
+    const B = 22;
+    const span = Math.max(1, 95 - from);
+    const X = (mm) => L + ((mm - from) / span) * (W - L - R);
+    const Y = (p) => T + (1 - p) * (H - T - B);
+    const line = [[from, 0]].concat(pts.map((q) => [q.m, q.p]));
+    const d = line.map(([mm, p], i) => `${i ? 'L' : 'M'}${X(mm).toFixed(1)} ${Y(p).toFixed(1)}`).join(' ');
+    const area = `${d} L${X(95).toFixed(1)} ${Y(0).toFixed(1)} L${X(from).toFixed(1)} ${Y(0).toFixed(1)} Z`;
+    const end = pts[pts.length - 1];
+    const ticks = [from, 45, 90].filter((t, i, arr) => t >= from && arr.indexOf(t) === i && !(i > 0 && t - from < 12));
+    return `<svg class="curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance auf ein Tor bis zur jeweiligen Minute">
+      ${[0, 0.5, 1].map((p) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(p).toFixed(1)}" y2="${Y(p).toFixed(1)}"/><text x="${L - 6}" y="${(Y(p) + 4).toFixed(1)}" text-anchor="end">${Math.round(p * 100)} %</text>`).join('')}
+      <path class="area" d="${area}"/><path class="ln" d="${d}"/>
+      ${ticks.map((t) => `<text x="${X(t).toFixed(1)}" y="${H - 4}" text-anchor="middle">${t}'</text>`).join('')}
+      <circle class="pt" cx="${X(95).toFixed(1)}" cy="${Y(end.p).toFixed(1)}" r="4.5"/>
+      <text class="pl" x="${(X(95) - 8).toFixed(1)}" y="${(Y(end.p) - 9).toFixed(1)}" text-anchor="end">${Math.round(end.p * 100)} % bis Abpfiff</text></svg>`;
+  }
+  function oddsBlock(m, a, i) {
     const q = RE.fromOdds(m.odds);
     const mk = RE.analyze({ lh: q.lh, la: q.la });
-    const row = (l, x, y) => `<div class="row cmp-row"><span class="grow">${l}</span><span class="v">${pct0(x)}</span><span class="v">${pct0(y)}</span></div>`;
-    return `<section class="sec"><div class="sec-h"><h2>Markt vs. Result AI</h2><span class="note">${nf2.format(m.odds.home)} · ${nf2.format(m.odds.draw)} · ${nf2.format(m.odds.away)}</span></div>
-      <div class="group"><div class="cmp-head"><span>Ausgang</span><span>Markt</span><span>Result AI</span></div>
+    const row = (l, x, y) => `<div class="cmp-row"><span>${l}</span><span class="v">${pct0(x)}</span><span class="v">${pct0(y)}</span></div>`;
+    return `<section class="card" style="--i:${i}"><div class="card-h"><h3>Markt vs. Result AI</h3><span class="note">${nf2.format(m.odds.home)} · ${nf2.format(m.odds.draw)} · ${nf2.format(m.odds.away)}</span></div>
+      <div class="cmp-row h"><span>Ausgang</span><span class="v">Markt</span><span class="v">Result AI</span></div>
       ${row(`Sieg ${esc(m.home)}`, q.market.home, a.probs.home)}${row('Remis', q.market.draw, a.probs.draw)}${row(`Sieg ${esc(m.away)}`, q.market.away, a.probs.away)}
-      ${row('Über 2,5 Tore', mk.over.find((o) => o.line === 2.5).over, a.over.find((o) => o.line === 2.5).over)}</div>
-      <p class="muted" style="font-size:13px;margin:10px 4px 0">Markt = aus den Quoten, ohne die Marge der Buchmacher (${nf1.format(q.market.margin * 100)} %). Result AI = eigene Rechnung aus den Team-Stärken.</p></section>`;
+      ${row('Über 2,5 Tore', mk.over.find((o) => o.line === 2.5).over, a.over.find((o) => o.line === 2.5).over)}
+      <p class="muted" style="font-size:13px;margin-top:10px">Markt = aus den Quoten, ohne die Marge der Buchmacher (${nf1.format(q.market.margin * 100)} %). Result AI = eigene Rechnung aus den Team-Stärken.</p></section>`;
   }
   function explain(m, a) {
     const xg = (v) => nf1.format(v);
+    const live = m.kind === 'live';
     const fav = a.probs.home >= a.probs.away ? m.home : m.away;
+    const facts = `<div class="facts"><span class="fact">${crest(m.home, 24)}<b>${xg(live ? a.rest.home : a.xg.home)}</b>${live ? 'Tore noch erwartet' : 'Tore erwartet'}</span>
+      <span class="fact">${crest(m.away, 24)}<b>${xg(live ? a.rest.away : a.xg.away)}</b>${live ? 'Tore noch erwartet' : 'Tore erwartet'}</span></div>`;
     const ps = [];
-    if (m.kind === 'live') {
+    if (live) {
       const pre = RE.analyze({ lh: m.lh, la: m.la });
       ps.push(`Vor dem Anpfiff lag ${esc(m.home)} bei ${pct0(pre.probs.home)} Siegchance. Beim Stand von ${m.score[0]}:${m.score[1]} in der ${m.minute}. Minute fallen im Schnitt nur noch ${xg(a.rest.home + a.rest.away)} Tore – deshalb steht ${esc(m.home)} jetzt bei ${pct0(a.probs.home)}, und ein Remis ist auf ${pct0(a.probs.draw)} gestiegen.`);
     } else {
-      ps.push(`Im Schnitt erzielt ${esc(m.home)} in diesem Spiel ${xg(a.xg.home)} Tore, ${esc(m.away)} ${xg(a.xg.away)}. Daraus ergeben sich ${pct0(Math.max(a.probs.home, a.probs.away))} für ${esc(fav)}.`);
+      ps.push(`${esc(m.home)} trifft in diesem Spiel im Schnitt ${xg(a.xg.home)}-mal, ${esc(m.away)} ${xg(a.xg.away)}-mal. Daraus ergeben sich ${pct0(Math.max(a.probs.home, a.probs.away))} für ${esc(fav)}.`);
     }
     ps.push(`Das wahrscheinlichste einzelne Ergebnis ist ${a.top[0].h}:${a.top[0].a} – aber auch das tritt nur in ${pct0(a.top[0].p)} der Fälle ein.`);
     ps.push('<span class="muted">Mit angeschlossener KI kommt hier ein Formcheck dazu: letzte Spiele, Ausfälle und was die Buchmacher erwarten.</span>');
-    return ps.map((p) => `<p>${p}</p>`).join('');
+    return facts + ps.map((p) => `<p>${p}</p>`).join('');
   }
 
   // ------------------------------------------------------------------ Spieltag

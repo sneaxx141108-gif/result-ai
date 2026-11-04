@@ -54,5 +54,14 @@ console.log('     1:1 (60.): nächstes Tor Heim', pct(n.next.home), 'Gast', pct(
 const f = RE.analyze({ lh: 1.6, la: 1.1, finished: true, minute: 90, score: [3, 1] });
 ok(near(f.probs.home, 1, 1e-9) && f.top[0].h === 3 && f.top[0].a === 1, 'abgepfiffen 3:1 -> 100 % Heimsieg');
 
+// 10) Torverteilung und Tor-Kurve
+const tv = RE.analyze({ lh: 2.35, la: 1.05 });
+ok(near(tv.totals.reduce((x, y) => x + y, 0), 1, 1e-9), 'Torverteilung 0..6+ = 100 %');
+ok(near(tv.totals.slice(3).reduce((x, y) => x + y, 0), tv.over.find((o) => o.line === 2.5).over, 1e-9), 'Torverteilung passt zu Über 2,5');
+const cv = RE.analyze({ lh: 1.6, la: 1.1, minute: 63, half: 2, score: [1, 1] }).next;
+ok(cv.curve.every((c, i) => i === 0 || c.p >= cv.curve[i - 1].p - 1e-12), 'Tor-Kurve steigt nur an');
+ok(near(cv.curve[cv.curve.length - 1].p, 1 - cv.none, 1e-9) && cv.curve[0].m === 65, 'Tor-Kurve: Start 65. Min., Ende = 1 - kein Tor');
+console.log('     Tore (Bayern–Dortmund):', tv.totals.map((x, i) => (i === 6 ? '6+' : i) + ': ' + pct(x)).join(' · '));
+
 console.log(fails ? fails + ' Test(s) fehlgeschlagen' : 'ALLE TESTS OK');
 process.exit(fails ? 1 : 0);
