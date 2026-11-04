@@ -1,8 +1,8 @@
 """Result AI – täglicher Stärken-Rechner (läuft frühmorgens auf GitHub Actions, ohne KI, nur Python-Standardbibliothek).
 
 Holt Ergebnisse, xG und Schlussquoten aus 38 Ligen (football-data.co.uk) und alle Europapokal-Spiele (ESPN), schätzt
-Angriff und Abwehr jedes Teams (Poisson-Modell aus scripts/forecast.py, wie bei der BVB-App: Spiele verlieren mit
-Halbwertszeit 180 Tage an Gewicht, Quoten zählen doppelt, Europapokal dreifach) und ordnet jedes Team einer ESPN-Team-ID zu
+Angriff und Abwehr jedes Teams (Poisson-Modell aus scripts/forecast.py, wie bei der BVB-App; Einstellungen per Backtest
+unten bei SPREAD) und ordnet jedes Team einer ESPN-Team-ID zu
 (Wappen, Namen für die Zuordnung der Screenshots). Ergebnis: web/data/ratings.json. Die Werte gelten den ganzen Tag –
 so liefert dasselbe Spiel am selben Tag immer dieselben Zahlen.
 
@@ -28,13 +28,22 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import forecast as fc  # noqa: E402
 
+# Einstellungen per Backtest bestimmt (04.11.2026, 38 Ligen, je 1.406 bzw. 2.246 Spiele aus den letzten 28/56 Tagen
+# vorhergesagt; scripts/backtest.py): Quoten zählen achtfach, wenig Zug zur Mitte, jüngere Spiele wichtiger,
+# Stärke-Unterschiede ×1,25 (vorher war das Modell bei klaren Favoriten zu vorsichtig: sagte 64 %, passiert waren 77 %).
+# Log-Loss 0,994 → 0,984 (28 Tage) bzw. 1,010 → 1,001 (56 Tage). Nur nach erneutem Backtest ändern.
+fc.W_MARKET = 8.0
+fc.TAU = 1.5
+fc.HALF_LIFE = 120.0
+SPREAD = 1.25
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'web', 'data', 'ratings.json')
 UA = 'ResultAI-Stats/1.0 (+https://github.com/sneaxx141108-gif/result-ai)'
 FD = 'https://football-data.co.uk'
 ESPN = 'https://site.api.espn.com/apis/site/v2/sports/soccer'
 NOW = datetime.now(timezone.utc)
-WINDOW_DAYS = 450  # so weit zurück zählen Spiele (mit Halbwertszeit 180 Tage zählt ein Jahr altes Spiel noch ~25 %)
+WINDOW_DAYS = 450  # so weit zurück zählen Spiele (mit Halbwertszeit 120 Tage zählt ein Jahr altes Spiel noch ~12 %)
 START = NOW.year if NOW.month >= 7 else NOW.year - 1  # europäische Saison: 2026/27 beginnt im Sommer 2026
 
 # Ligen: football-data-Kürzel -> (ESPN-Liga, Name, Land)
@@ -236,27 +245,8 @@ def espn_cup(lg, season):
 
 
 # ---------------------------------------------------------------- Rechnen
-def main(quick=False):
-    t0 = time.time()
-    obs, info, leagues = [], {}, []
-
-    def team(tid, name=None, lg=None, row=None, logo=None):
-        """Merkt Namen, Liga und Wappen je Team (für die Zuordnung der Screenshots in der App)."""
-        t = info.setdefault(tid, {'names': set(), 'lg': {}, 'logo': None, 'display': None, 'short': None, 'abbr': None, 'w': 0.0})
-        if name:
-            t['names'].add(name)
-        if lg:
-            t['lg'][lg] = t['lg'].get(lg, 0) + 1
-        if row:
-            t['names'].update(row['names'])
-            t['display'] = t['display'] or row['display']
-            t['short'] = t['short'] or row['short']
-            t['abbr'] = t['abbr'] or row['abbr']
-            t['logo'] = t['logo'] or row['logo']
-        if logo and not t['logo']:
-            t['logo'] = logo
-        return t
-
+def load(quick=False):
+    """Lädt Europapokal und alle Ligen und ordnet die Teams zu (dauert ~1 Minute)."""
     # 1) Europapokal (ESPN) zuerst: seine Teams (ESPN-IDs) verbinden die Ligen untereinander
     cup_events, cup_teams = [], {}
     for lg in CUPS:
@@ -319,16 +309,42 @@ def main(quick=False):
         loaded.append((code, lg, lname, country, games, stats))
         time.sleep(0.3)
 
+    return {'cup_events': cup_events, 'cup_teams': cup_teams, 'loaded': loaded, 'cmap': cmap}
+
+
+def build(data, now, upto=None):
+    """Beobachtungen fürs Modell; upto = nur Spiele vor diesem Zeitpunkt (für den Backtest)."""
+    obs, info, leagues = [], {}, []
+
+    def team(tid, name=None, lg=None, row=None, logo=None):
+        """Merkt Namen, Liga und Wappen je Team (für die Zuordnung der Screenshots in der App)."""
+        t = info.setdefault(tid, {'names': set(), 'lg': {}, 'logo': None, 'display': None, 'short': None, 'abbr': None, 'w': 0.0})
+        if name:
+            t['names'].add(name)
+        if lg:
+            t['lg'][lg] = t['lg'].get(lg, 0) + 1
+        if row:
+            t['names'].update(row['names'])
+            t['display'] = t['display'] or row['display']
+            t['short'] = t['short'] or row['short']
+            t['abbr'] = t['abbr'] or row['abbr']
+            t['logo'] = t['logo'] or row['logo']
+        if logo and not t['logo']:
+            t['logo'] = logo
+        return t
+
     # 3) Beobachtungen fürs Modell
-    for code, lg, lname, country, games, stats in loaded:
-        cm = cmap.get(country, {})
+    for code, lg, lname, country, games, stats in data['loaded']:
+        cm = data['cmap'].get(country, {})
         key = lambda n: cm[n]['id'] if n in cm else 'fd:%s:%s' % (country, n)  # noqa: E731
         played = 0
         for g in games:
             h, a = key(g['home']), key(g['away'])
             team(h, g['home'], lg, cm.get(g['home']))
             team(a, g['away'], lg, cm.get(g['away']))
-            w = fc.decay((NOW - g['t']).total_seconds() / 86400.0)
+            if upto and g['t'] >= upto:
+                continue
+            w = fc.decay((now - g['t']).total_seconds() / 86400.0)
             if g['hg'] is not None and g['ag'] is not None:
                 x, y = g['hg'], g['ag']
                 if g['hx'] is not None and g['ax'] is not None:
@@ -345,18 +361,32 @@ def main(quick=False):
         log('  %-4s %-16s %4d Spiele, %2d/%2d Teams mit Wappen' % (code, lname, played, leagues[-1]['mapped'], len(stats)))
 
     # Europapokal: zählt dreifach
-    for dt, e in cup_events:
+    for dt, e in data['cup_events']:
+        if upto and dt >= upto:
+            continue
         for side in ('home', 'away'):
             s = e[side]
-            c = cup_teams[s['id']]
+            c = data['cup_teams'][s['id']]
             team(s['id'], s['name'], None, {'names': sorted(c['names']), 'display': c['display'], 'short': c['short'], 'abbr': c['abbr'], 'logo': c['logo']})
-        w = fc.W_EURO * fc.decay((NOW - dt).total_seconds() / 86400.0)
+        w = fc.W_EURO * fc.decay((now - dt).total_seconds() / 86400.0)
         obs.append((e['home']['id'], e['away']['id'], e['hs'], e['as'], w, e.get('neutral', False)))
-    cups = len(cup_events)
+    cups = sum(1 for dt, e in data['cup_events'] if not upto or dt < upto)
     log('  Europapokal: %d Spiele' % cups)
 
+    return obs, info, leagues, cups
+
+
+def spread(fit):
+    """Stärke-Unterschiede verstärken (SPREAD, per Backtest bestimmt) – Angriff und Abwehr bleiben um 0 zentriert."""
+    return dict(fit, att={t: SPREAD * v for t, v in fit['att'].items()}, **{'def': {t: SPREAD * v for t, v in fit['def'].items()}})
+
+
+def main(quick=False):
+    t0 = time.time()
+    data = load(quick)
+    obs, info, leagues, cups = build(data, NOW)
     log('Rechne Stärken aus %d Beobachtungen …' % len(obs))
-    fit = fc.fit_ratings(obs)
+    fit = spread(fc.fit_ratings(obs))
     # Inseln erkennen: Teams sind nur vergleichbar, wenn sie über Spiele miteinander verbunden sind (z. B. Europa über den
     # Europapokal). Brasilien, MLS, Japan … bilden eigene Gruppen – Spiele zwischen Gruppen rechnet die App nicht aus den
     # Stärken, sondern braucht Quoten bzw. die Recherche der KI.
@@ -389,7 +419,7 @@ def main(quick=False):
         gs = [t['grp'] for t in teams if t['lg'] == L['id']]
         L['grp'] = max(set(gs), key=gs.count) if gs else None
     out = {'updatedAt': NOW.strftime('%Y-%m-%dT%H:%M:%SZ'), 'season': START,
-           'model': {'mu': round(fit['mu'], 4), 'h': round(fit['h'], 4), 'rho': fc.DC_RHO, 'halfLife': fc.HALF_LIFE},
+           'model': {'mu': round(fit['mu'], 4), 'h': round(fit['h'], 4), 'rho': fc.DC_RHO, 'halfLife': fc.HALF_LIFE, 'spread': SPREAD},
            'leagues': leagues, 'cups': cups, 'groups': len(order), 'teams': teams}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:

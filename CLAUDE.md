@@ -161,8 +161,13 @@ Design, Übergänge, Animationen.
 
 - `scripts/ratings.py` (nur Standardbibliothek, ohne KI) rechnet **jeden Morgen um 3:30 UTC** (`.github/workflows/ratings.yml`,
   danach wird die App mit veröffentlicht) die Stärken von **~770 Teams aus 38 Ligen** + Europapokal → `web/data/ratings.json`
-  (~170 KB). Modell = `scripts/forecast.py` aus der BVB-App (Poisson, Halbwertszeit 180 Tage, xG halb gemischt, Quoten ×2,
-  Europapokal ×3, Zeitfenster 450 Tage). Gleicher Tag = gleiche Stärken = gleiche Zahlen.
+  (~170 KB). Modell = `scripts/forecast.py` aus der BVB-App (Poisson, xG halb gemischt, Europapokal ×3, Zeitfenster 450 Tage).
+  Gleicher Tag = gleiche Stärken = gleiche Zahlen.
+- **Einstellungen per Backtest** (`scripts/backtest.py`, 04.11.2026: Stärken bis vor 28/56 Tagen, dann 1.406/2.246 echte Spiele
+  aller 38 Ligen vorhergesagt): Quoten ×8, Zug zur Mitte 1,5, Halbwertszeit 120 Tage, Stärke-Unterschiede ×1,25 (`SPREAD`).
+  Ergebnis 28 Tage: **Favorit richtig 54,0 %** (Buchmacher-Schlussquoten 56,2 %, Raten 33 %), Log-Loss 0,994 → **0,984**
+  (Buchmacher 0,964); vorher war das Modell bei klaren Favoriten zu vorsichtig. Nur nach erneutem Backtest ändern.
+  Folgerung: Wo Quoten zu einem Spiel bekannt sind, sind sie genauer als die Stärken → in der App bevorzugen.
 - Quellen: football-data.co.uk (22 europäische Ligen inkl. 2.–5. Liga England, Schottland 1–4, je zwei Saison-Dateien mit xG +
   16 weitere Ligen aus `/new/<Land>.csv`), ESPN (Tabellen für die Team-Zuordnung, alle CL/EL/ECL-Spiele).
   football-data erlaubt normale Programme (robots.txt sperrt nur KI-Trainings-Crawler) – der Rechner meldet sich ehrlich als
@@ -176,8 +181,8 @@ Design, Übergänge, Animationen.
   **Spiele zwischen Gruppen nicht aus den Stärken rechnen** → Quoten bzw. KI-Recherche (ehrlich „k. A.“, wenn nichts da).
 - Tor-Erwartung (App, noch einzubauen): `exp(mu + h + att[heim] - def[gast])` bzw. `exp(mu + att[gast] - def[heim])`
   (`h` = 0 bei neutralem Platz). Danach rechnet `web/engine.js` wie gehabt.
-- Noch offen: Rechner in die App einbauen (Name aus dem Screenshot → Team → Tor-Erwartung), Backtest der 38 Ligen
-  (Treffsicherheit des Modells gegen die Schlussquoten), weitere Ligen/Länderspiele.
+- Noch offen: Rechner in die App einbauen (Name aus dem Screenshot → Team → Tor-Erwartung; Stärken × `SPREAD` sind in
+  `ratings.json` schon eingerechnet), weitere Ligen/Länderspiele, Wappen für FIN/IRL/POL/ROU/SUI.
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 
