@@ -207,6 +207,31 @@ def espn_table(lg):
     return rows
 
 
+def espn_colors(lg):
+    """Vereinsfarben aller Teams einer ESPN-Liga: {id: (Hauptfarbe, Zweitfarbe)} als Hex ohne #."""
+    d = json.loads(get('%s/%s/teams' % (ESPN, lg), timeout=30))
+    out = {}
+    for x in ((d.get('sports') or [{}])[0].get('leagues') or [{}])[0].get('teams') or []:
+        t = x.get('team') or {}
+        if t.get('id'):
+            out[str(t['id'])] = (t.get('color'), t.get('alternateColor'))
+    return out
+
+
+def pick_color(c1, c2):
+    """Farbe für die Spiel-Karte: Hauptfarbe, außer sie ist weiß/fast weiß (dann Zweitfarbe). Kräftiges Gelb (BVB) bleibt."""
+    def ok(h):
+        try:
+            r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        except (TypeError, ValueError):
+            return False
+        return min(r, g, b) < 0.78  # alle drei Kanäle hell = weiß oder hellgrau
+    for c in (c1, c2):
+        if c and ok(c):
+            return '#' + c.upper()
+    return None
+
+
 def map_teams(stats, espn_rows):
     """football-data-Name -> ESPN-Zeile. Namensähnlichkeit plus Abgleich der Bilanz (Spiele, Tore, Gegentore)."""
     cands = []
@@ -240,6 +265,10 @@ def espn_cup(lg, season):
             if (e.get('season') or {}).get('year') == season:
                 ev = fc.norm_event(e)
                 if ev:
+                    for c in ((e.get('competitions') or [{}])[0].get('competitors') or []):
+                        t = c.get('team') or {}
+                        side = 'home' if c.get('homeAway') == 'home' else 'away'
+                        ev[side]['color'] = (t.get('color'), t.get('alternateColor'))
                     out[ev['id']] = ev
     return [e for e in out.values() if e['done']]
 
@@ -261,7 +290,7 @@ def load(quick=False):
                 for side in ('home', 'away'):
                     s = e[side]
                     c = cup_teams.setdefault(s['id'], {'id': s['id'], 'names': set(), 'display': s['name'], 'short': s.get('short'),
-                                                       'abbr': s.get('abbr'), 'logo': s.get('logo')})
+                                                       'abbr': s.get('abbr'), 'logo': s.get('logo'), 'color': s.get('color')})
                     c['names'].update(n for n in (s['name'], s.get('short'), s.get('abbr')) if n)
 
     # 2) Ligen laden und jedes football-data-Team einer ESPN-ID zuordnen: über die ESPN-Tabelle (Name + Bilanz),
@@ -294,6 +323,13 @@ def load(quick=False):
         except Exception as e:
             log('  ESPN %s: %s' % (lg, e))
             emap = {}
+        try:
+            cols = espn_colors(lg)
+        except Exception as e:
+            log('  Farben %s: %s' % (lg, e))
+            cols = {}
+        for r in emap.values():
+            r['color'] = cols.get(r['id'])
         used = {r['id'] for r in emap.values()}
         names = {g['home'] for g in games} | {g['away'] for g in games}
         for n in sorted(names - set(emap)):  # Rest: Europapokal-Teams mit sehr ähnlichem Namen
@@ -301,7 +337,8 @@ def load(quick=False):
                        key=lambda bc: bc[0], default=(0, None))
             if best[0] >= 0.85:
                 c = best[1]
-                emap[n] = {'id': c['id'], 'names': sorted(c['names']), 'display': c['display'], 'short': c['short'], 'abbr': c['abbr'], 'logo': c['logo']}
+                emap[n] = {'id': c['id'], 'names': sorted(c['names']), 'display': c['display'], 'short': c['short'], 'abbr': c['abbr'],
+                           'logo': c['logo'], 'color': c.get('color')}
                 used.add(c['id'])
         cm = cmap.setdefault(country, {})
         for n, r in emap.items():
@@ -329,6 +366,8 @@ def build(data, now, upto=None):
             t['short'] = t['short'] or row['short']
             t['abbr'] = t['abbr'] or row['abbr']
             t['logo'] = t['logo'] or row['logo']
+            if row.get('color') and not t.get('color'):
+                t['color'] = pick_color(*row['color'])
         if logo and not t['logo']:
             t['logo'] = logo
         return t
@@ -367,7 +406,8 @@ def build(data, now, upto=None):
         for side in ('home', 'away'):
             s = e[side]
             c = data['cup_teams'][s['id']]
-            team(s['id'], s['name'], None, {'names': sorted(c['names']), 'display': c['display'], 'short': c['short'], 'abbr': c['abbr'], 'logo': c['logo']})
+            team(s['id'], s['name'], None, {'names': sorted(c['names']), 'display': c['display'], 'short': c['short'], 'abbr': c['abbr'],
+                                            'logo': c['logo'], 'color': c.get('color')})
         w = fc.W_EURO * fc.decay((now - dt).total_seconds() / 86400.0)
         obs.append((e['home']['id'], e['away']['id'], e['hs'], e['as'], w, e.get('neutral', False)))
     cups = sum(1 for dt, e in data['cup_events'] if not upto or dt < upto)
@@ -413,7 +453,7 @@ def main(quick=False):
         disp = t['display'] or (names[-1] if names else tid)
         teams.append({'id': tid, 'name': disp, 'short': t['short'] or None, 'abbr': t['abbr'] or None,
                       'alias': names[:10], 'lg': lg, 'att': round(fit['att'][tid], 4), 'def': round(fit['def'][tid], 4),
-                      'logo': t['logo'], 'n': round(t['w'], 1), 'grp': grp[root(tid)]})
+                      'logo': t['logo'], 'color': t.get('color'), 'n': round(t['w'], 1), 'grp': grp[root(tid)]})
     teams.sort(key=lambda x: -(x['att'] + x['def']))
     for L in leagues:
         gs = [t['grp'] for t in teams if t['lg'] == L['id']]

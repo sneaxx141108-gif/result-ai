@@ -41,6 +41,8 @@
     scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>',
     back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+    swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 20V4M4 8l4-4 4 4M16 4v16M12 16l4 4 4-4"/></svg>',
     target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
   };
   const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 18 18)">
@@ -76,6 +78,7 @@
   }
   function teamColor(name) {
     if (TEAMS[name]) return TEAMS[name][1];
+    if (REG[name] && REG[name].color) return REG[name].color;
     let h = 0;
     for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
     return hslHex(h % 360, 0.55, 0.42);
@@ -92,13 +95,25 @@
     return { h, a };
   }
   const logoUrl = (id, dark, px) => `https://a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/${dark ? '500-dark' : '500'}/${id}.png&w=${px}&h=${px}`;
+  // Teams aus den Stärken (selbst ausgewählte Spiele, Verlauf): Name -> Wappen-Adresse und Farbe
+  const REG = {};
+  function logoSrc(name, dark, px) {
+    if (TEAMS[name]) return logoUrl(TEAMS[name][0], dark, px);
+    const r = REG[name];
+    if (!r || !r.logo) return null;
+    const m = /\/i\/teamlogos\/soccer\/500\/(\d+)\.png/.exec(r.logo);
+    return m ? logoUrl(m[1], dark, px) : r.logo;
+  }
   function crest(name, s = 30, onPlate = false) {
-    const t = TEAMS[name];
     const c = teamColor(name);
-    if (t) return `<span class="crest" style="--s:${s}px"><img src="${logoUrl(t[0], isDark() && !onPlate, s > 44 ? 200 : 128)}" alt="" decoding="async" crossorigin="anonymous" data-fb="${esc(initials(name))}" data-c="${c}"></span>`;
+    const src = logoSrc(name, isDark() && !onPlate, s > 44 ? 200 : 128);
+    if (src) return `<span class="crest" style="--s:${s}px"><img src="${src}" alt="" decoding="async" crossorigin="anonymous" data-fb="${esc(initials(name))}" data-c="${c}"></span>`;
     return `<span class="crest fb" style="--s:${s}px;background:${c};color:${onColor(c)}" aria-hidden="true">${esc(initials(name))}</span>`;
   }
-  const plate = (name, p) => `<span class="plate" style="--p:${p}px">${crest(name, Math.round(p * 0.66), true)}</span>`;
+  const plate = (name, p, extra = '') => `<span class="plate" style="--p:${p}px">${crest(name, Math.round(p * 0.66), true)}${extra}</span>`;
+  // rote Karten: Kärtchen am Wappen und „zu zehnt“ im Untertitel
+  const redCards = (m, i) => { const n = (m.reds && m.reds[i]) || 0; return n ? `<span class="rcs" role="img" aria-label="${n} Rote Karte${n > 1 ? 'n' : ''}">${'<i></i>'.repeat(Math.min(n, 3))}</span>` : ''; };
+  const shortHanded = (m) => [0, 1].map((i) => { const n = (m.reds && m.reds[i]) || 0; return n ? ` · ${esc(i ? m.away : m.home)} zu ${['', 'zehnt', 'neunt', 'acht'][Math.min(n, 3)]}` : ''; }).join('');
   // Spiel-Karte: scharfer Schnitt zwischen den Vereinsfarben mit feiner heller Naht (wie eine TV-Grafik)
   const teamBg = (m) => {
     const h = teamColor(m.home);
@@ -127,7 +142,25 @@
     { home: 'Leipzig', away: 'Freiburg', lh: 1.7, la: 1.1 }, { home: 'Leverkusen', away: 'Stuttgart', lh: 1.9, la: 1.3 },
     { home: 'Bremen', away: 'Mainz', lh: 1.4, la: 1.3 }, { home: 'Union', away: 'HSV', lh: 1.3, la: 1.2 }] };
   MD.games.forEach((g, i) => Object.assign(g, { id: 'md-' + i, kind: 'pre', comp: 'Bundesliga', when: 'Sa., 15:30', fromMd: true }));
-  const findMatch = (id) => DEMO[id] || MD.games.find((g) => g.id === id) || (store.get('history', []).find((h) => h.id === id) || null);
+  // gespeicherte Wappen/Farben eines Spiels wieder anmelden (Verlauf nach dem Neustart der App)
+  const regTeams = (m) => { if (m && m.teams) Object.keys(m.teams).forEach((n) => { REG[n] = m.teams[n]; }); };
+  function findMatch(id) {
+    const m = DEMO[id] || MD.games.find((g) => g.id === id) || store.get('history', []).find((h) => h.id === id) || null;
+    regTeams(m);
+    return m;
+  }
+  // Verlauf: „Bundesliga · 1:0 in der 70. · heute, 14:05“
+  function agoText(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const now = new Date();
+    const y = new Date(now); y.setDate(now.getDate() - 1);
+    const hm = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === now.toDateString()) return `heute, ${hm}`;
+    if (d.toDateString() === y.toDateString()) return `gestern, ${hm}`;
+    return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+  }
+  const histSub = (h) => [h.comp, h.kind === 'live' && h.score ? `${h.score[0]}:${h.score[1]} in der ${h.minute}.` : h.kind === 'odds' ? 'Quoten' : 'vor dem Spiel', agoText(h.at)].filter(Boolean).join(' · ');
   const analyze = (m) => RE.analyze({ lh: m.lh, la: m.la, minute: m.minute, half: m.half, score: m.score, reds: m.reds, finished: m.finished });
   // die wahrscheinlichste der drei Möglichkeiten
   function lead(m, a) {
@@ -137,7 +170,7 @@
 
   // ------------------------------------------------------------------ Seiten
   const S = { stack: [], busy: false, pending: false, swipe: null, url: null, timers: [] };
-  const titleOf = (path) => (path === '/' ? '' : path === '/scan' ? 'Analyse' : path === '/md' ? 'Spieltag' : path === '/acc' ? 'Treffsicherheit' : 'Ergebnis');
+  const titleOf = (path) => (path === '/' ? '' : path === '/scan' ? 'Analyse' : path === '/md' ? 'Spieltag' : path === '/acc' ? 'Treffsicherheit' : path === '/pick' ? 'Spiel auswählen' : 'Ergebnis');
   function barHtml(path) {
     const root = path === '/';
     let tt = titleOf(path);
@@ -151,6 +184,7 @@
     if (path === '/scan') return vScan();
     if (path === '/md') return vMatchday();
     if (path === '/acc') return vAccuracy();
+    if (path === '/pick') return vPick();
     if (path.startsWith('/r/')) return vResult(decodeURIComponent(path.slice(3)));
     return vHome();
   }
@@ -176,12 +210,13 @@
         <div><h2>Spiel scannen</h2><p>Live-Spiel, Paarung, ganzer Spieltag oder Quoten – Result AI rechnet, wer gewinnt.</p></div>
         <div class="acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="pick" aria-label="Screenshot aus Fotos wählen"></label>
           <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="pick" aria-label="Foto mit der Kamera machen"></label></div></section>
+      <a class="card pickrow" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Teams aus 38 Ligen · ohne Screenshot</div></span><span class="chev">›</span></a>
       <section class="sec"><div class="sec-h"><h2>Beispiele</h2><span class="note">ausgedacht · echte Rechnung</span></div>
         <div class="ex-row">${card(DEMO.live)}${card(DEMO.pre)}${card(DEMO.odds)}${mdCard}</div></section>
       <section class="sec"><div class="sec-h"><h2>Treffsicherheit</h2></div>
-        <a class="group" href="#/acc"><div class="row"><span class="round">${I.target}</span><span class="grow"><div class="t">Wie oft lag Result AI richtig?</div><div class="s">${hist.length ? `${hist.length} Scans gespeichert` : 'Nur deine Scans · noch keine ausgewertet'}</div></span><span class="chev">›</span></div></a></section>
+        <a class="group" href="#/acc"><div class="row"><span class="round">${I.target}</span><span class="grow"><div class="t">Wie oft lag Result AI richtig?</div><div class="s">${hist.length ? `${hist.length} ${hist.length === 1 ? 'Prognose' : 'Prognosen'} gespeichert · noch keine ausgewertet` : 'Nur deine Scans · noch keine ausgewertet'}</div></span><span class="chev">›</span></div></a></section>
       <section class="sec"><div class="sec-h"><h2>Verlauf</h2></div>
-        ${hist.length ? `<div class="group">${hist.slice(0, 20).map((h) => `<a class="row" href="#/r/${esc(h.id)}">${crest(h.home)}<span class="grow"><div class="t">${esc(h.home)} – ${esc(h.away)}</div><div class="s">${esc(h.comp || '')}</div></span><span class="chev">›</span></a>`).join('')}</div>`
+        ${hist.length ? `<div class="group">${hist.slice(0, 20).map((h) => { regTeams(h); return `<a class="row" href="#/r/${esc(h.id)}"><span class="duo">${crest(h.home, 30, true)}${crest(h.away, 30, true)}</span><span class="grow"><div class="t">${esc(h.home)} – ${esc(h.away)}</div><div class="s">${esc(histSub(h))}</div></span><span class="chev">›</span></a>`; }).join('')}</div>`
         : '<div class="empty">Noch keine Scans. Sobald die KI angeschlossen ist, landet hier jede Analyse – und nach dem Spiel siehst du, ob Result AI richtig lag.</div>'}</section>
       <p class="foot">Vorschau-Version · Die KI zum Lesen der Screenshots wird gerade angeschlossen.</p>`;
   }
@@ -209,7 +244,7 @@
     at(2000, () => {
       $('.notice-slot', el).innerHTML = `<div class="notice"><b>Die KI wird gerade angeschlossen</b>
         <p>Dein Screenshot ist angekommen. Lesen kann Result AI ihn, sobald der Server mit der KI steht. Erfunden wird nichts – deshalb hier noch kein Ergebnis.</p>
-        <a class="btn" href="#/r/live">Beispiel ansehen</a><button class="btn soft" data-act="home">Zurück zum Start</button></div>`;
+        <a class="btn" href="#/pick">Spiel selbst auswählen</a><a class="btn soft" href="#/r/live">Beispiel ansehen</a></div>`;
     });
   }
 
@@ -221,7 +256,7 @@
     return `<span class="roll" aria-hidden="true">${ds.map((d, i) => `<span class="rc"><span class="rs" style="--to:${10 + +d};--dl:${(i * 0.1).toFixed(2)}s">${strip}</span></span>`).join('')}</span><span class="sr">${n} Prozent</span>`;
   }
   // großes Wappen als Wasserzeichen auf der Spiel-Karte
-  const wm = (name, side) => (TEAMS[name] ? `<span class="wm ${side}" aria-hidden="true"><img src="${logoUrl(TEAMS[name][0], false, 200)}" alt="" decoding="async" crossorigin="anonymous"></span>` : '');
+  const wm = (name, side) => { const src = logoSrc(name, false, 200); return src ? `<span class="wm ${side}" aria-hidden="true"><img src="${src}" alt="" decoding="async" crossorigin="anonymous"></span>` : ''; };
   const oneIn = (p) => { const n = Math.round(1 / Math.max(p, 1e-6)); return n <= 1 ? 'fast jedes Spiel' : `etwa jedes ${n}. Spiel`; };
   // kleine Dreier-Aufteilung mit Balken (Halbzeit, nächstes Tor)
   function mini(title, note, ps, c, names) {
@@ -246,15 +281,15 @@
       : favP > 0.7 ? ['Klarer Favorit', favCol, onColor(favCol)] : favP > 0.5 ? ['Favorit', favCol, onColor(favCol)] : ['Leicht vorne', favCol, onColor(favCol)];
     let out = `<div class="res"><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
       <div class="match-top">${live ? `<span class="chip live">LIVE ${m.minute}'</span>` : `<span class="chip glass">${m.kind === 'odds' ? 'Quoten' : 'Vor dem Spiel'}</span>`}<span class="chip glass">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
-      <div class="versus"><div class="side">${plate(m.home, 80)}<span class="nm">${esc(m.home)}</span></div>
+      <div class="versus"><div class="side">${plate(m.home, 80, redCards(m, 0))}<span class="nm">${esc(m.home)}</span></div>
         <div class="mid">${live ? `<div class="sc">${m.score[0]}:${m.score[1]}</div><div class="sub">${m.minute}. Minute</div>` : '<div class="vs">VS</div>'}</div>
-        <div class="side">${plate(m.away, 80)}<span class="nm">${esc(m.away)}</span></div></div></section>
+        <div class="side">${plate(m.away, 80, redCards(m, 1))}<span class="nm">${esc(m.away)}</span></div></div></section>
       <div class="cards" style="margin-top:14px">`;
 
     // 1) Prognose mit der großen Zahl
     out += `<section class="card prob big" style="--i:0"><div class="top"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
         <span class="badge" style="background:${badge[1]};color:${badge[2]}">${badge[0]}</span></div>
-      <div class="big-l">${esc(label)}</div><div class="big-s">${live ? `beim Stand von ${m.score[0]}:${m.score[1]} in der ${m.minute}. Minute` : 'vor dem Anpfiff'}</div>
+      <div class="big-l">${esc(label)}</div><div class="big-s">${live ? `beim Stand von ${m.score[0]}:${m.score[1]} in der ${m.minute}. Minute${shortHanded(m)}` : 'vor dem Anpfiff'}</div>
       <div class="split" role="img" aria-label="Sieg ${esc(m.home)} ${r[0]} Prozent, Remis ${r[1]} Prozent, Sieg ${esc(m.away)} ${r[2]} Prozent">
         <i style="flex:${a.probs.home};background:${c.h}"></i><i style="flex:${a.probs.draw};background:var(--draw)"></i><i style="flex:${a.probs.away};background:${c.a}"></i></div>
       <div class="legend3"><div class="it">${crest(m.home, 24)}<div class="tx"><b>${r[0]} %</b><span>${esc(m.home)}</span></div></div>
@@ -294,7 +329,7 @@
 
     // 8) Erklärung
     out += `<section class="card explain" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
-    out += `</div><p class="foot">${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
+    out += `</div><p class="foot">${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (38 Ligen + Europapokal).<br>` : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
     return out;
   }
   function heatmap(a, m, c) {
@@ -375,6 +410,168 @@
     return facts + ps.map((p) => `<p>${p}</p>`).join('');
   }
 
+  // ------------------------------------------------------------------ Team-Stärken von heute (scripts/ratings.py, jeden Morgen neu)
+  const R = { data: null, byId: {}, leagues: {}, loading: null };
+  const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, ' ').trim();
+  // deutsche Spitznamen und Schreibweisen -> ESPN-Team-ID bzw. englischer Name
+  const NICK = { bvb: '124', fcb: '132', 'fc bayern': '132', 'bayern munchen': '132', hsv: '127', b04: '131', rbl: '11420', svw: '137',
+    vfb: '134', 'fc koln': '122', koln: '122', effzeh: '122', sge: '125', gladbach: '268', bmg: '268', s04: '133', fck: '130', ksc: '4471',
+    tsg: '7911', fcu: '598', fca: '3841', scf: '126', wob: '138', m05: '2950', bsc: '129', fcn: '269', h96: '2428', fcsp: '270', svd: '3812', scp: '3307',
+    mailand: 'milan', 'inter mailand': 'internazionale', 'ac mailand': 'ac milan', turin: 'torino', rom: 'roma', neapel: 'napoli', lissabon: 'lisbon',
+    'paris saint germain': 'paris saint germain', psg: 'paris saint germain', 'real': 'real madrid', barca: 'barcelona', 'man utd': 'manchester united',
+    'man city': 'manchester city', 'atletico': 'atletico madrid', juve: 'juventus' };
+  // deutsche Anzeigenamen (wie bei kicker/Sportschau) – Schlüssel = Name in den Stärken (ESPN bzw. football-data)
+  const DE = { 'FC Cologne': 'Köln', 'Hamburg SV': 'Hamburger SV', 'Fortuna Dusseldorf': 'Fortuna Düsseldorf', 'SpVgg Greuther Fürth': 'Greuther Fürth',
+    'VfL Osnabruck': 'VfL Osnabrück', 'TSV Eintracht Braunschweig': 'Eintracht Braunschweig', 'Hertha Berlin': 'Hertha BSC',
+    'Rapid Vienna': 'Rapid Wien', 'Austria Vienna': 'Austria Wien', 'SC Rheindorf Altach': 'Altach', 'WSG Swarovski Tirol': 'WSG Tirol',
+    'BW Linz': 'Blau-Weiß Linz', 'SV Josko Ried': 'SV Ried', Wolfsberger: 'Wolfsberger AC', Zurich: 'FC Zürich', Sion: 'FC Sion',
+    Internazionale: 'Inter Mailand', 'AC Milan': 'AC Mailand', Napoli: 'SSC Neapel', 'AS Roma': 'AS Rom', Lazio: 'Lazio Rom', Torino: 'FC Turin',
+    Genoa: 'CFC Genua', Fiorentina: 'AC Florenz', 'Athletic Club': 'Athletic Bilbao', 'Real Betis': 'Betis Sevilla', Sevilla: 'FC Sevilla',
+    Barcelona: 'FC Barcelona', Valencia: 'FC Valencia', 'Sporting CP': 'Sporting Lissabon', Benfica: 'Benfica Lissabon', Braga: 'Sporting Braga',
+    'Club Brugge': 'FC Brügge', 'Union St.-Gilloise': 'Union Saint-Gilloise', 'F.C. København': 'FC Kopenhagen',
+    'Red Star Belgrade': 'Roter Stern Belgrad', 'Slavia Prague': 'Slavia Prag', 'Sparta Prague': 'Sparta Prag', 'Viktoria Plzen': 'Viktoria Pilsen',
+    'Dynamo Kyiv': 'Dynamo Kiew', 'Shakhtar Donetsk': 'Schachtar Donezk', 'Lech Poznan': 'Lech Posen', 'Legia Warsaw': 'Legia Warschau',
+    Ferencvaros: 'Ferencváros', Olympiacos: 'Olympiakos Piräus', 'AEK Athens': 'AEK Athen', Fenerbahce: 'Fenerbahçe', Besiktas: 'Beşiktaş',
+    'Istanbul Basaksehir': 'Başakşehir', Celtic: 'Celtic Glasgow', Rangers: 'Glasgow Rangers', Lyon: 'Olympique Lyon', Marseille: 'Olympique Marseille',
+    Nice: 'OGC Nizza', 'Stade Rennais': 'Stade Rennes', Strasbourg: 'Racing Straßburg', Lille: 'OSC Lille', Lens: 'RC Lens', Toulouse: 'FC Toulouse',
+    Brest: 'Stade Brest', 'Saint-Étienne': 'AS Saint-Étienne', 'Tottenham Hotspur': 'Tottenham', 'Wolverhampton Wanderers': 'Wolverhampton',
+    'Brighton & Hove Albion': 'Brighton', 'Spartak Moscow': 'Spartak Moskau', 'Lokomotiv Moscow': 'Lokomotive Moskau', 'Dinamo Moscow': 'Dynamo Moskau',
+    'CSKA Moscow': 'ZSKA Moskau', 'Rodina Moscow': 'Rodina Moskau', 'Zenit St Petersburg': 'Zenit St. Petersburg', 'Widzew Lodz': 'Widzew Łódź',
+    'Lechia Gdansk': 'Lechia Danzig', 'Slask Wroclaw': 'Śląsk Breslau', 'Wieczysta Krakow': 'Wieczysta Krakau', 'Sparta Rotterdam': 'Sparta Rotterdam',
+    'Metaloglobus Bucharest': 'Metaloglobus Bukarest' };
+  function loadRatings() {
+    if (R.data) return Promise.resolve(R.data);
+    if (!R.loading) {
+      R.loading = fetch('data/ratings.json', { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then((d) => {
+        d.teams.forEach((t) => { R.byId[t.id] = t; t._k = [DE[t.name], t.name, t.short, t.abbr].concat(t.alias || []).filter(Boolean).map(norm); });
+        (d.leagues || []).forEach((l) => { R.leagues[l.id] = l; });
+        R.data = d;
+        return d;
+      }).catch((e) => { R.loading = null; throw e; });
+    }
+    return R.loading;
+  }
+  // Anzeigename: deutsch, sonst der kurze Name – außer ESPN-Kürzeln wie „D Dresden“, „C Palace“ oder „Nottm Forest“
+  const tName = (t) => DE[t.name] || (t.short && !/^[A-Z] |Nottm/.test(t.short) ? t.short : t.name);
+  const lgName = (lg) => (R.leagues[lg] ? `${R.leagues[lg].name} · ${R.leagues[lg].country}` : 'Europapokal');
+  const reg = (t) => { REG[tName(t)] = { logo: t.logo, color: t.color }; return tName(t); };
+  // Suche: exakter Name > Anfang > alle Wörter enthalten; bei Gleichstand das Team mit mehr Spielen (größerer Verein)
+  function searchTeams(q, n) {
+    const raw = norm(q);
+    if (!raw || !R.data) return [];
+    const nick = NICK[raw];
+    const pinned = nick && R.byId[nick] ? R.byId[nick] : null; // Spitzname mit fester Team-ID (z. B. „BVB“) steht ganz oben
+    const k = nick && !pinned ? nick : raw;
+    const words = k.split(' ');
+    const hits = [];
+    for (const t of R.data.teams) {
+      if (t === pinned) continue;
+      let best = 0;
+      for (const a of t._k) {
+        if (a === k) best = Math.max(best, 100);
+        else if (a.startsWith(k)) best = Math.max(best, 80);
+        else if (words.every((w) => a.split(' ').some((x) => x.startsWith(w)))) best = Math.max(best, 60);
+        else if (k.length > 3 && a.includes(k)) best = Math.max(best, 40);
+      }
+      if (best) hits.push([best + Math.min(15, t.n / 6), t]);
+    }
+    const list = hits.sort((x, y) => (y[0] - x[0]) || (x[1].name < y[1].name ? -1 : 1)).map((x) => x[1]);
+    return (pinned ? [pinned].concat(list) : list).slice(0, n);
+  }
+  // zuletzt gewählte Teams (oben in der Suche, z. B. der eigene Verein)
+  const rememberTeam = (id) => store.set('recentTeams', [id].concat(store.get('recentTeams', []).filter((x) => x !== id)).slice(0, 6));
+
+  // ------------------------------------------------------------------ Spiel selbst auswählen (ohne Screenshot)
+  const P = { home: null, away: null, neutral: false, live: false, minute: 60, score: [0, 0], reds: [0, 0], msg: '' };
+  const fmtDay = (iso) => { const d = new Date(iso); return isNaN(d) ? 'heute' : d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }); };
+  function vPick() {
+    const d = R.data;
+    if (!d) return '<h1 class="ptitle">Spiel auswählen</h1><div class="empty" style="margin-top:18px">Die Team-Stärken werden geladen …</div>';
+    const slot = (side, label) => {
+      const t = P[side] && R.byId[P[side]];
+      return `<button class="slot ${t ? 'set' : ''}" data-act="slot" data-side="${side}">${t ? crest(reg(t), 46) : `<span class="slot-ph">${I.search}</span>`}
+        <span class="grow"><span class="slot-l">${label}</span><span class="slot-n">${t ? esc(tName(t)) : 'Team suchen'}</span>${t ? `<span class="slot-s">${esc(lgName(t.lg))}</span>` : ''}</span><span class="chev">›</span></button>`;
+    };
+    return `<h1 class="ptitle">Spiel auswählen</h1><p class="psub">Zwei Teams suchen – Result AI rechnet mit den Stärken von heute.</p>
+      <div class="card pick" style="margin-top:18px">${slot('home', 'Heim')}<div class="pick-vs"><span>gegen</span>${P.home || P.away ? `<button class="swap" data-act="swap" aria-label="Heim und Gast tauschen">${I.swap}</button>` : ''}</div>${slot('away', 'Gast')}</div>
+      <div class="card opts" style="margin-top:14px">
+        <label class="tgl"><span class="grow"><b>Neutraler Platz</b><small>z. B. ein Finale – ohne Heimvorteil</small></span><input type="checkbox" data-act="opt" data-k="neutral" ${P.neutral ? 'checked' : ''}><i></i></label>
+        <label class="tgl"><span class="grow"><b>Spiel läuft schon</b><small>Spielstand, Minute und rote Karten eingeben</small></span><input type="checkbox" data-act="opt" data-k="live" ${P.live ? 'checked' : ''}><i></i></label>
+        ${P.live ? liveInputs() : ''}</div>
+      ${P.msg ? `<div class="notice"><b>Das rechnet Result AI so nicht</b><p>${P.msg}</p></div>` : ''}
+      <div style="margin-top:16px"><button class="btn" data-act="calc" ${P.home && P.away ? '' : 'disabled'}>Prognose berechnen</button></div>
+      <p class="foot">Stärken vom ${esc(fmtDay(d.updatedAt))} · ${d.teams.length} Teams aus ${d.leagues.length} Ligen + Europapokal<br>Jeden Morgen neu gerechnet – am selben Tag immer dieselben Zahlen.</p>`;
+  }
+  const stepper = (k, i, v) => `<span class="stepper"><button data-act="step" data-k="${k}" data-i="${i}" data-d="-1" aria-label="weniger">−</button><b>${v}</b><button data-act="step" data-k="${k}" data-i="${i}" data-d="1" aria-label="mehr">+</button></span>`;
+  function liveInputs() {
+    const h = P.home && R.byId[P.home];
+    const a = P.away && R.byId[P.away];
+    return `<div class="live-in"><div class="li-row"><span>Minute</span><b class="li-min">${P.minute}'</b></div>
+      <input type="range" min="1" max="90" value="${P.minute}" data-act="minute" aria-label="Spielminute">
+      <div class="li-grid"><span></span><span class="li-h">${h ? esc(tName(h)) : 'Heim'}</span><span class="li-h">${a ? esc(tName(a)) : 'Gast'}</span>
+        <span>Tore</span>${stepper('score', 0, P.score[0])}${stepper('score', 1, P.score[1])}
+        <span>Rote Karten</span>${stepper('reds', 0, P.reds[0])}${stepper('reds', 1, P.reds[1])}</div></div>`;
+  }
+  function openSearch(side) {
+    if ($('.sheet')) return;
+    const sh = document.createElement('div');
+    sh.className = 'sheet';
+    sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel tall" role="dialog" aria-label="Team suchen"><div class="grip" data-grip></div>
+      <h2>${side === 'home' ? 'Heim-Team' : 'Gast-Team'}</h2>
+      <input class="search" type="search" placeholder="z. B. BVB, Arsenal, Flamengo …" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" data-act="search" data-side="${side}" aria-label="Team suchen">
+      <div class="results"></div></div>`;
+    document.body.appendChild(sh);
+    renderResults(sh, '');
+    $('input', sh).focus(); // noch im Antippen, sonst öffnet iOS die Tastatur nicht
+  }
+  function renderResults(sh, q) {
+    const side = $('input', sh).dataset.side;
+    const rows = (list) => `<div class="card flush">${list.map((t) => `<button class="row res-row" data-act="choose" data-id="${esc(t.id)}" data-side="${side}">${crest(reg(t), 34)}<span class="grow"><div class="t">${esc(tName(t))}</div><div class="s">${esc(lgName(t.lg))}</div></span></button>`).join('')}</div>`;
+    let html;
+    if (q.trim()) {
+      const list = searchTeams(q, 14);
+      html = list.length ? rows(list) : '<div class="empty">Kein Team gefunden. Versuch es mit einem anderen Namen – z. B. dem Ort.</div>';
+    } else {
+      const recent = store.get('recentTeams', []).map((id) => R.byId[id]).filter(Boolean);
+      const top = R.data.teams.filter((t) => t.grp === 0 && t.logo && !recent.includes(t)).slice(0, 12);
+      html = (recent.length ? `<div class="lab">ZULETZT GEWÄHLT</div>${rows(recent)}<div class="lab" style="margin-top:22px">BELIEBT</div>` : '<div class="lab">BELIEBT</div>') + rows(top);
+    }
+    $('.results', sh).innerHTML = html;
+  }
+  function calcPick() {
+    const h = R.byId[P.home];
+    const a = R.byId[P.away];
+    if (!h || !a) return;
+    if (h.id === a.id) { P.msg = 'Bitte zwei verschiedene Teams wählen.'; redrawTop(); return; }
+    if (h.grp !== a.grp) {
+      P.msg = `${esc(tName(h))} und ${esc(tName(a))} spielen in Ligen, die nie über gemeinsame Gegner verbunden waren (z. B. Europa und Südamerika). Die Zahlen wären geraten. Solche Spiele rechnet Result AI später über den Screenshot-Scan – mit den Quoten der Buchmacher.`;
+      redrawTop();
+      return;
+    }
+    P.msg = '';
+    const md = R.data.model;
+    const day = String(R.data.updatedAt).slice(0, 10);
+    const id = ['p', h.id, a.id, P.neutral ? 'n' : 'h', P.live ? `${P.minute}-${P.score.join('-')}-${P.reds.join('-')}` : 'vor', day].join('_');
+    const sameLg = h.lg && h.lg === a.lg;
+    const m = { id, kind: P.live ? 'live' : 'pre', src: 'ratings', day, at: Date.now(),
+      comp: sameLg ? R.leagues[h.lg].name : 'Selbst ausgewählt', when: P.neutral ? 'neutraler Platz' : sameLg ? 'selbst ausgewählt' : '',
+      home: reg(h), away: reg(a), teams: { [tName(h)]: { logo: h.logo, color: h.color }, [tName(a)]: { logo: a.logo, color: a.color } },
+      lh: Math.exp(md.mu + (P.neutral ? 0 : md.h) + h.att - a.def), la: Math.exp(md.mu + a.att - h.def) };
+    if (P.live) Object.assign(m, { minute: P.minute, half: P.minute > 45 ? 2 : 1, score: P.score.slice(), reds: P.reds.slice() });
+    const hist = store.get('history', []).filter((x) => x.id !== id);
+    hist.unshift(m);
+    store.set('history', hist.slice(0, 50));
+    location.hash = '#/r/' + encodeURIComponent(id);
+  }
+  // oberste Seite neu zeichnen (z. B. nach einer Eingabe), Scrollstand bleibt
+  function redrawTop() {
+    const p = S.stack[S.stack.length - 1];
+    if (!p) return;
+    const y = p.el.scrollTop;
+    p.el.innerHTML = barHtml(p.path) + `<div class="wrap">${viewHtml(p.path)}</div>`;
+    p.el.scrollTop = y;
+  }
+
   // ------------------------------------------------------------------ Spieltag
   function vMatchday() {
     return `<h1 class="ptitle">Ganzer Spieltag</h1><p class="psub">${esc(MD.comp)}</p>
@@ -445,6 +642,7 @@
       if (lg) lg.classList.add('intro');
     }
     if (p.path === '/scan') runScan(p.el);
+    if (p.path === '/pick' && !R.data) loadRatings().then(() => { if (S.stack[S.stack.length - 1] === p) redrawTop(); }).catch(() => {});
     if (p.path.startsWith('/r/')) reveal(p.el);
   }
   // Ergebnis-Auftritt: Karte → Zahl rollt → Balken → Liste (einmalig)
@@ -669,6 +867,16 @@
     else if (act === 'home') goHome();
     else if (act === 'settings') openSettings();
     else if (act === 'close') closeSheet();
+    else if (act === 'slot') openSearch(a.dataset.side);
+    else if (act === 'choose') { P[a.dataset.side] = a.dataset.id; P.msg = ''; rememberTeam(a.dataset.id); closeSheet(); redrawTop(); }
+    else if (act === 'step') {
+      const k = a.dataset.k;
+      const i = +a.dataset.i;
+      P[k][i] = Math.max(0, Math.min(k === 'reds' ? 3 : 15, P[k][i] + +a.dataset.d));
+      redrawTop();
+    }
+    else if (act === 'calc') calcPick();
+    else if (act === 'swap') { [P.home, P.away] = [P.away, P.home]; P.score.reverse(); P.reds.reverse(); P.msg = ''; redrawTop(); }
     else if (act === 'theme') {
       const seg = a.closest('.seg');
       if (seg.dataset.v === a.dataset.val) return;
@@ -679,6 +887,9 @@
     }
   });
   document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.dataset && t.dataset.act === 'opt') { P[t.dataset.k] = t.checked; P.msg = ''; redrawTop(); return; }
+    if (t.dataset && t.dataset.act === 'minute') { P.minute = +t.value; redrawTop(); return; }
     const inp = e.target.closest('[data-act="pick"]');
     if (!inp || !inp.files || !inp.files[0]) return;
     if (S.url) URL.revokeObjectURL(S.url);
@@ -687,9 +898,16 @@
     location.hash = '#/scan';
   });
 
+  document.addEventListener('input', (e) => {
+    const t = e.target;
+    if (!t.dataset) return;
+    if (t.dataset.act === 'search') renderResults(t.closest('.sheet'), t.value);
+    else if (t.dataset.act === 'minute') { const b = $('.li-min', t.closest('.live-in')); if (b) b.textContent = t.value + "'"; }
+  });
+
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel aus der BVB-App); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = 'a.gcard, a.group, a.row, .btn, .round, .sbtn, .seg button';
+    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };
@@ -717,6 +935,8 @@
     navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !S.swReload) { S.swReload = true; location.reload(); } });
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+
+  setTimeout(() => loadRatings().catch(() => {}), 1200);
 
   // ------------------------------------------------------------------ Start: Startseite unten im Stapel; Direktlink obendrauf
   applyTheme(store.get('theme', 'light'));

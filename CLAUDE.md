@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v6`).
+  hochzählen (zuletzt `ra-shell-v7`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -179,10 +179,26 @@ Design, Übergänge, Animationen.
 - **Inseln (`grp`):** Teams sind nur vergleichbar, wenn sie über Spiele verbunden sind. Gruppe 0 = alle 31 europäischen Ligen
   (über den Europapokal verbunden); Argentinien, MLS, Brasilien, Japan, Mexiko, Russland, China sind eigene Gruppen.
   **Spiele zwischen Gruppen nicht aus den Stärken rechnen** → Quoten bzw. KI-Recherche (ehrlich „k. A.“, wenn nichts da).
-- Tor-Erwartung (App, noch einzubauen): `exp(mu + h + att[heim] - def[gast])` bzw. `exp(mu + att[gast] - def[heim])`
-  (`h` = 0 bei neutralem Platz). Danach rechnet `web/engine.js` wie gehabt.
-- Noch offen: Rechner in die App einbauen (Name aus dem Screenshot → Team → Tor-Erwartung; Stärken × `SPREAD` sind in
-  `ratings.json` schon eingerechnet), weitere Ligen/Länderspiele, Wappen für FIN/IRL/POL/ROU/SUI.
+- Tor-Erwartung (in der App eingebaut, `calcPick`): `exp(mu + h + att[heim] - def[gast])` bzw. `exp(mu + att[gast] - def[heim])`
+  (`h` = 0 bei neutralem Platz; Stärken × `SPREAD` sind in `ratings.json` schon eingerechnet). Danach rechnet `web/engine.js`.
+- Vereinsfarben kommen aus ESPN (`/teams` je Liga, `pick_color`: Weiß/Hellgrau übersprungen) → `color` (652 von 773 Teams).
+- Noch offen: Name aus dem Screenshot → Team (KI-Scan, `searchTeams`), weitere Ligen/Länderspiele, Wappen für
+  FIN/IRL/POL/ROU/SUI.
+
+### Spiel selbst auswählen (04.11.2026, abends – Niklas: „mach noch was“)
+
+- Startseite → **„Spiel selbst auswählen“** (`#/pick`, `vPick` in `web/app.js`): Heim und Gast über eine Team-Suche wählen
+  (Blatt mit Suchfeld, „Zuletzt gewählt“ + „Beliebt“), Tauschen-Knopf, **Neutraler Platz**, **Spiel läuft schon** (Minute per
+  Regler, Tore und rote Karten per +/−). „Prognose berechnen“ rechnet mit den Stärken von heute und öffnet die normale
+  Ergebnis-Seite; das Spiel landet im Verlauf (mit Wappen/Farben in `teams`, damit es nach dem Neustart gleich aussieht).
+  Gleiche Eingaben am selben Tag = gleiche ID (`p_<heim>_<gast>_<h|n>_<vor|min-stand-rot>_<tag>`) = gleiche Zahlen.
+- **Suche** (`searchTeams`): ohne Akzente/Groß-Klein, Spitznamen in `NICK` (BVB, FCB, S04, HSV, SGE, Effzeh …, Wert = ESPN-ID → steht ganz oben), deutsche Anzeigenamen in
+  `DE` (Köln, Inter Mailand, Roter Stern Belgrad, Rapid Wien … – Schlüssel = Name in `ratings.json`); ESPN-Kürzel wie
+  „D Dresden“ werden durch den vollen Namen ersetzt (`tName`). Wappen/Farben fremder Teams laufen über `REG` + `logoSrc`.
+- **Ehrlich:** Teams aus verschiedenen Inseln (`grp`, z. B. Flamengo gegen Bayern) werden nicht gerechnet – Hinweis statt
+  geratener Zahlen. Rote Karten stehen als Kärtchen am Wappen und als „Bayern zu zehnt“ im Untertitel.
+- Die Stärken lädt die App 1,2 s nach dem Start im Hintergrund (`loadRatings`), der Service Worker holt `/data/` immer zuerst
+  frisch aus dem Netz.
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 
@@ -214,7 +230,7 @@ Design, Übergänge, Animationen.
 ### Danach (Reihenfolge)
 
 1. Niklas: Cloudflare-Konto anlegen; Gemini-Schlüssel aus AI Studio bereithalten (alter Schlüssel), ggf. neuen Groq-Schlüssel.
-2. **Täglicher Stärken-Rechner** mit 30+ Ligen + Backtest.
+2. ~~Täglicher Stärken-Rechner mit 30+ Ligen + Backtest~~ – erledigt, in der App als „Spiel selbst auswählen“.
 3. **Cloudflare Worker:** Scan (Gemini Vision), Internet-Recherche, Cache, Einladungscode, Schutz vor Überlastung.
 4. **App komplett:** echter Scan-Ablauf, Verlauf & Treffsicherheit mit echten Ergebnissen, Live mitrechnen.
 5. **Test auf Niklas' iPhone 12**, Feinschliff, Freunde einladen.
