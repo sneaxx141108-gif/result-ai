@@ -44,6 +44,9 @@
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
     swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 20V4M4 8l4-4 4 4M16 4v16M12 16l4 4 4-4"/></svg>',
     target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
+    home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>',
+    flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.6 3.2 5.5 5.6 5.5 10.6A5.5 5.5 0 0 1 12 19.1a5.5 5.5 0 0 1-5.5-5.5c0-2.6 1.4-4.3 2.6-5.4.2 1.9 1 3 2.1 3.4C11 8.6 10.6 5.6 12 3z"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   };
   const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 18 18)">
     <circle class="ring-a" cx="18" cy="18" r="13" pathLength="100" stroke="var(--text)" stroke-dasharray="44 56"/>
@@ -145,6 +148,7 @@
   // gespeicherte Wappen/Farben eines Spiels wieder anmelden (Verlauf nach dem Neustart der App)
   const regTeams = (m) => { if (m && m.teams) Object.keys(m.teams).forEach((n) => { REG[n] = m.teams[n]; }); };
   function findMatch(id) {
+    if (id.startsWith('t_')) return tipMatchById(id);
     const m = DEMO[id] || MD.games.find((g) => g.id === id) || store.get('history', []).find((h) => h.id === id) || null;
     regTeams(m);
     return m;
@@ -160,6 +164,7 @@
     if (d.toDateString() === y.toDateString()) return `gestern, ${hm}`;
     return d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
   }
+  const histRow = (h) => { regTeams(h); return `<a class="row" href="#/r/${esc(h.id)}"><span class="duo">${crest(h.home, 30, true)}${crest(h.away, 30, true)}</span><span class="grow"><div class="t">${esc(h.home)} – ${esc(h.away)}</div><div class="s">${esc(histSub(h))}</div></span><span class="chev">›</span></a>`; };
   const histSub = (h) => [h.comp, h.kind === 'live' && h.score ? `${h.score[0]}:${h.score[1]} in der ${h.minute}.` : h.kind === 'odds' ? 'Quoten' : 'vor dem Spiel', agoText(h.at)].filter(Boolean).join(' · ');
   const analyze = (m) => RE.analyze({ lh: m.lh, la: m.la, minute: m.minute, half: m.half, score: m.score, reds: m.reds, finished: m.finished });
   // die wahrscheinlichste der drei Möglichkeiten
@@ -169,14 +174,18 @@
   }
 
   // ------------------------------------------------------------------ Seiten
-  const S = { stack: [], busy: false, pending: false, swipe: null, url: null, timers: [] };
-  const titleOf = (path) => (path === '/' ? '' : path === '/scan' ? 'Analyse' : path === '/md' ? 'Spieltag' : path === '/acc' ? 'Treffsicherheit' : path === '/pick' ? 'Spiel auswählen' : 'Ergebnis');
+  const S = { stack: [], busy: false, pending: false, swipe: null, url: null, timers: [], tabScroll: {} };
+  // Leiste unten: vier Bereiche mit eigener Startseite (wie die Tab-Leiste einer iPhone-App)
+  const TABS = [['/', 'Start', 'home'], ['/tips', 'Top-Tipps', 'flame'], ['/pick', 'Auswählen', 'search'], ['/hist', 'Verlauf', 'clock']];
+  const isTab = (p) => TABS.some((t) => t[0] === p);
+  const TITLES = { '/': '', '/scan': 'Analyse', '/md': 'Spieltag', '/acc': 'Treffsicherheit', '/pick': 'Spiel auswählen', '/tips': 'Top-Tipps', '/hist': 'Verlauf' };
+  const titleOf = (path) => (path in TITLES ? TITLES[path] : 'Ergebnis');
   function barHtml(path) {
-    const root = path === '/';
     let tt = titleOf(path);
     if (path.startsWith('/r/')) { const m = findMatch(decodeURIComponent(path.slice(3))); if (m) tt = `${m.home} – ${m.away}`; }
-    return `<header class="bar">${root ? `<span class="brand">${logo('intro-logo')}<span>Result AI</span></span>`
-      : `<button class="round" data-act="back" aria-label="Zurück">${I.back}</button>`}<span class="tt">${esc(tt)}</span>
+    const lead = path === '/' ? `<span class="brand">${logo('intro-logo')}<span>Result AI</span></span>`
+      : isTab(path) ? '' : `<button class="round" data-act="back" aria-label="Zurück">${I.back}</button>`;
+    return `<header class="bar">${lead}<span class="tt">${esc(tt)}</span>
       <span class="end"><button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span></header>`;
   }
   function viewHtml(path) {
@@ -185,6 +194,8 @@
     if (path === '/md') return vMatchday();
     if (path === '/acc') return vAccuracy();
     if (path === '/pick') return vPick();
+    if (path === '/tips') return vTips();
+    if (path === '/hist') return vHist();
     if (path.startsWith('/r/')) return vResult(decodeURIComponent(path.slice(3)));
     return vHome();
   }
@@ -211,13 +222,12 @@
         <div class="acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="pick" aria-label="Screenshot aus Fotos wählen"></label>
           <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="pick" aria-label="Foto mit der Kamera machen"></label></div></section>
       <a class="card pickrow" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Teams aus 38 Ligen · ohne Screenshot</div></span><span class="chev">›</span></a>
+      <section class="sec"><div class="sec-h"><h2>Top-Tipps</h2><button class="note link" data-act="tab" data-tab="/tips">Alle ›</button></div><div class="tips-prev">${tipsPreview()}</div></section>
       <section class="sec"><div class="sec-h"><h2>Beispiele</h2><span class="note">ausgedacht · echte Rechnung</span></div>
         <div class="ex-row">${card(DEMO.live)}${card(DEMO.pre)}${card(DEMO.odds)}${mdCard}</div></section>
-      <section class="sec"><div class="sec-h"><h2>Treffsicherheit</h2></div>
-        <a class="group" href="#/acc"><div class="row"><span class="round">${I.target}</span><span class="grow"><div class="t">Wie oft lag Result AI richtig?</div><div class="s">${hist.length ? `${hist.length} ${hist.length === 1 ? 'Prognose' : 'Prognosen'} gespeichert · noch keine ausgewertet` : 'Nur deine Scans · noch keine ausgewertet'}</div></span><span class="chev">›</span></div></a></section>
-      <section class="sec"><div class="sec-h"><h2>Verlauf</h2></div>
-        ${hist.length ? `<div class="group">${hist.slice(0, 20).map((h) => { regTeams(h); return `<a class="row" href="#/r/${esc(h.id)}"><span class="duo">${crest(h.home, 30, true)}${crest(h.away, 30, true)}</span><span class="grow"><div class="t">${esc(h.home)} – ${esc(h.away)}</div><div class="s">${esc(histSub(h))}</div></span><span class="chev">›</span></a>`; }).join('')}</div>`
-        : '<div class="empty">Noch keine Scans. Sobald die KI angeschlossen ist, landet hier jede Analyse – und nach dem Spiel siehst du, ob Result AI richtig lag.</div>'}</section>
+      <section class="sec"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="note link" data-act="tab" data-tab="/hist">Alle ›</button>' : ''}</div>
+        ${hist.length ? `<div class="group">${hist.slice(0, 3).map(histRow).join('')}</div>`
+        : '<div class="empty">Noch keine Prognosen. Wähl ein Spiel aus oder scanne einen Screenshot – alles landet hier.</div>'}</section>
       <p class="foot">Vorschau-Version · Die KI zum Lesen der Screenshots wird gerade angeschlossen.</p>`;
   }
 
@@ -296,6 +306,9 @@
         <div class="it"><span class="dot">X</span><div class="tx"><b>${r[1]} %</b><span>Remis</span></div></div>
         <div class="it"><div class="tx"><b>${r[2]} %</b><span>${esc(m.away)}</span></div>${crest(m.away, 24)}</div></div></section>`;
 
+    // 1b) Top-Tipps zu diesem Spiel (man kommt ja über einen Tipp hierher)
+    if (m.src === 'tips') out += tipsForGame(m, 1);
+
     // 2) Wahrscheinlichstes Ergebnis als Anzeigetafel, darunter die nächsten
     const t0 = a.top[0];
     const sCol = (s) => (s.h > s.a ? c.h : s.h < s.a ? c.a : 'var(--draw)');
@@ -329,7 +342,7 @@
 
     // 8) Erklärung
     out += `<section class="card explain" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
-    out += `</div><p class="foot">${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (38 Ligen + Europapokal).<br>` : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
+    out += `</div><p class="foot">${m.src === 'tips' ? 'Chancen aus den Buchmacher-Quoten (DraftKings über ESPN), Tore zusätzlich mit Result AI · jede Stunde neu gesucht.<br>' : ''}${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (38 Ligen + Europapokal).<br>` : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
     return out;
   }
   function heatmap(a, m, c) {
@@ -385,12 +398,16 @@
   function oddsBlock(m, a, i) {
     const q = RE.fromOdds(m.odds);
     const mk = RE.analyze({ lh: q.lh, la: q.la });
-    const row = (l, x, y) => `<div class="cmp-row"><span>${l}</span><span class="v">${pct0(x)}</span><span class="v">${pct0(y)}</span></div>`;
+    // Result AI = eigene Rechnung aus den Team-Stärken; bei Top-Tipps steht die Ergebnis-Seite selbst auf den Quoten
+    const own = m.model ? RE.analyze({ lh: m.model.lh, la: m.model.la }) : m.src === 'tips' ? null : a;
+    const v = (x) => (x == null ? '–' : pct0(x));
+    const ov = (r) => { const o = r && r.over.find((x) => x.line === 2.5); return o ? o.over : null; };
+    const row = (l, x, y) => `<div class="cmp-row"><span>${l}</span><span class="v">${v(x)}</span><span class="v">${v(y)}</span></div>`;
     return `<section class="card" style="--i:${i}"><div class="card-h"><h3>Markt vs. Result AI</h3><span class="note">${nf2.format(m.odds.home)} · ${nf2.format(m.odds.draw)} · ${nf2.format(m.odds.away)}</span></div>
       <div class="cmp-row h"><span>Ausgang</span><span class="v">Markt</span><span class="v">Result AI</span></div>
-      ${row(`Sieg ${esc(m.home)}`, q.market.home, a.probs.home)}${row('Remis', q.market.draw, a.probs.draw)}${row(`Sieg ${esc(m.away)}`, q.market.away, a.probs.away)}
-      ${row('Über 2,5 Tore', mk.over.find((o) => o.line === 2.5).over, a.over.find((o) => o.line === 2.5).over)}
-      <p class="muted" style="font-size:13px;margin-top:10px">Markt = aus den Quoten, ohne die Marge der Buchmacher (${nf1.format(q.market.margin * 100)} %). Result AI = eigene Rechnung aus den Team-Stärken.</p></section>`;
+      ${row(`Sieg ${esc(m.home)}`, q.market.home, own && own.probs.home)}${row('Remis', q.market.draw, own && own.probs.draw)}${row(`Sieg ${esc(m.away)}`, q.market.away, own && own.probs.away)}
+      ${row('Über 2,5 Tore', ov(mk), ov(own))}
+      <p class="muted" style="font-size:13px;margin-top:10px">Markt = aus den Quoten, ohne die Marge der Buchmacher (${nf1.format(q.market.margin * 100)} %). Result AI = eigene Rechnung aus den Team-Stärken${own ? '' : ' – für dieses Spiel zu wenig Daten'}.</p></section>`;
   }
   function explain(m, a) {
     const xg = (v) => nf1.format(v);
@@ -571,12 +588,184 @@
     location.hash = '#/r/' + encodeURIComponent(id);
   }
   // oberste Seite neu zeichnen (z. B. nach einer Eingabe), Scrollstand bleibt
-  function redrawTop() {
-    const p = S.stack[S.stack.length - 1];
-    if (!p) return;
+  function redrawTop() { redrawPage(S.stack[S.stack.length - 1]); }
+  function redrawPage(p) {
+    if (!p || !p.el.isConnected) return;
     const y = p.el.scrollTop;
     p.el.innerHTML = barHtml(p.path) + `<div class="wrap">${viewHtml(p.path)}</div>`;
+    p.drawn = { tips: T.at, ratings: !!R.data, err: T.err };
     p.el.scrollTop = y;
+  }
+
+  // ------------------------------------------------------------------ Top-Tipps (scripts/tips.py sucht jede Stunde neu)
+  // Chance = aus den Buchmacher-Quoten (Backtest: am genauesten), Tore zusätzlich mit Result AI; „≈“ = geschätzte Quote.
+  const T = { data: null, loading: null, at: 0, err: false, list: 'safe', day: 'all', seen: {} };
+  function loadTips(maxAge) {
+    if (T.data && Date.now() - T.at < (maxAge == null ? 10 * 60e3 : maxAge)) return Promise.resolve(T.data);
+    if (!T.loading) {
+      T.loading = fetch('data/tips.json', { cache: 'no-cache' })
+        .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then((d) => { T.data = d; T.at = Date.now(); T.err = false; return d; })
+        .catch((e) => { T.err = true; throw e; })
+        .finally(() => { T.loading = null; });
+    }
+    return T.loading;
+  }
+  // Team eines Tipps: deutscher Name aus den Stärken (falls bekannt), Wappen/Farbe von ESPN
+  function tipTeam(t) {
+    const r = R.byId[t.id];
+    const name = r ? tName(r) : DE[t.name] || (t.short && !/^[A-Z] |Nottm/.test(t.short) ? t.short : t.name);
+    if (!REG[name] || !REG[name].logo) REG[name] = { logo: t.logo || (r && r.logo) || null, color: t.color || (r && r.color) || null };
+    return name;
+  }
+  function tipLabel(code, h, a) {
+    if (/^[OU]\d\d$/.test(code)) return `${code[0] === 'O' ? 'Über' : 'Unter'} ${code[1]},${code[2]} Tore`;
+    return { H: `Sieg ${h}`, D: 'Unentschieden', A: `Sieg ${a}`, HD: `${h} oder Remis`, DA: `${a} oder Remis`, HA: 'Kein Unentschieden',
+      BY: 'Beide Teams treffen', BN: 'Nicht beide treffen', HS: `${h} trifft`, AS: `${a} trifft` }[code] || code;
+  }
+  const tipKind = (code) => (['H', 'D', 'A'].includes(code) ? 'Sieg' : ['HD', 'DA', 'HA'].includes(code) ? 'Doppelchance'
+    : /^[OU]/.test(code) ? 'Tore' : code[0] === 'B' ? 'Beide treffen' : 'Team trifft');
+  const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = (iso) => Math.round((dayStart(new Date(iso)) - dayStart(new Date())) / 864e5);
+  function kickoff(iso) {
+    const d = new Date(iso);
+    const hm = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    const k = dayDiff(iso);
+    return k === 0 ? `Heute, ${hm}` : k === 1 ? `Morgen, ${hm}` : `${['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'][d.getDay()]}, ${hm}`;
+  }
+  const dayKey = (iso) => String(dayDiff(iso));
+  const dayLabel = (k) => (k === '0' ? 'Heute' : k === '1' ? 'Morgen' : new Date(dayStart(new Date()) + (+k) * 864e5 + 432e5).toLocaleDateString('de-DE', { weekday: 'long' }));
+  const upcoming = (t) => T.data && T.data.games[t.g] && new Date(T.data.games[t.g].t).getTime() > Date.now();
+  const qTxt = (t) => `${t.real ? '' : '≈'}${nf2.format(t.q)}`;
+  const ring = (p) => `<span class="ring" role="img" aria-label="Chance ${Math.round(p * 100)} Prozent"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bgc" cx="18" cy="18" r="15.5" pathLength="100"/><circle class="fgc" cx="18" cy="18" r="15.5" pathLength="100" stroke-dasharray="${(p * 100).toFixed(1)} 100"/></svg><b>${Math.round(p * 100)}<small>%</small></b></span>`;
+
+  // Spiel eines Tipps als Ergebnis-Seite (Quoten-Spiel): Tor-Erwartung aus den Quoten, Result AI als zweite Meinung
+  function tipMatchById(id) {
+    if (T.seen[id]) return T.seen[id];
+    const g = T.data && T.data.games[id.slice(2)];
+    if (!g) return null;
+    const o = g.odds || {};
+    let odds = null;
+    if (o.H && o.D && o.A) {
+      odds = { home: o.H, draw: o.D, away: o.A };
+      const k = g.line ? String(Math.round(g.line * 10)) : '';
+      if (k && o['O' + k] && o['U' + k]) Object.assign(odds, { line: g.line, over: o['O' + k], under: o['U' + k] });
+    }
+    const m = { id, kind: odds ? 'odds' : 'pre', src: 'tips', comp: g.comp, when: kickoff(g.t), home: tipTeam(g.home), away: tipTeam(g.away),
+      lh: g.lh, la: g.la, odds, model: g.mlh ? { lh: g.mlh, la: g.mla } : null, gid: g.id };
+    T.seen[id] = m;
+    return m;
+  }
+  // „Tipps zu diesem Spiel“ auf der Ergebnis-Seite
+  function tipsForGame(m, i) {
+    if (!T.data) return '';
+    const seen = new Set();
+    const list = [['safe', 'Sicher'], ['top', 'Top-Quote']].flatMap(([k, l]) => T.data[k].filter((t) => t.g === m.gid).map((t) => [t, l]))
+      .filter(([t]) => !seen.has(t.m) && seen.add(t.m));
+    if (!list.length) return '';
+    return `<section class="card" style="--i:${i}"><div class="card-h"><h3>Top-Tipps zu diesem Spiel</h3><span class="note">jede Stunde neu</span></div>
+      ${list.map(([t, l]) => `<div class="tg-row"><span class="grow"><span class="k">${l} · ${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, m.home, m.away))}</b></span>${ring(t.p)}<span class="tg-q"><span>Quote</span><b>${qTxt(t)}</b></span></div>`).join('')}</section>`;
+  }
+
+  function tipCard(t, i, list) {
+    const g = T.data.games[t.g];
+    const h = tipTeam(g.home);
+    const a = tipTeam(g.away);
+    return `<a class="tcard ${list}" href="#/r/t_${esc(g.id)}" style="--i:${Math.min(i, 8)}">
+      <div class="tc-top"><span class="tc-comp">${esc(g.comp)}</span><span class="tc-time">${esc(kickoff(g.t))}</span></div>
+      <div class="tc-main"><div class="tc-teams"><span class="tm">${crest(h, 24)}<span>${esc(h)}</span></span><span class="tm">${crest(a, 24)}<span>${esc(a)}</span></span></div>${ring(t.p)}</div>
+      <div class="tc-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="tc-q"><span class="k">Quote</span><b>${qTxt(t)}</b></div></div>
+      <div class="tc-foot"><span>Buchmacher ${Math.round(t.p * 100)} %</span><span>${t.pm != null ? `Result AI ${Math.round(t.pm * 100)} %` : 'Result AI: zu wenig Daten'}</span></div></a>`;
+  }
+  function kombisHtml(d) {
+    const all = d.top.concat(d.safe);
+    const cards = d.kombis.map((k) => {
+      const legs = k.legs.map((l) => all.find((t) => t.g === l.g && t.m === l.m));
+      if (!legs.length || !legs.every((t) => t && upcoming(t))) return ''; // ein Spiel läuft schon → nicht mehr spielbar
+      return `<section class="kombi ${k.kind}"><div class="k-head"><div><span class="k-eb">${esc(k.name)}</span><h3>${legs.length} Tipps auf einem Schein</h3></div>
+          <div class="k-q"><span>Gesamtquote</span><b>${nf2.format(k.q)}</b></div></div>
+        <div class="k-legs">${legs.map((t) => {
+          const g = d.games[t.g];
+          const h = tipTeam(g.home);
+          const a = tipTeam(g.away);
+          return `<a class="k-leg" href="#/r/t_${esc(g.id)}"><span class="duo">${crest(h, 26, true)}${crest(a, 26, true)}</span><span class="grow"><b>${esc(tipLabel(t.m, h, a))}</b><span>${esc(h)} – ${esc(a)} · ${esc(kickoff(g.t))}</span></span><span class="k-lp"><b>${Math.round(t.p * 100)} %</b><span>${qTxt(t)}</span></span></a>`;
+        }).join('')}</div>
+        <div class="k-foot"><span>Chance, dass alle aufgehen</span><b>${pct0(k.p)}</b></div></section>`;
+    }).join('');
+    return '<p class="tl-note">Kombi = mehrere Tipps auf einem Schein: Die Quoten werden malgenommen – aber jeder einzelne Tipp muss aufgehen.</p>'
+      + (cards || '<div class="empty" style="margin-top:14px">Gerade keine Kombi – die nächste Suche läuft in spätestens einer Stunde.</div>');
+  }
+  function tipsBody() {
+    const d = T.data;
+    if (T.list === 'kombi') return kombisHtml(d);
+    const all = d[T.list].filter(upcoming);
+    const days = [...new Set(all.map((t) => dayKey(d.games[t.g].t)))].sort((x, y) => x - y);
+    if (T.day !== 'all' && !days.includes(T.day)) T.day = 'all';
+    const shown = T.day === 'all' ? all : all.filter((t) => dayKey(d.games[t.g].t) === T.day);
+    const chips = days.length > 1 ? `<div class="chips">${['all'].concat(days).map((x) => `<button class="${T.day === x ? 'on' : ''}" data-act="tday" data-val="${x}">${x === 'all' ? 'Alle' : dayLabel(x)}</button>`).join('')}</div>` : '';
+    const note = T.list === 'safe' ? 'Chance ab 70 % bei einer Quote ab 1,20 – oben steht, worin sich Buchmacher und Result AI am einigsten sind.'
+      : 'Quote ab 1,60 bei über 50 % Chance – die beste Mischung aus Quote und Chance.';
+    return chips + `<p class="tl-note">${note}</p>` + (shown.length ? `<div class="tlist">${shown.slice(0, 25).map((t, i) => tipCard(t, i, T.list)).join('')}</div>`
+      : '<div class="empty" style="margin-top:14px">Gerade keine passenden Tipps – die nächste Suche läuft in spätestens einer Stunde.</div>');
+  }
+  function recordHtml(d) {
+    const r = d.record || {};
+    const line = (key, label) => {
+      const x = (r[key] || {})['30'] || { n: 0 };
+      return x.n ? `<div class="rec-row"><span class="rl">${label}</span><b>${x.won} von ${x.n} richtig</b><span class="rp">${pct0(x.won / x.n)}<small>erwartet ${pct0(x.exp / x.n)}</small></span></div>`
+        : `<div class="rec-row"><span class="rl">${label}</span><span class="muted">noch keine beendeten Spiele</span></div>`;
+    };
+    const recent = (d.recent || []).slice(0, 8).map((e) => {
+      const h = tipTeam({ id: e.hid, name: e.home });
+      const a = tipTeam({ id: e.aid, name: e.away });
+      return `<div class="rec-it ${e.res.won ? 'won' : 'lost'}"><span class="mk">${e.res.won ? '✓' : '✗'}</span><span class="grow"><b>${esc(tipLabel(e.m, h, a))}</b><span>${esc(h)} ${e.res.hs}:${e.res.as} ${esc(a)}</span></span><span class="rp2">${pct0(e.p)}</span></div>`;
+    }).join('');
+    return `<section class="sec"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="card rec">${line('safe', 'Sicher')}${line('top', 'Top-Quote')}
+      ${recent ? `<div class="rec-list">${recent}</div>` : '<p class="muted rec-empty">Läuft seit dem 5. November: Jeder angezeigte Tipp wird festgehalten und nach dem Spiel ehrlich ausgewertet – auch die, die danebengehen.</p>'}</div></section>`;
+  }
+  function vTips() {
+    const head = '<h1 class="ptitle">Top-Tipps</h1><p class="psub">Jede Stunde neu gesucht in über 40 Ligen und Pokalen – die Wetten mit der besten Chance.</p>';
+    const d = T.data;
+    if (!d) return head + `<div class="empty" style="margin-top:18px">${T.err ? 'Die Tipps konnten gerade nicht geladen werden – prüf die Verbindung.' : 'Die Tipps werden geladen …'}</div>`;
+    const tabs = [['safe', 'Sicher'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
+    const k = Math.max(0, tabs.findIndex((x) => x[0] === T.list));
+    const upd = new Date(d.updatedAt);
+    return head + `<div class="seg s3" style="--k:${k};margin-top:18px"><span class="ind"></span>${tabs.map(([v, l]) => `<button class="${T.list === v ? 'on' : ''}" data-act="tlist" data-val="${v}">${l}</button>`).join('')}</div>
+      <div class="tips-body">${tipsBody()}</div>${recordHtml(d)}
+      <p class="foot">Gesucht ${esc(isNaN(upd) ? '' : (dayDiff(d.updatedAt) === 0 ? 'heute' : 'am ' + upd.toLocaleDateString('de-DE')) + ' um ' + upd.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))} · ${esc(d.source)}<br>
+      Chance aus den Quoten der Buchmacher (ohne ihre Marge), Tore zusätzlich mit Result AI. „≈“ = geschätzte Quote, beim Buchmacher kann sie etwas abweichen.<br>
+      Keine Garantie: Auch ein Tipp mit 80 % geht etwa jedes 5. Mal schief. Wetten erst ab 18 · Glücksspiel kann süchtig machen – Hilfe gibt es bei check-dein-spiel.de oder kostenlos unter 0800 1 37 27 00 (BZgA).</p>`;
+  }
+  // Startseite: die drei sichersten Tipps
+  function tipsPreview() {
+    if (!T.data) return `<div class="empty">${T.err ? 'Die Tipps sind gerade nicht erreichbar.' : 'Die Top-Tipps werden geladen …'}</div>`;
+    const list = T.data.safe.filter(upcoming).slice(0, 3);
+    if (!list.length) return '<div class="empty">Gerade keine Tipps – die nächste Suche läuft in spätestens einer Stunde.</div>';
+    return `<div class="group">${list.map((t) => {
+      const g = T.data.games[t.g];
+      const h = tipTeam(g.home);
+      const a = tipTeam(g.away);
+      return `<a class="row tmini" href="#/r/t_${esc(g.id)}"><span class="duo">${crest(h, 30, true)}${crest(a, 30, true)}</span><span class="grow"><div class="t">${esc(tipLabel(t.m, h, a))}</div><div class="s">${esc(h)} – ${esc(a)} · ${esc(kickoff(g.t))}</div></span><span class="pq"><b>${Math.round(t.p * 100)} %</b><span>${qTxt(t)}</span></span></a>`;
+    }).join('')}</div>`;
+  }
+  // Tipps (und Namen aus den Stärken) frisch holen; Seite nur neu zeichnen, wenn sich etwas geändert hat
+  function freshTips(p, maxAge) {
+    Promise.all([loadTips(maxAge), loadRatings().catch(() => {})]).catch(() => {}).then(() => {
+      if (!p.el.isConnected) return;
+      const now = { tips: T.at, ratings: !!R.data, err: T.err };
+      if (p.drawn && p.drawn.tips === now.tips && p.drawn.ratings === now.ratings && p.drawn.err === now.err) return;
+      if (p.path.startsWith('/r/') && p.drawn && p.drawn.tips) return; // Ergebnis-Seite steht schon
+      if (p.path === '/') { $$('.tips-prev', p.el).forEach((x) => { x.innerHTML = tipsPreview(); }); p.drawn = now; } else redrawPage(p);
+    });
+  }
+
+  // ------------------------------------------------------------------ Verlauf (eigener Bereich in der Leiste unten)
+  function vHist() {
+    const hist = store.get('history', []);
+    return `<h1 class="ptitle">Verlauf</h1><p class="psub">Alle deine Prognosen – nur auf diesem Handy gespeichert.</p>
+      <div class="group" style="margin-top:18px"><a class="row" href="#/acc"><span class="round">${I.target}</span><span class="grow"><div class="t">Wie oft lag Result AI richtig?</div><div class="s">${hist.length ? `${hist.length} ${hist.length === 1 ? 'Prognose' : 'Prognosen'} gespeichert · noch keine ausgewertet` : 'Nur deine Prognosen · noch keine ausgewertet'}</div></span><span class="chev">›</span></a></div>
+      <section class="sec"><div class="sec-h"><h2>Deine Prognosen</h2>${hist.length ? `<span class="note">${hist.length}</span>` : ''}</div>
+        ${hist.length ? `<div class="group">${hist.map(histRow).join('')}</div>` : '<div class="empty">Noch keine Prognosen. Wähl ein Spiel aus oder scanne einen Screenshot – alles landet hier.</div>'}</section>`;
   }
 
   // ------------------------------------------------------------------ Spieltag
@@ -613,6 +802,31 @@
   const stackEl = document.createElement('div');
   stackEl.className = 'stack';
   document.body.appendChild(stackEl);
+  const tabbar = document.createElement('nav');
+  tabbar.className = 'tabbar';
+  tabbar.setAttribute('aria-label', 'Bereiche');
+  tabbar.innerHTML = '<span class="tab-ind" aria-hidden="true"></span>' + TABS.map(([p, label, ic]) => `<button data-act="tab" data-tab="${p}"><span class="ti">${I[ic]}</span><span class="tl">${label}</span></button>`).join('');
+  document.body.appendChild(tabbar);
+  function syncTabs() {
+    const root = S.stack[0] ? S.stack[0].path : '/';
+    const i = Math.max(0, TABS.findIndex((t) => t[0] === root));
+    tabbar.style.setProperty('--i', i);
+    $$('button', tabbar).forEach((b, k) => { b.classList.toggle('on', k === i); if (k === i) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  }
+  // Bereich wechseln: ohne Schieben (wie bei iPhone-Apps), der Scrollstand je Bereich bleibt
+  function switchTab(path) {
+    const root = S.stack[0];
+    if (root) S.tabScroll[root.path] = root.el.scrollTop;
+    S.stack.forEach((p) => p.el.remove());
+    $$('.shade', stackEl).forEach((x) => x.remove());
+    const p = makePage(path);
+    stackEl.appendChild(p.el);
+    S.stack = [p];
+    p.el.scrollTop = S.tabScroll[path] || 0;
+    syncTabs();
+    if (!reduce) p.el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+    afterShow(p, false);
+  }
   const curPath = () => (location.hash || '#/').slice(1) || '/';
   const shadeMax = () => (isDark() ? 0.5 : 0.12);
   const SLIDE = { duration: 440, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'both' };
@@ -638,7 +852,7 @@
     el.className = 'page';
     el.innerHTML = barHtml(path) + `<div class="wrap">${viewHtml(path)}</div>`;
     el.addEventListener('scroll', onPageScroll, { passive: true });
-    return { path, el, shown: false };
+    return { path, el, shown: false, drawn: { tips: T.at, ratings: !!R.data, err: T.err } };
   }
   function afterShow(p, first) {
     if (p.shown) return;
@@ -650,6 +864,7 @@
     }
     if (p.path === '/scan') runScan(p.el);
     if (p.path === '/pick' && !R.data) loadRatings().then(() => { if (S.stack[S.stack.length - 1] === p) redrawTop(); }).catch(() => {});
+    if (p.path === '/' || p.path === '/tips' || p.path.startsWith('/r/t_')) freshTips(p);
     if (p.path.startsWith('/r/')) reveal(p.el);
   }
   // Ergebnis-Auftritt: Karte → Zahl rollt → Balken → Liste (einmalig)
@@ -724,7 +939,8 @@
     if (S.busy) { S.pending = true; return; }
     const path = curPath();
     const top = S.stack[S.stack.length - 1];
-    if (!top || top.path !== path) {
+    if (isTab(path) && S.stack[0] && S.stack[0].path !== path) switchTab(path);
+    else if (!top || top.path !== path) {
       const idx = S.stack.findIndex((p) => p.path === path);
       if (idx >= 0) await popTo(idx); else await push(path);
     }
@@ -883,6 +1099,24 @@
       redrawTop();
     }
     else if (act === 'calc') calcPick();
+    else if (act === 'tab') {
+      const to = a.dataset.tab;
+      if (S.stack[0] && S.stack[0].path === to) {
+        if (S.stack.length > 1) goHome(); // nochmal tippen: zurück zur Startseite des Bereichs
+        else S.stack[0].el.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+      } else location.replace('#' + to);
+    }
+    else if (act === 'tlist' || act === 'tday') {
+      if (act === 'tlist') {
+        const seg = a.closest('.seg');
+        seg.style.setProperty('--k', $$('button', seg).indexOf(a));
+        $$('button', seg).forEach((b) => b.classList.toggle('on', b === a));
+        T.list = a.dataset.val;
+        T.day = 'all';
+      } else T.day = a.dataset.val;
+      const body = $('.tips-body', a.closest('.page'));
+      if (body) body.innerHTML = tipsBody();
+    }
     else if (act === 'swap') { [P.home, P.away] = [P.away, P.home]; P.score.reverse(); P.reds.reverse(); P.msg = ''; redrawTop(); }
     else if (act === 'theme') {
       const seg = a.closest('.seg');
@@ -914,7 +1148,7 @@
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel aus der BVB-App); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap';
+    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };
@@ -948,10 +1182,11 @@
   // ------------------------------------------------------------------ Start: Startseite unten im Stapel; Direktlink obendrauf
   applyTheme(store.get('theme', 'light'));
   const start = curPath();
-  const home = makePage('/');
+  const home = makePage(isTab(start) ? start : '/');
   stackEl.appendChild(home.el);
   S.stack.push(home);
-  if (start !== '/') {
+  syncTabs();
+  if (!isTab(start)) {
     // damit „Zurück“ auch nach einem Direktlink zur Startseite führt
     history.replaceState(null, '', '#/');
     history.pushState(null, '', '#' + start);
@@ -963,4 +1198,10 @@
   } else {
     afterShow(home, true);
   }
+  // zurück aus dem Hintergrund: neueste Tipp-Suche holen (läuft jede Stunde)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    const root = S.stack[0];
+    if (root && S.stack.length === 1 && (root.path === '/' || root.path === '/tips')) freshTips(root, 5 * 60e3);
+  });
 })();

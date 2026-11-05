@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v8`).
+  hochzählen (zuletzt `ra-shell-v9`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -215,6 +215,37 @@ Design, Übergänge, Animationen.
   geratener Zahlen. Rote Karten stehen als Kärtchen am Wappen und als „Bayern zu zehnt“ im Untertitel.
 - Die Stärken lädt die App 1,2 s nach dem Start im Hintergrund (`loadRatings`), der Service Worker holt `/data/` immer zuerst
   frisch aus dem Netz.
+
+### Top-Tipps + Leiste unten (05.11.2026 – Niklas: „top quoten mit hoher gewinn warscheinlichkeit … die KI soll immer neu suchen“)
+
+- **Leiste unten** (schwebende Kapsel wie iOS 26, ohne Glas-Unschärfe): Start · Top-Tipps · Auswählen · Verlauf (`TABS`).
+  Bereichswechsel per `location.replace` → `switchTab` (ohne Schieben, Scrollstand je Bereich bleibt); Detailseiten schieben
+  sich wie gehabt von rechts herein; nochmal auf den aktiven Bereich tippen = zurück zu dessen Startseite bzw. nach oben.
+  Startseite: Scan, „Spiel selbst auswählen“, **Top-Tipps (die 3 sichersten)**, Beispiele, „Zuletzt“ (3). Verlauf + Treffsicherheit
+  wohnen jetzt im Bereich „Verlauf“ (`vHist`).
+- **`scripts/tips.py`** (ohne KI, nur Mathe) läuft **jede Stunde** (`.github/workflows/tips.yml`, Cron `17 * * * *`, gleiche
+  Concurrency-Gruppe wie der Stärken-Rechner): holt pro Liga/Pokal den Monats-Spielplan von ESPN (`scoreboard?dates=JJJJMM`,
+  ~50 Abrufe), nimmt alle Spiele der nächsten 4 Tage **mit Quoten (DraftKings)** → `web/data/tips.json`.
+- **Woher die Chance kommt** (Backtest 05.11.2026, 1.398/2.229 Spiele): wer gewinnt **nur aus den Quoten** (Result AI
+  beimischen machte es in jedem Test schlechter: 1X2-Log-Loss 0,9651 → 0,9846), Tore aus der Über/Unter-Quote, sonst aus
+  Result AI. Result AI steht als zweite Meinung dabei – nur wenn beide Teams genug Liga-Spiele haben (`n ≥ 5`; Teams, die
+  nur aus dem Europapokal bekannt sind, gaben absurde Werte, z. B. 5,8 Tore bei Torreense–Ararat).
+- **Wetten:** Sieg/Remis/Niederlage, Doppelchance, Über/Unter 1,5/2,5/3,5, beide treffen ja/nein, Heim/Gast trifft. Echte Quoten
+  gibt es nur für 1X2 und die Über/Unter-Linie des Buchmachers; sonst **„≈“ = geschätzte Quote** (faire Quote − 6 % Marge).
+- **Listen** (je Spiel höchstens ein Tipp): **Sicher** = Chance ≥ 70 %, Quote ≥ 1,20, gereiht nach Buchmacher-Chance + ¼ Abstand
+  zu Result AI (max. ±8 Punkte; ohne das stünden lauter Tipps genau an der Grenze, weil die geschätzte Quote an der Chance hängt).
+  **Top-Quote** = Quote ≥ 1,60 bei Chance ≥ 50 %, gereiht nach vorsichtigerer Chance × Quote. **Kombis**: „Sichere Kombi“
+  (bis 3 Tipps, Gesamtchance ≥ 45 %) und „Top-Kombi“ (bis 3, ≥ 30 %), bevorzugt Spiele der nächsten 36 Stunden.
+- **Ehrlich:** Buchmacher rechnen ihre Marge ein – kein Tipp ist ein sicherer Gewinn; die App sagt das, dazu „18+ · Glücksspiel
+  kann süchtig machen · check-dein-spiel.de · BZgA 0800 1 37 27 00“. Keine Links zu Buchmachern.
+- **Bilanz:** jeder angezeigte Tipp (Sicher/Top-Quote) wird bis zum Anpfiff in `web/data/tips_log.json` festgehalten, danach
+  mit dem Endstand ausgewertet (45 Tage); die Seite zeigt „x von y richtig · erwartet z %“ und die letzten Ergebnisse ✓/✗.
+- Prüfung vor jedem Speichern/Veröffentlichen: `node tests/tips.test.js`. Tipp-Spiele öffnen die normale Ergebnis-Seite
+  (`#/r/t_<ESPN-ID>`, Tor-Erwartung aus den Quoten, „Top-Tipps zu diesem Spiel“, „Markt vs. Result AI“ mit dem Modell).
+- **Reihenfolge laut Niklas (05.11.2026):** 1. Top-Tipps (erledigt) → 2. **Design maxen überall, auch auf der neuen Seite**
+  (Apple-Übergänge: Karte wächst in die Seite, Kopf schrumpft beim Scrollen; Ergebnis-Seite edler: Vereinsfarben-Glow,
+  Sprung-Leiste, schönere Grafiken; Scan-Animation; Stil „mehr Farbe & Glow“) → 3. **Vereine & Wappen fixen** (falsche Ligen,
+  fehlende Wappen; Teams nur aus dem Europapokal brauchen ihre Ligen, z. B. Tschechien, Ukraine, Serbien, Kroatien).
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 
