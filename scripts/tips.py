@@ -164,7 +164,7 @@ def main():
     rd = json.load(open(RATINGS, encoding='utf-8'))
     teams = {t['id']: t for t in rd['teams']}
     md = rd['model']
-    names = {L['id']: L['name'] for L in rd['leagues']}
+    names = {L['id']: L['name'] for L in rd['leagues'] if L.get('src') != 'fotmob'}  # FotMob-Ligen hat ESPN nicht
     names.update(CUPS)
 
     games, cands, results = {}, [], {}

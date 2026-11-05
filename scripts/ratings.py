@@ -22,6 +22,7 @@ import sys
 import time
 import unicodedata
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -36,6 +37,10 @@ fc.W_MARKET = 8.0
 fc.TAU = 1.5
 fc.HALF_LIFE = 120.0
 SPREAD = 1.25
+# Liga-Niveau (05.11.2026): Stärke = Niveau der Liga + Abweichung des Teams (fc.fit_ratings_lg). Backtest: Europapokal-Spiele
+# (Ligen gegeneinander) Log-Loss 0,9810 → 0,9578 (28 Tage) bzw. 0,9954 → 0,9888 (56 Tage), Liga-Spiele 0,9848 → 0,9837;
+# wie stark das Liga-Niveau zur Mitte gezogen wird (TAU_L 0,3 bis 3), war fast egal.
+TAU_L = 1.0
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'web', 'data', 'ratings.json')
@@ -68,6 +73,22 @@ NEW = {  # eine Datei mit allen Jahren /new/<Kürzel>.csv – Ergebnisse + Schlu
     'SWZ': ('sui.1', 'Super League', 'Schweiz'), 'USA': ('usa.1', 'MLS', 'USA'),
 }
 CUPS = {'uefa.champions': 'Champions League', 'uefa.europa': 'Europa League', 'uefa.europa.conf': 'Conference League'}
+# Ligen, die weder football-data noch ESPN haben – die Heimat vieler Europapokal-Teams (Sparta Prag, Dinamo Zagreb, Roter Stern …).
+# Quelle FotMob: normale Seiten sind laut robots.txt erlaubt (nur /api ist gesperrt), Daten aus __NEXT_DATA__ wie in der BVB-App.
+# FotMob-Liga-ID -> (Kürzel, Name, Land); aktuelle Saison + Vorsaison, nur Ergebnisse (kein xG, keine Quoten).
+FM = 'https://www.fotmob.com'
+FM_LOGO = 'https://images.fotmob.com/image_resources/logo/teamlogo/%s.png'
+FM_LEAGUES = {
+    122: ('cze.1', '1. Liga', 'Tschechien'), 441: ('ukr.1', 'Premjer-Liha', 'Ukraine'), 182: ('srb.1', 'Superliga', 'Serbien'),
+    252: ('cro.1', 'HNL', 'Kroatien'), 212: ('hun.1', 'NB I', 'Ungarn'), 270: ('bul.1', 'Parwa Liga', 'Bulgarien'),
+    136: ('cyp.1', '1. Division', 'Zypern'), 127: ('isr.1', "Ligat ha'Al", 'Israel'), 176: ('svk.1', 'Niké liga', 'Slowakei'),
+    173: ('svn.1', 'Prva Liga', 'Slowenien'), 225: ('kaz.1', 'Premjer-Liga', 'Kasachstan'), 262: ('aze.1', 'Premyer Liqa', 'Aserbaidschan'),
+    267: ('bih.1', 'Premijer Liga', 'Bosnien'), 118: ('arm.1', 'Premier League', 'Armenien'), 439: ('geo.1', 'Erovnuli Liga', 'Georgien'),
+    260: ('alb.1', 'Kategoria Superiore', 'Albanien'), 226: ('lva.1', 'Virslīga', 'Lettland'), 228: ('ltu.1', 'A Lyga', 'Litauen'),
+    185: ('por.2', 'Liga Portugal 2', 'Portugal'),
+}
+# football-data-Ligen, für die ESPN keine Wappen hat: Wappen + Vereinsfarbe von FotMob (gleiche Vereine, nur Bild und Farbe)
+FM_CRESTS = {196: 'Polen', 51: 'Finnland', 126: 'Irland', 189: 'Rumänien'}
 QUICK = {'D1', 'E0', 'BRA'}
 
 # football-data-Kurznamen, die sich nicht von selbst den ESPN-Namen zuordnen lassen (aus der BVB-App)
@@ -78,7 +99,9 @@ FD_ALIAS = {'Paris SG': 'Paris Saint-Germain', "Nott'm Forest": 'Nottingham Fore
             'Sociedad': 'Real Sociedad', 'Betis': 'Real Betis', 'Celta': 'Celta Vigo', 'Espanol': 'Espanyol',
             'Wolves': 'Wolverhampton Wanderers', 'Olympiakos': 'Olympiacos', 'St. Gilloise': 'Union St.-Gilloise',
             'Buyuksehyr': 'Istanbul Basaksehir', 'For Sittard': 'Fortuna Sittard', 'Nijmegen': 'NEC',
-            'Guimaraes': 'Vitoria Guimaraes', 'Verona': 'Hellas Verona', 'Hamburg': 'Hamburger SV'}
+            'Guimaraes': 'Vitoria Guimaraes', 'Verona': 'Hellas Verona', 'Hamburg': 'Hamburger SV',
+            'FK Crvena Zvezda': 'Red Star Belgrade', 'Crvena Zvezda': 'Red Star Belgrade', 'Plzen': 'Viktoria Plzen',
+            'Hapoel Beer Sheva': "Hapoel Be'er Sheva", 'Ararat Armenia': 'Ararat-Armenia'}
 GENERIC = {'fc', 'sc', 'sv', 'cf', 'ac', 'as', 'afc', 'club', 'de', 'the', '1', 'fk', 'sk', 'bk', 'if', 'ss', 'cd', 'ca', 'cs',
            'calcio', 'football', 'futbol', 'borussia', 'real', 'sporting', 'olympique', 'stade', 'ssc', 'vfb', 'vfl', 'united', 'city'}
 
@@ -292,6 +315,78 @@ def espn_cup(lg, season):
     return [e for e in out.values() if e['done']]
 
 
+def fm_page(league_id, season=None):
+    """FotMob-Ligaseite (erlaubte Seite, kein /api) -> pageProps aus __NEXT_DATA__."""
+    url = '%s/leagues/%d/overview/x%s' % (FM, league_id, '?season=' + urllib.parse.quote(season, safe='') if season else '')
+    m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', get(url, timeout=45), re.S)
+    if not m:
+        raise RuntimeError('FotMob %d: keine Daten auf der Seite' % league_id)
+    return json.loads(m.group(1))['props']['pageProps']
+
+
+def fm_colors(pp):
+    """Vereinsfarben einer FotMob-Seite (stecken bei Teams und Spielern als teamColors) -> {Team-ID: '#RRGGBB'}."""
+    out = {}
+
+    def walk(o):
+        if isinstance(o, dict):
+            tc = o.get('teamColors')
+            tid = o.get('teamId') or o.get('id')
+            if isinstance(tc, dict) and tid and re.match(r'^#[0-9A-Fa-f]{6}$', str(tc.get('lightMode') or '')):
+                out.setdefault(str(tid), tc['lightMode'])
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk(pp)
+    return out
+
+
+def fm_teams(pp):
+    """Teams einer FotMob-Ligaseite: {ID: Name}."""
+    return {str(t['id']): t.get('name') for t in ((pp.get('fixtures') or {}).get('fixtureInfo') or {}).get('teams') or [] if t.get('id')}
+
+
+def fm_league(league_id):
+    """Spiele einer FotMob-Liga (aktuelle Saison + Vorsaison, im Zeitfenster) im Format von league_games, dazu
+    Teams {ID: {'name','short'}} und Farben."""
+    pp = fm_page(league_id)
+    pages = [pp]
+    seasons = pp.get('allAvailableSeasons') or []
+    if len(seasons) > 1:
+        try:
+            time.sleep(0.4)
+            pages.append(fm_page(league_id, seasons[1]))
+        except Exception as e:  # Vorsaison ist nur eine Zugabe
+            log('  FotMob %d Vorsaison: %s' % (league_id, e))
+    teams, colors, games, seen_ids = {}, {}, [], set()
+    for p in pages:
+        for k, v in fm_colors(p).items():
+            colors.setdefault(k, v)
+        season = (p.get('details') or {}).get('selectedSeason') or ''
+        for m in ((p.get('fixtures') or {}).get('allMatches') or []):
+            st = m.get('status') or {}
+            h, a = m.get('home') or {}, m.get('away') or {}
+            if not st.get('utcTime') or st.get('cancelled') or st.get('awarded') or m.get('id') in seen_ids or not h.get('name') or not a.get('name'):
+                continue
+            seen_ids.add(m.get('id'))
+            t = datetime.fromisoformat(str(st['utcTime']).replace('Z', '+00:00'))
+            if t < NOW - timedelta(days=WINDOW_DAYS):
+                continue
+            for x in (h, a):
+                e = teams.setdefault(str(x.get('id')), {'name': x['name'], 'short': None})
+                e['short'] = e['short'] or (x.get('shortName') if x.get('shortName') != x['name'] else None)
+            hg = ag = None
+            if st.get('finished'):
+                sc = re.match(r'\s*(\d+)\s*-\s*(\d+)', st.get('scoreStr') or '')
+                if not sc:
+                    continue
+                hg, ag = int(sc.group(1)), int(sc.group(2))
+            games.append({'t': t, 'home': h['name'], 'away': a['name'], 'hg': hg, 'ag': ag, 'hx': None, 'ax': None, 'odds': None, 'season': season})
+    return games, teams, colors
+
+
 # ---------------------------------------------------------------- Rechnen
 def load(quick=False):
     """Lädt Europapokal und alle Ligen und ordnet die Teams zu (dauert ~1 Minute)."""
@@ -371,6 +466,45 @@ def load(quick=False):
         loaded.append((code, lg, lname, country, games, stats))
         time.sleep(0.3)
 
+    # 1c) Ligen von FotMob (Heimat der Europapokal-Teams aus Tschechien, Kroatien, Serbien …): Europapokal-Teams behalten
+    #     ihre ESPN-ID (gleicher Name, sehr ähnlich), alle anderen bekommen eine FotMob-ID samt Wappen und Farbe
+    for fid, (lg, lname, country) in ({} if quick else FM_LEAGUES).items():
+        try:
+            games, fteams, colors = fm_league(fid)
+        except Exception as e:
+            log('  FotMob %s (%s): %s' % (lname, country, e))
+            continue
+        if not games:
+            continue
+        cm = cmap.setdefault(country, {})
+        taken = {r['id'] for c2 in cmap.values() for r in c2.values()}
+        for tid, t in sorted(fteams.items()):
+            if t['name'] in cm:
+                continue
+            best = max(((name_sim(t['name'], c['names'], c.get('abbr')), c) for c in cup_teams.values() if c['id'] not in taken),
+                       key=lambda bc: bc[0], default=(0, None))
+            col = colors.get(tid)
+            if best[0] >= 0.85:
+                c = best[1]
+                cm[t['name']] = {'id': c['id'], 'names': sorted(set(c['names']) | {t['name']}), 'display': c['display'], 'short': c['short'],
+                                 'abbr': c['abbr'], 'logo': c['logo'], 'color': c.get('color') or ((col[1:], None) if col else None)}
+                taken.add(c['id'])
+            else:
+                cm[t['name']] = {'id': 'fm:%s' % tid, 'names': [n for n in (t['name'], t['short']) if n], 'display': t['name'], 'short': t['short'],
+                                 'abbr': None, 'logo': FM_LOGO % tid, 'color': (col[1:], None) if col else None}
+        cur_season = max((g['season'] for g in games), default='')
+        stats = {}
+        for g in games:
+            if g['season'] == cur_season and g['hg'] is not None:
+                for n, gf, ga in ((g['home'], g['hg'], g['ag']), (g['away'], g['ag'], g['hg'])):
+                    st = stats.setdefault(n, [0, 0, 0])
+                    st[0] += 1
+                    st[1] += gf
+                    st[2] += ga
+        loaded.append(('FM%d' % fid, lg, lname, country, games, stats))
+        log('  FotMob %-20s %s: %d Spiele, %d Teams' % (lname, country, sum(1 for g in games if g['hg'] is not None), len(fteams)))
+        time.sleep(0.4)
+
     # 2b) Rest über die Europapokal-Teams: nur volle Namen (Kürzel wie „HAM“ passen zu vielen), jede ESPN-ID nur einmal
     used = {r['id'] for cm in cmap.values() for r in cm.values()}
     for country, span in seen.items():
@@ -384,6 +518,28 @@ def load(quick=False):
                          'logo': c['logo'], 'color': c.get('color')}
                 used.add(c['id'])
                 log('  %s: „%s“ = %s (über den Europapokal)' % (country, n, c['display']))
+    # 2b') Wappen + Farben von FotMob für football-data-Teams, die ESPN nicht kennt (nur aktuelle Teams der Liga)
+    for fid, country in ({} if quick else FM_CRESTS).items():
+        try:
+            pp = fm_page(fid)
+        except Exception as e:
+            log('  FotMob-Wappen %s: %s' % (country, e))
+            continue
+        cm = cmap.setdefault(country, {})
+        span = seen.get(country, {})
+        colors = fm_colors(pp)
+        cands = sorted(((name_sim(n, [fn]), n, tid, fn) for n in span if n not in cm for tid, fn in fm_teams(pp).items() if fn), reverse=True)
+        taken = set()
+        for sc, n, tid, fn in cands:
+            if sc < 0.75 or n in cm or tid in taken:
+                continue
+            col = colors.get(tid)
+            cm[n] = {'id': 'fd:%s:%s' % (country, n), 'names': [n, fn], 'display': fn, 'short': None, 'abbr': None,
+                     'logo': FM_LOGO % tid, 'color': (col[1:], None) if col else None}
+            taken.add(tid)
+        log('  %s: %d Wappen von FotMob' % (country, len(taken)))
+        time.sleep(0.4)
+
     # 2c) umbenannte Vereine (football-data schreibt manchmal je Saison anders, z. B. „Din. Bucuresti“ → „Dinamo Bucuresti“):
     #     sehr ähnlicher Name im selben Land, der NIE gleichzeitig gespielt hat → dasselbe Team (der neuere Name zählt)
     for country, span in seen.items():
@@ -457,7 +613,7 @@ def build(data, now, upto=None):
                 lh, la = fc.market_lambdas(od, quick=True)
                 obs.append((h, a, lh, la, fc.W_MARKET * w, False))
         leagues.append({'id': lg, 'code': code, 'name': lname, 'country': country, 'matches': played,
-                        'teams': len(stats), 'mapped': sum(1 for n in stats if n in cm)})
+                        'teams': len(stats), 'mapped': sum(1 for n in stats if n in cm), 'src': 'fotmob' if code.startswith('FM') else 'fd'})
         log('  %-4s %-16s %4d Spiele, %2d/%2d Teams mit Wappen' % (code, lname, played, leagues[-1]['mapped'], len(stats)))
 
     # Europapokal: zählt dreifach
@@ -477,6 +633,12 @@ def build(data, now, upto=None):
     return obs, info, leagues, cups
 
 
+def fit_all(obs, info):
+    """Stärken aller Teams mit Liga-Niveau (Liga = Liga des letzten Spiels), Unterschiede verstärkt (SPREAD)."""
+    groups = {tid: max(t['lg'], key=t['lg'].get) for tid, t in info.items() if t['lg']}
+    return spread(fc.fit_ratings_lg(obs, groups, tau_l=TAU_L))
+
+
 def spread(fit):
     """Stärke-Unterschiede verstärken (SPREAD, per Backtest bestimmt) – Angriff und Abwehr bleiben um 0 zentriert."""
     return dict(fit, att={t: SPREAD * v for t, v in fit['att'].items()}, **{'def': {t: SPREAD * v for t, v in fit['def'].items()}})
@@ -487,7 +649,7 @@ def main(quick=False):
     data = load(quick)
     obs, info, leagues, cups = build(data, NOW)
     log('Rechne Stärken aus %d Beobachtungen …' % len(obs))
-    fit = spread(fc.fit_ratings(obs))
+    fit = fit_all(obs, info)
     # Inseln erkennen: Teams sind nur vergleichbar, wenn sie über Spiele miteinander verbunden sind (z. B. Europa über den
     # Europapokal). Brasilien, MLS, Japan … bilden eigene Gruppen – Spiele zwischen Gruppen rechnet die App nicht aus den
     # Stärken, sondern braucht Quoten bzw. die Recherche der KI.
@@ -506,10 +668,19 @@ def main(quick=False):
     order = sorted(sizes, key=lambda r: -sizes[r])
     grp = {r: i for i, r in enumerate(order)}
     teams = []
+    lg_last = {}
+    for t in info.values():
+        for lgx, d in t['lg'].items():
+            lg_last[lgx] = max(lg_last.get(lgx, d), d)
+    stale = 0
     for tid, t in info.items():
         if tid not in fit['att'] or t['w'] < 0.5 and not tid.isdigit():
             continue
         lg = max(t['lg'], key=t['lg'].get) if t['lg'] else None  # Liga des letzten Spiels (Auf-/Absteiger)
+        # nicht mehr in dieser Liga (abgestiegen in eine Liga, die Result AI nicht lädt): aus der Suche nehmen
+        if lg and t['lg'][lg] < lg_last[lg] - timedelta(days=60):
+            stale += 1
+            continue
         names = sorted({n for n in t['names'] if n}, key=len)
         disp = t['display'] or (names[-1] if names else tid)
         teams.append({'id': tid, 'name': disp, 'short': t['short'] or None, 'abbr': t['abbr'] or None,
@@ -525,7 +696,8 @@ def main(quick=False):
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
-    log('Fertig: %d Teams aus %d Ligen + Europapokal, %.0f s, %d KB' % (len(teams), len(leagues), time.time() - t0, os.path.getsize(OUT) // 1024))
+    log('Fertig: %d Teams aus %d Ligen + Europapokal (%d nicht mehr in ihrer Liga, ausgeblendet), %.0f s, %d KB' % (
+        len(teams), len(leagues), stale, time.time() - t0, os.path.getsize(OUT) // 1024))
     return out
 
 

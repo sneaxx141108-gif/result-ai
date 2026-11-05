@@ -20,8 +20,8 @@ def main(days=28):
     t0 = time.time()
     data = rt.load()
     cut = rt.NOW - timedelta(days=days)
-    obs = rt.build(data, cut, upto=cut)[0]
-    fit = rt.spread(fc.fit_ratings(obs))  # genau wie im täglichen Rechner
+    obs, info = rt.build(data, cut, upto=cut)[:2]
+    fit = rt.fit_all(obs, info)  # genau wie im täglichen Rechner (mit Liga-Niveau)
     model = fc.Model(fit)
     # Inseln: nur Spiele innerhalb einer verbundenen Gruppe zählen (wie in der App)
     parent = {}

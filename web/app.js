@@ -108,10 +108,12 @@
     const m = /\/i\/teamlogos\/soccer\/500\/(\d+)\.png/.exec(r.logo);
     return m ? logoUrl(m[1], dark, px) : r.logo;
   }
+  // ESPN-Wappen mit CORS (der Service Worker speichert sie dauerhaft); FotMob-Wappen ohne – deren Server erlaubt das nicht
+  const cors = (src) => (/espncdn\.com/.test(src) ? ' crossorigin="anonymous"' : '');
   function crest(name, s = 30, onPlate = false) {
     const c = teamColor(name);
     const src = logoSrc(name, isDark() && !onPlate, s > 44 ? 200 : 128);
-    if (src) return `<span class="crest" style="--s:${s}px"><img src="${src}" alt="" decoding="async" crossorigin="anonymous" data-fb="${esc(initials(name))}" data-c="${c}"></span>`;
+    if (src) return `<span class="crest" style="--s:${s}px"><img src="${src}" alt="" decoding="async"${cors(src)} data-fb="${esc(initials(name))}" data-c="${c}"></span>`;
     return `<span class="crest fb" style="--s:${s}px;background:${c};color:${onColor(c)}" aria-hidden="true">${esc(initials(name))}</span>`;
   }
   const plate = (name, p, extra = '') => `<span class="plate" style="--p:${p}px">${crest(name, Math.round(p * 0.66), true)}${extra}</span>`;
@@ -291,7 +293,7 @@
     return `<span class="roll" aria-hidden="true">${ds.map((d, i) => `<span class="rc"><span class="rs" style="--to:${10 + +d};--dl:${(i * 0.1).toFixed(2)}s">${strip}</span></span>`).join('')}</span><span class="sr">${n} Prozent</span>`;
   }
   // großes Wappen als Wasserzeichen auf der Spiel-Karte
-  const wm = (name, side) => { const src = logoSrc(name, false, 200); return src ? `<span class="wm ${side}" aria-hidden="true"><img src="${src}" alt="" decoding="async" crossorigin="anonymous"></span>` : ''; };
+  const wm = (name, side) => { const src = logoSrc(name, false, 200); return src ? `<span class="wm ${side}" aria-hidden="true"><img src="${src}" alt="" decoding="async"${cors(src)}></span>` : ''; };
   const oneIn = (p) => { const n = Math.round(1 / Math.max(p, 1e-6)); return n <= 1 ? 'fast jedes Spiel' : `etwa jedes ${n}. Spiel`; };
   // kleine Dreier-Aufteilung mit Balken (Halbzeit, nächstes Tor)
   function mini(title, note, ps, c, names) {

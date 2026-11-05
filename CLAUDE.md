@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v10`).
+  hochzählen (zuletzt `ra-shell-v11`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -265,6 +265,31 @@ Design, Übergänge, Animationen.
 - **Mehr Farbe:** Beispiel-Karten werfen einen Schein in beiden Vereinsfarben, Tipp-Karten haben einen zarten Farbschein, gewählte
   Teams in „Auswählen“ leuchten in ihrer Farbe, die Leiste unten färbt „Top-Tipps“ orange. Listen-Karten (`.group`) wieder weiß.
 - Offen fürs Design: am iPhone prüfen lassen (Flug der Karte, Glow), ggf. Feinschliff; danach **Vereine & Wappen** (siehe oben).
+
+### Vereine & Wappen (05.11.2026, spätabends – Niklas: „viele Teams sind in der falschen Liga und haben kein Wappen“)
+
+- **19 Ligen von FotMob** (`FM_LEAGUES` in `scripts/ratings.py`: Tschechien, Ukraine, Serbien, Kroatien, Ungarn, Bulgarien, Zypern,
+  Israel, Slowakei, Slowenien, Kasachstan, Aserbaidschan, Bosnien, Armenien, Georgien, Albanien, Lettland, Litauen, Portugal 2):
+  aktuelle Saison + Vorsaison aus den Liga-Seiten (`__NEXT_DATA__`; robots.txt erlaubt die Seiten, nur `/api` ist gesperrt,
+  ehrlicher UA). Europapokal-Teams behalten ihre ESPN-ID (Namensabgleich ≥ 0,85, FotMob-Namen in `FD_ALIAS`), alle anderen
+  bekommen `fm:<ID>`, Wappen `images.fotmob.com/…/teamlogo/<ID>.png` und Vereinsfarbe (`teamColors.lightMode`).
+  Ergebnis: nur noch 6 statt 40 Teams ohne Liga (Mini-Ligen: Island, Gibraltar, Andorra, Kosovo, Malta, Nordmazedonien).
+- **Wappen von FotMob** für football-data-Teams, die ESPN nicht kennt (`FM_CRESTS`: Polen, Finnland, Irland, Rumänien).
+  Ohne Wappen nur noch 26 statt 122 (kleine rumänische Vereine, National League, Schottland 3./4. Liga).
+  FotMob schickt keine CORS-Freigabe → die App bindet diese Bilder **ohne** `crossorigin` ein (`cors()` in `web/app.js`),
+  der Service Worker lässt sie durch (Browser-Zwischenspeicher, 30 Tage).
+- **Abgestiegene ausblenden:** wer über 60 Tage kein Spiel mehr in seiner Liga hatte, während die Liga weiterspielt, spielt
+  dort nicht mehr (z. B. in eine Liga abgestiegen, die Result AI nicht lädt) → nicht mehr in `ratings.json` (~100 Teams).
+- **Liga-Niveau im Modell** (`fc.fit_ratings_lg`, `TAU_L = 1`, `fit_all` in ratings.py, auch im Backtest): Stärke = Niveau der
+  Liga + Abweichung des Teams; vorher zog der Zug zur Gesamt-Mitte jedes Team einzeln zur Weltmitte (schwache Ligen wirkten
+  zu stark). Backtest Europapokal-Spiele (Ligen gegeneinander): Log-Loss 0,9810 → **0,9578** (28 Tage), 0,9954 → **0,9888**
+  (56 Tage); Liga-Spiele 0,9848 → 0,9837. `W_EURO = 3` per Test bestätigt (2 / 1,5 / 1 waren bei Europapokal-Spielen schlechter).
+  Offizieller Backtest danach (28 Tage, jetzt 1.877 Spiele inkl. FotMob-Ligen): Favorit 53,9 %; mit Schlussquoten 54,4 % /
+  0,9825 (Buchmacher 55,9 % / 0,9658). Hinweis: Ferencváros steht gerade sehr hoch (4 Europapokal-Siege seit September, u. a.
+  2:0 beim AC Mailand am 05.11.) – das sagen die Daten; vor 8 Wochen lag der Verein bei 0,66.
+- Tipps: FotMob-Ligen haben bei ESPN keine Spiele/Quoten → `tips.py` überspringt Ligen mit `src: 'fotmob'`.
+- Noch offen: Quoten der Europapokal-Spiele archivieren (die Tipp-Suche sieht sie jede Stunde) → als Markt-Beobachtung ins
+  Modell, damit wenige Europapokal-Spiele Teams aus Ligen ohne Quoten nicht so stark verschieben.
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 

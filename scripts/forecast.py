@@ -278,6 +278,93 @@ def fit_ratings(obs, prior=None, iters=60):
     return {'mu': mu, 'h': h, 'att': att, 'def': dfn}
 
 
+
+def fit_ratings_lg(obs, groups, tau_l=1.0, iters=60):
+    """Wie fit_ratings, aber Stärke = Liga-Niveau + Abweichung des Teams (Result AI, 05.11.2026). Die Abweichung wird
+    zur Mitte der eigenen Liga gezogen (TAU), das Liga-Niveau nur schwach zur Gesamt-Mitte (tau_l) – es ergibt sich aus
+    Spielen gegen andere Ligen (Europapokal, Auf-/Absteiger). Ohne das zieht der Zug zur Gesamt-Mitte jede schwache Liga
+    nach oben und ihr Serienmeister wirkt übermächtig (Ferencváros stand vor Dortmund). groups: Team -> Liga."""
+    teams = sorted({o[0] for o in obs} | {o[1] for o in obs})
+    lg = {t: groups.get(t) for t in teams}
+    leagues = sorted({g for g in lg.values() if g is not None})
+    members = {L: [t for t in teams if lg[t] == L] for L in leagues}
+    a = dict.fromkeys(teams, 0.0)
+    d = dict.fromkeys(teams, 0.0)
+    LA = dict.fromkeys(leagues, 0.0)
+    LD = dict.fromkeys(leagues, 0.0)
+    tw = sum(o[4] for o in obs) or 1.0
+    mu = math.log(max(0.4, sum(o[4] * (o[2] + o[3]) for o in obs) / (2 * tw)))
+    h = 0.2
+
+    def tot():
+        return ({t: a[t] + (LA[lg[t]] if lg[t] is not None else 0.0) for t in teams},
+                {t: d[t] + (LD[lg[t]] if lg[t] is not None else 0.0) for t in teams})
+
+    def grads():
+        at, dt = tot()
+        ga, ha, gd, hd = (dict.fromkeys(teams, 0.0) for _ in range(4))
+        for i, j, x, y, w, nt in obs:
+            lh = math.exp(mu + (0.0 if nt else h) + at[i] - dt[j])
+            la = math.exp(mu + at[j] - dt[i])
+            ga[i] += w * (x - lh)
+            ha[i] += w * lh
+            ga[j] += w * (y - la)
+            ha[j] += w * la
+            gd[j] -= w * (x - lh)
+            hd[j] += w * lh
+            gd[i] -= w * (y - la)
+            hd[i] += w * la
+        return ga, ha, gd, hd
+    for _ in range(iters):
+        ga, ha, gd, hd = grads()
+        for t in teams:  # Abweichungen, zur Mitte der eigenen Liga gezogen
+            a[t] += 0.9 * (ga[t] - TAU * a[t]) / (ha[t] + TAU)
+            d[t] += 0.9 * (gd[t] - TAU * d[t]) / (hd[t] + TAU)
+        if leagues:
+            ga, ha, gd, hd = grads()
+            for L in leagues:  # Liga-Niveau, nur schwach zur Gesamt-Mitte gezogen
+                ms = members[L]
+                LA[L] += 0.9 * (sum(ga[t] for t in ms) - tau_l * LA[L]) / (sum(ha[t] for t in ms) + tau_l)
+                LD[L] += 0.9 * (sum(gd[t] for t in ms) - tau_l * LD[L]) / (sum(hd[t] for t in ms) + tau_l)
+            for L in leagues:  # die Mitte der Abweichungen gehört zum Liga-Niveau
+                ms = members[L]
+                ma = sum(a[t] for t in ms) / len(ms)
+                md = sum(d[t] for t in ms) / len(ms)
+                for t in ms:
+                    a[t] -= ma
+                    d[t] -= md
+                LA[L] += ma
+                LD[L] += md
+        at, dt = tot()  # Gesamt-Mitte 0 wie bisher, das Niveau steckt in mu
+        ma = sum(at.values()) / len(teams)
+        md = sum(dt.values()) / len(teams)
+        for L in leagues:
+            LA[L] -= ma
+            LD[L] -= md
+        for t in teams:
+            if lg[t] is None:
+                a[t] -= ma
+                d[t] -= md
+        mu += ma - md
+        at, dt = tot()
+        g = hh = 0.0
+        for i, j, x, y, w, nt in obs:
+            lh = math.exp(mu + (0.0 if nt else h) + at[i] - dt[j])
+            la = math.exp(mu + at[j] - dt[i])
+            g += w * (x - lh + y - la)
+            hh += w * (lh + la)
+        mu += g / max(hh, 1e-9)
+        g = hh = 0.0
+        for i, j, x, y, w, nt in obs:
+            if not nt:
+                lh = math.exp(mu + h + at[i] - dt[j])
+                g += w * (x - lh)
+                hh += w * lh
+        if hh > 0:
+            h = min(0.6, max(-0.1, h + g / hh))
+    at, dt = tot()
+    return {'mu': mu, 'h': h, 'att': at, 'def': dt, 'lgA': LA, 'lgD': LD}
+
 # ---------------------------------------------------------------- ESPN-Spiele
 def norm_event(e):
     """ESPN-Spiel -> kompaktes dict (Teams, Ergebnis, Status, Runde, Hin-/Rueckspiel, Sieger, Quoten)."""
