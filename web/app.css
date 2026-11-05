@@ -624,3 +624,6 @@ h1, h2, h3, p { margin: 0; }
 /* Auswählen: gewähltes Team leuchtet in seiner Vereinsfarbe */
 .slot.set { background: radial-gradient(70% 140% at 0% 50%, var(--sg, transparent), transparent 72%); }
 :root[data-theme="dark"] .slot.set { background: radial-gradient(70% 140% at 0% 50%, var(--sgd, transparent), transparent 72%); }
+
+/* Tipp-Filter: zwei Reihen (Zeitraum, Wettbewerb) */
+.chips + .chips { margin-top: 2px; }

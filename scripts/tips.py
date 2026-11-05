@@ -26,7 +26,7 @@ RATINGS = os.path.join(rt.ROOT, 'web', 'data', 'ratings.json')
 OUT = os.path.join(rt.ROOT, 'web', 'data', 'tips.json')
 LOG = os.path.join(rt.ROOT, 'web', 'data', 'tips_log.json')
 NOW = datetime.now(timezone.utc)
-DAYS = 4          # Tipps für heute und die nächsten 3 Tage
+DAYS = 21         # 3 Wochen voraus: so ist der nächste Spieltag von Champions/Europa/Conference League immer dabei (Niklas)
 KEEP_DAYS = 45    # so lange bleibt die Bilanz
 MARGIN = 0.06     # typische Buchmacher-Marge → geschätzte Quote, wo ESPN keine liefert (Doppelchance, Beide treffen …)
 MIN_Q = 1.12      # kleinere Quoten lohnen nicht (z. B. „Über 0,5 Tore“)
@@ -231,13 +231,23 @@ def main():
                 k = key(c)
                 if c['g'] not in out or k > out[c['g']][0]:
                     out[c['g']] = (k, c)
-        return [c for k, c in sorted(out.values(), key=lambda kc: (kc[0], kc[1]['p']), reverse=True)][:40]
+        return [c for k, c in sorted(out.values(), key=lambda kc: (kc[0], kc[1]['p']), reverse=True)][:90]
     safe = best(*SAFE, key=lambda c: (round(c['sure'], 3), c['real']))
     top = best(*TOP, key=lambda c: (round(c['conf'] * c['q'], 3), c['real']))
     # Kombis bevorzugt aus Spielen der nächsten 36 Stunden (heute/morgen spielbar)
     soon = lambda lst: [c for c in lst if when(games[c['g']]['t']) < NOW + timedelta(hours=36)]  # noqa: E731
     kombis = [k for k in (dict(kombi(soon(safe), 0.45, 3) or kombi(safe, 0.45, 3) or {}, name='Sichere Kombi', kind='safe'),
                           dict(kombi(soon(top), 0.30, 3) or kombi(top, 0.30, 3) or {}, name='Top-Kombi', kind='top')) if k.get('legs')]
+
+    # Kombis für den nächsten Spieltag der Champions League und der Bundesliga (aus den sicheren Tipps)
+    def comp_kombi(slug, name, kind):
+        pool = [c for c in safe if games[c['g']]['slug'] == slug]
+        if len(pool) < 2:
+            return None
+        first = min(when(games[c['g']]['t']) for c in pool)
+        k = kombi([c for c in pool if when(games[c['g']]['t']) < first + timedelta(days=3)], 0.45, 3)
+        return dict(k, name=name, kind=kind) if k else None
+    kombis += [k for k in (comp_kombi('uefa.champions', 'Champions-League-Kombi', 'cl'), comp_kombi('ger.1', 'Bundesliga-Kombi', 'bl')) if k]
 
     # Bilanz: Tipps bis zum Anpfiff festhalten, danach auswerten
     try:

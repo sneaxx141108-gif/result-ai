@@ -642,7 +642,7 @@
 
   // ------------------------------------------------------------------ Top-Tipps (scripts/tips.py sucht jede Stunde neu)
   // Chance = aus den Buchmacher-Quoten (Backtest: am genauesten), Tore zusätzlich mit Result AI; „≈“ = geschätzte Quote.
-  const T = { data: null, loading: null, at: 0, err: false, list: 'safe', day: 'all', seen: {} };
+  const T = { data: null, loading: null, at: 0, err: false, list: 'safe', day: 'all', comp: 'all', seen: {} };
   function loadTips(maxAge) {
     if (T.data && Date.now() - T.at < (maxAge == null ? 10 * 60e3 : maxAge)) return Promise.resolve(T.data);
     if (!T.loading) {
@@ -674,7 +674,8 @@
     const d = new Date(iso);
     const hm = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     const k = dayDiff(iso);
-    return k === 0 ? `Heute, ${hm}` : k === 1 ? `Morgen, ${hm}` : `${['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'][d.getDay()]}, ${hm}`;
+    const wd = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'][d.getDay()];
+    return k === 0 ? `Heute, ${hm}` : k === 1 ? `Morgen, ${hm}` : k > 6 ? `${wd}, ${d.getDate()}.${d.getMonth() + 1}., ${hm}` : `${wd}, ${hm}`;
   }
   const dayKey = (iso) => String(dayDiff(iso));
   const dayLabel = (k) => (k === '0' ? 'Heute' : k === '1' ? 'Morgen' : new Date(dayStart(new Date()) + (+k) * 864e5 + 432e5).toLocaleDateString('de-DE', { weekday: 'long' }));
@@ -740,17 +741,31 @@
     return '<p class="tl-note">Kombi = mehrere Tipps auf einem Schein: Die Quoten werden malgenommen – aber jeder einzelne Tipp muss aufgehen.</p>'
       + (cards || '<div class="empty" style="margin-top:14px">Gerade keine Kombi – die nächste Suche läuft in spätestens einer Stunde.</div>');
   }
+  // Filter der Tipp-Listen: Zeitraum (3 Wochen voraus) und Wettbewerb (die wichtigsten zuerst)
+  const PERIODS = [['all', 'Alle Tage'], ['0', 'Heute'], ['1', 'Morgen'], ['week', 'Diese Woche'], ['later', 'Später']];
+  const inPeriod = (iso, k) => { const dd = dayDiff(iso); return k === 'all' || (k === 'week' ? dd <= 6 : k === 'later' ? dd > 6 : String(dd) === k); };
+  const COMP_ORDER = ['uefa.champions', 'uefa.europa', 'uefa.europa.conf', 'ger.1', 'eng.1', 'esp.1', 'ita.1', 'fra.1', 'ger.dfb_pokal', 'ger.2',
+    'eng.2', 'eng.fa', 'eng.league_cup', 'esp.copa_del_rey', 'ita.coppa_italia', 'fra.coupe_de_france', 'ned.1', 'por.1', 'tur.1'];
   function tipsBody() {
     const d = T.data;
     if (T.list === 'kombi') return kombisHtml(d);
     const all = d[T.list].filter(upcoming);
-    const days = [...new Set(all.map((t) => dayKey(d.games[t.g].t)))].sort((x, y) => x - y);
-    if (T.day !== 'all' && !days.includes(T.day)) T.day = 'all';
-    const shown = T.day === 'all' ? all : all.filter((t) => dayKey(d.games[t.g].t) === T.day);
-    const chips = days.length > 1 ? `<div class="chips">${['all'].concat(days).map((x) => `<button class="${T.day === x ? 'on' : ''}" data-act="tday" data-val="${x}">${x === 'all' ? 'Alle' : dayLabel(x)}</button>`).join('')}</div>` : '';
+    const per = PERIODS.filter(([k]) => k === 'all' || all.some((t) => inPeriod(d.games[t.g].t, k)));
+    if (!per.some(([k]) => k === T.day)) T.day = 'all';
+    const byTime = all.filter((t) => inPeriod(d.games[t.g].t, T.day));
+    const comps = {};
+    byTime.forEach((t) => { const g = d.games[t.g]; (comps[g.slug] = comps[g.slug] || { name: g.comp, n: 0 }).n++; });
+    const rank = (k) => { const x = COMP_ORDER.indexOf(k); return x < 0 ? 99 : x; };
+    const order = Object.keys(comps).sort((x, y) => (rank(x) - rank(y)) || (comps[y].n - comps[x].n));
+    // gleicher Name in mehreren Ländern (z. B. „Super League“) → mit Land
+    const label = (k) => (order.some((o) => o !== k && comps[o].name === comps[k].name) && R.leagues[k] ? `${comps[k].name} (${R.leagues[k].country})` : comps[k].name);
+    if (T.comp !== 'all' && !comps[T.comp]) T.comp = 'all';
+    const shown = T.comp === 'all' ? byTime : byTime.filter((t) => d.games[t.g].slug === T.comp);
+    const chips = (list, act, cur) => `<div class="chips">${list.map(([k, l]) => `<button class="${cur === k ? 'on' : ''}" data-act="${act}" data-val="${esc(k)}">${esc(l)}</button>`).join('')}</div>`;
     const note = T.list === 'safe' ? 'Chance ab 70 % bei einer Quote ab 1,20 – oben steht, worin sich Buchmacher und Result AI am einigsten sind.'
       : 'Quote ab 1,60 bei über 50 % Chance – die beste Mischung aus Quote und Chance.';
-    return chips + `<p class="tl-note">${note}</p>` + (shown.length ? `<div class="tlist">${shown.slice(0, 25).map((t, i) => tipCard(t, i, T.list)).join('')}</div>`
+    return chips(per, 'tday', T.day) + (order.length > 1 ? chips([['all', 'Alle Wettbewerbe']].concat(order.map((k) => [k, `${label(k)} · ${comps[k].n}`])), 'tcomp', T.comp) : '')
+      + `<p class="tl-note">${note}</p>` + (shown.length ? `<div class="tlist">${shown.slice(0, 40).map((t, i) => tipCard(t, i, T.list)).join('')}</div>`
       : '<div class="empty" style="margin-top:14px">Gerade keine passenden Tipps – die nächste Suche läuft in spätestens einer Stunde.</div>');
   }
   function recordHtml(d) {
@@ -769,7 +784,7 @@
       ${recent ? `<div class="rec-list">${recent}</div>` : '<p class="muted rec-empty">Läuft seit dem 5. November: Jeder angezeigte Tipp wird festgehalten und nach dem Spiel ehrlich ausgewertet – auch die, die danebengehen.</p>'}</div></section>`;
   }
   function vTips() {
-    const head = '<h1 class="ptitle">Top-Tipps</h1><p class="psub">Jede Stunde neu gesucht in über 40 Ligen und Pokalen – die Wetten mit der besten Chance.</p>';
+    const head = '<h1 class="ptitle">Top-Tipps</h1><p class="psub">Jede Stunde neu gesucht – über 40 Ligen und Pokale, 3 Wochen voraus, inklusive Champions League.</p>';
     const d = T.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${T.err ? 'Die Tipps konnten gerade nicht geladen werden – prüf die Verbindung.' : 'Die Tipps werden geladen …'}</div>`;
     const tabs = [['safe', 'Sicher'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
@@ -1277,14 +1292,16 @@
         else S.stack[0].el.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
       } else location.replace('#' + to);
     }
-    else if (act === 'tlist' || act === 'tday') {
+    else if (act === 'tlist' || act === 'tday' || act === 'tcomp') {
       if (act === 'tlist') {
         const seg = a.closest('.seg');
         seg.style.setProperty('--k', $$('button', seg).indexOf(a));
         $$('button', seg).forEach((b) => b.classList.toggle('on', b === a));
         T.list = a.dataset.val;
         T.day = 'all';
-      } else T.day = a.dataset.val;
+        T.comp = 'all';
+      } else if (act === 'tday') T.day = a.dataset.val;
+      else T.comp = a.dataset.val;
       const body = $('.tips-body', a.closest('.page'));
       if (body) body.innerHTML = tipsBody();
     }
