@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v9`).
+  hochzählen (zuletzt `ra-shell-v10`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -246,6 +246,25 @@ Design, Übergänge, Animationen.
   (Apple-Übergänge: Karte wächst in die Seite, Kopf schrumpft beim Scrollen; Ergebnis-Seite edler: Vereinsfarben-Glow,
   Sprung-Leiste, schönere Grafiken; Scan-Animation; Stil „mehr Farbe & Glow“) → 3. **Vereine & Wappen fixen** (falsche Ligen,
   fehlende Wappen; Teams nur aus dem Europapokal brauchen ihre Ligen, z. B. Tschechien, Ukraine, Serbien, Kroatien).
+
+### Design maxen (05.11.2026, abends – Niklas: „Übergänge wie bei Apple, Ergebnis-Seite edler, Scan-Animation“, Stil „mehr Farbe & Glow“)
+
+- **Karte wächst in die Seite** (wie im App Store): Beispiel-Karten, Tipp-Karten, Tipp-Zeilen, Kombi-Zeilen, Verlauf-Zeilen öffnen das
+  Spiel mit einem fliegenden Abbild der Spiel-Karte (`morphPush`: Klon der echten `.match`-Karte, gleichmäßig skaliert, nur
+  transform/opacity, Seite blendet darunter ein); zurück schrumpft sie in die angetippte Karte (`morphPop`, nur wenn beide sichtbar
+  sind, sonst normales Zurückschieben; Wischen vom Rand schiebt immer). Sicherung `settle` wie bei den Seitenwechseln.
+- **Ergebnis-Seite:** Glow in beiden Vereinsfarben hinter der Spiel-Karte (ruhender Verlauf, dunkel kräftiger), Kopfleiste oben
+  durchsichtig; ist die große Karte weggescrollt, zeigt die Leiste eine **Mini-Spielzeile** (Wappen · Stand · Wappen).
+  **Sprung-Leiste** (Übersicht · Tipps · Ergebnisse · Markt · Tore · Halbzeit · Nächstes Tor · Erklärung) klebt unter der
+  Kopfleiste und markiert den Abschnitt (`pageGeo` misst einmal aus dem Layout, `spy` beim Scrollen). Balken mit Schein,
+  Favorit-Abzeichen leuchtet, große Zahl auf einem Hauch Vereinsfarbe, Tor-Kurve und Tore-Balken in der Farbe des Favoriten,
+  wahrscheinlichstes Feld der Ergebnis-Karte hervorgehoben.
+- **Scan:** Linie läuft, solange gelesen wird; „Beispiel-Scan ansehen“ (Startseite, Scan-Karte) zeigt einen nachgebauten
+  Live-Screenshot (Arsenal–Chelsea 1:1, 63.): erkannte Felder leuchten nacheinander grün auf (mit Haptik), Schritte haken sich
+  ab, dann verwandelt sich der Screenshot in die Prognose (`#/r/live`). Echte Screenshots: ehrlicher Hinweis, bis die KI läuft.
+- **Mehr Farbe:** Beispiel-Karten werfen einen Schein in beiden Vereinsfarben, Tipp-Karten haben einen zarten Farbschein, gewählte
+  Teams in „Auswählen“ leuchten in ihrer Farbe, die Leiste unten färbt „Top-Tipps“ orange. Listen-Karten (`.group`) wieder weiß.
+- Offen fürs Design: am iPhone prüfen lassen (Flug der Karte, Glow), ggf. Feinschliff; danach **Vereine & Wappen** (siehe oben).
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 

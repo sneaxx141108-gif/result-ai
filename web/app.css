@@ -533,3 +533,94 @@ h1, h2, h3, p { margin: 0; }
 .tg-q { flex: none; text-align: right; min-width: 52px; }
 .tg-q span { display: block; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .tg-q b { font-family: var(--display); font-size: 19px; font-weight: 800; }
+
+/* ======================================================================================================================
+   Design maxen (05.11.2026, Niklas: „Übergänge wie bei Apple, Ergebnis-Seite edler, Scan-Animation · mehr Farbe & Glow“).
+   Weiter nur transform/opacity animiert; Glow = ruhende Verläufe (einmal gemalt, kein Filter, keine Dauer-Animation).
+   ====================================================================================================================== */
+
+/* ---------- Ergebnis-Seite: Glow in beiden Vereinsfarben hinter der Spiel-Karte (dunkel kräftiger) */
+.res { position: relative; }
+.res > .glow { position: absolute; z-index: 0; left: -16px; right: -16px; top: -160px; height: 620px; pointer-events: none;
+  background: radial-gradient(62% 52% at 10% 46%, var(--hgl), transparent 72%), radial-gradient(62% 52% at 90% 46%, var(--agl), transparent 72%); }
+:root[data-theme="dark"] .res > .glow { background: radial-gradient(62% 52% at 10% 46%, var(--hgd), transparent 72%), radial-gradient(62% 52% at 90% 46%, var(--agd), transparent 72%); }
+.res > .cards { position: relative; }
+.page.rp .bar:not(.scrolled) { background: transparent; }
+.page.rp .bar::after { display: none; }
+
+/* kleiner Spiel-Kopf in der Leiste oben, sobald die große Karte weggescrollt ist */
+.tt .mm { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; vertical-align: middle; }
+.tt .mm b { font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt .mm em { flex: none; font-style: normal; font-family: var(--display); font-weight: 800; font-size: 14px; padding: 2px 8px; border-radius: 8px; background: var(--fill); font-variant-numeric: tabular-nums; }
+
+/* Sprung-Leiste: klebt unter der Kopfleiste, markiert den Abschnitt, in dem man gerade ist */
+.snav { position: sticky; top: calc(var(--safe-t) + 54px); z-index: 9; display: flex; gap: 8px; overflow-x: auto; margin: 14px -16px 0; padding: 8px 16px 10px; scrollbar-width: none; }
+.snav::-webkit-scrollbar { display: none; }
+.snav.stuck { background: var(--bg); box-shadow: 0 .5px 0 var(--line); }
+.snav button { flex: none; height: 34px; padding: 0 14px; border-radius: 999px; background: var(--card); box-shadow: var(--shadow); font-weight: 700; font-size: 14px; color: var(--muted); }
+:root[data-theme="dark"] .snav button { box-shadow: 0 0 0 .5px var(--line); }
+.snav button.on { background: var(--text); color: var(--bg); box-shadow: none; }
+.snav + .cards { margin-top: 6px; }
+
+/* Grafiken mit Farbe: Balken mit Schein, Favorit-Abzeichen leuchtet, große Zahl auf einem Hauch Vereinsfarbe */
+.split i { box-shadow: 0 6px 14px -8px currentColor; }
+.badge { box-shadow: 0 8px 18px -8px var(--bgc, transparent); }
+.prob.big { background: radial-gradient(120% 85% at 0% 0%, var(--fvl, transparent), transparent 62%), var(--card); }
+:root[data-theme="dark"] .prob.big { background: radial-gradient(120% 85% at 0% 0%, var(--fvd, transparent), transparent 62%), var(--card); }
+.heat .c.top { box-shadow: 0 8px 18px -8px var(--tc); }
+.heat .c.top em { font-weight: 900; }
+.bars7 .col.max i { background: var(--bc, var(--text)); box-shadow: 0 10px 20px -10px var(--bc, transparent); }
+.bars7 .col.max .pv { color: var(--bc, var(--text)); }
+
+/* ---------- Karte wächst in die Seite: das fliegende Abbild der Spiel-Karte */
+.ghost { position: fixed; z-index: 35; margin: 0 !important; pointer-events: none; transform-origin: 0 0; will-change: transform, opacity; }
+.morphed .match, .morphed .match .plate { animation: none !important; }
+
+/* ---------- Startseite: Beispiel-Karten werfen einen Schein in ihren Vereinsfarben */
+.gcard.teamcard { box-shadow: -14px 20px 34px -22px var(--gl, transparent), 14px 20px 34px -22px var(--gr, transparent), var(--shadow-lg); }
+:root[data-theme="dark"] .gcard.teamcard { box-shadow: -12px 18px 40px -16px var(--gl, transparent), 12px 18px 40px -16px var(--gr, transparent); }
+.demo-scan { display: flex; align-items: center; gap: 10px; margin: -4px -4px -6px; padding: 10px 8px; border-radius: 14px; font-weight: 700; font-size: 15px; color: var(--on-ink); opacity: .82; text-align: left; }
+.demo-scan svg { width: 20px; height: 20px; flex: none; }
+.demo-scan span:first-of-type { flex: 1; }
+.demo-scan .chev { font-size: 20px; opacity: .6; }
+
+/* Tipp-Karten: zarter Schein in beiden Vereinsfarben, im Dunkeln deutlicher */
+.tcard { background: radial-gradient(75% 60% at 0% 0%, var(--hg, transparent), transparent 70%), radial-gradient(75% 60% at 100% 0%, var(--ag, transparent), transparent 70%), var(--card); }
+:root[data-theme="dark"] .tcard { background: radial-gradient(75% 60% at 0% 0%, var(--hgd, transparent), transparent 70%), radial-gradient(75% 60% at 100% 0%, var(--agd, transparent), transparent 70%), var(--card); }
+.tabbar[data-tab="/tips"] .tab-ind { background: rgba(255, 122, 0, .13); }
+:root[data-theme="dark"] .tabbar[data-tab="/tips"] .tab-ind { background: rgba(255, 159, 10, .2); }
+
+/* ---------- Scan: Linie läuft, solange gelesen wird; erkannte Felder leuchten grün auf */
+.scanning .beam { animation: beam 1.6s var(--ease) infinite; }
+.scan-frame.found { box-shadow: 0 0 0 3px #30D158, 0 24px 50px -20px rgba(48, 209, 88, .65); }
+.scan-frame [data-box] { position: relative; }
+.scan-frame [data-box]::before { content: ""; position: absolute; inset: -5px; border-radius: 10px; border: 2px solid #30D158; box-shadow: 0 0 16px rgba(48, 209, 88, .55), inset 0 0 10px rgba(48, 209, 88, .25);
+  opacity: 0; transform: scale(1.18); transition: opacity .3s, transform .45s var(--spring); }
+.scan-frame [data-box]::after { content: attr(data-label); position: absolute; z-index: 2; left: 50%; top: calc(100% + 7px); padding: 3px 8px; border-radius: 999px; background: #30D158; color: #04210F;
+  font: 800 10px/1.25 var(--font); letter-spacing: 0; white-space: nowrap; opacity: 0; transform: translate(-50%, -4px) scale(.85); transition: opacity .3s .12s, transform .45s var(--spring) .12s; }
+.scan-frame [data-box].hit::before { opacity: 1; transform: none; }
+.scan-frame [data-box].hit::after { opacity: 1; transform: translate(-50%, 0); }
+.mk-team[data-box]::after, .mk-mid b[data-box]::after { top: auto; bottom: calc(100% + 7px); transform: translate(-50%, 4px) scale(.85); }
+.mk-team[data-box].hit::after, .mk-mid b[data-box].hit::after { transform: translate(-50%, 0); }
+
+/* Beispiel-Screenshot: so sieht ein Live-Spiel in einer Fußball-App aus */
+.mock { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 12px 14px 16px; background: linear-gradient(180deg, #121821, #0B0F15); color: #fff; font-family: var(--font); }
+.mk-bar { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; opacity: .75; padding: 0 4px; }
+.mk-head { margin-top: 20px; text-align: center; font-size: 10px; font-weight: 700; color: #8D97A5; }
+.mk-sb { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 4px; margin-top: 30px; }
+.mk-team { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 6px 2px; border-radius: 10px; }
+.mk-team i { width: 36px; height: 36px; border-radius: 50%; box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .9); }
+.mk-team b { font-size: 11px; font-weight: 800; }
+.mk-mid { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.mk-mid b { font-size: 27px; font-weight: 900; letter-spacing: -.02em; padding: 0 6px; border-radius: 8px; }
+.mk-mid span { font-size: 11px; font-weight: 800; color: #30D158; padding: 1px 7px; border-radius: 8px; }
+.mk-ev { display: flex; justify-content: space-between; margin-top: 30px; font-size: 9.5px; color: #8D97A5; padding: 0 6px; }
+.mk-stats { margin-top: auto; display: flex; flex-direction: column; gap: 9px; padding: 12px 10px; border-radius: 14px; background: rgba(255, 255, 255, .06); }
+.mk-stats div { display: grid; grid-template-columns: 38px 1fr 38px; align-items: center; font-size: 10px; }
+.mk-stats b { font-weight: 800; }
+.mk-stats b:last-child { text-align: right; }
+.mk-stats span { text-align: center; color: #8D97A5; font-weight: 600; }
+
+/* Auswählen: gewähltes Team leuchtet in seiner Vereinsfarbe */
+.slot.set { background: radial-gradient(70% 140% at 0% 50%, var(--sg, transparent), transparent 72%); }
+:root[data-theme="dark"] .slot.set { background: radial-gradient(70% 140% at 0% 50%, var(--sgd, transparent), transparent 72%); }

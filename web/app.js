@@ -89,6 +89,7 @@
   const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   const lum = (hex) => { const [r, g, b] = rgb(hex).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const onColor = (hex) => (lum(hex) > 0.45 ? '#111111' : '#FFFFFF');
+  const rgba = (hex, a) => { const [r, g, b] = rgb(hex); return `rgba(${r},${g},${b},${a})`; };
   const initials = (n) => String(n).split(/\s+/).map((w) => w[0]).join('').slice(0, 3).toUpperCase();
   // Farben eines Spiels für Balken/Punkte: sind beide Teamfarben zu ähnlich, bekommt der Gast Schwarz (dunkel: Weiß)
   function pair(m) {
@@ -181,11 +182,11 @@
   const TITLES = { '/': '', '/scan': 'Analyse', '/md': 'Spieltag', '/acc': 'Treffsicherheit', '/pick': 'Spiel auswählen', '/tips': 'Top-Tipps', '/hist': 'Verlauf' };
   const titleOf = (path) => (path in TITLES ? TITLES[path] : 'Ergebnis');
   function barHtml(path) {
-    let tt = titleOf(path);
-    if (path.startsWith('/r/')) { const m = findMatch(decodeURIComponent(path.slice(3))); if (m) tt = `${m.home} – ${m.away}`; }
+    let tt = esc(titleOf(path));
+    if (path.startsWith('/r/')) { const m = findMatch(decodeURIComponent(path.slice(3))); if (m) tt = miniMatch(m); }
     const lead = path === '/' ? `<span class="brand">${logo('intro-logo')}<span>Result AI</span></span>`
       : isTab(path) ? '' : `<button class="round" data-act="back" aria-label="Zurück">${I.back}</button>`;
-    return `<header class="bar">${lead}<span class="tt">${esc(tt)}</span>
+    return `<header class="bar">${lead}<span class="tt">${tt}</span>
       <span class="end"><button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span></header>`;
   }
   function viewHtml(path) {
@@ -207,7 +208,7 @@
       const a = analyze(m);
       const [k, p] = lead(m, a);
       const short = (n) => esc(n.length > 11 ? n.split(' ').pop() : n);
-      return `<a class="gcard teamcard" href="#/r/${m.id}" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
+      return `<a class="gcard teamcard" href="#/r/${m.id}" style="background:${teamBg(m)};--gl:${rgba(teamColor(m.home), 0.6)};--gr:${rgba(teamColor(m.away), 0.6)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
         <div class="gt"><span>${esc(m.comp)}</span>${m.kind === 'live' ? `<span class="chip live">${m.minute}'</span>` : `<span class="chip glass">${esc(m.kind === 'odds' ? 'Quoten' : m.when)}</span>`}</div>
         <div class="gv">${plate(m.home, 54)}<div class="gm">${m.score ? `${m.score[0]}:${m.score[1]}` : 'VS'}<small>${short(m.home)} – ${short(m.away)}</small></div>${plate(m.away, 54)}</div>
         <div><div class="gf"><b>${Math.round(p * 100)} %</b><span>${k === 'draw' ? 'Remis' : 'Sieg ' + esc(k === 'home' ? m.home : m.away)}</span></div>
@@ -220,7 +221,8 @@
       <section class="scan-card">${decoRing}<span class="ic">${I.scan}</span>
         <div><h2>Spiel scannen</h2><p>Live-Spiel, Paarung, ganzer Spieltag oder Quoten – Result AI rechnet, wer gewinnt.</p></div>
         <div class="acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="pick" aria-label="Screenshot aus Fotos wählen"></label>
-          <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="pick" aria-label="Foto mit der Kamera machen"></label></div></section>
+          <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="pick" aria-label="Foto mit der Kamera machen"></label></div>
+        <button class="demo-scan" data-act="demoscan">${I.scan}<span>Beispiel-Scan ansehen</span><span class="chev">›</span></button></section>
       <a class="card pickrow" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Teams aus 38 Ligen · ohne Screenshot</div></span><span class="chev">›</span></a>
       <section class="sec"><div class="sec-h"><h2>Top-Tipps</h2><button class="note link" data-act="tab" data-tab="/tips">Alle ›</button></div><div class="tips-prev">${tipsPreview()}</div></section>
       <section class="sec"><div class="sec-h"><h2>Beispiele</h2><span class="note">ausgedacht · echte Rechnung</span></div>
@@ -232,9 +234,17 @@
   }
 
   // ------------------------------------------------------------------ Scan (Screenshot wird gelesen)
+  // Beispiel-Screenshot (so sieht ein Live-Spiel in einer Fußball-App aus) – zeigt, wie Result AI liest
+  const demoShot = () => `<div class="mock" aria-hidden="true"><div class="mk-bar"><span>20:41</span><span>5G ▮▮▮</span></div>
+    <div class="mk-head">Premier League · 11. Spieltag</div>
+    <div class="mk-sb"><div class="mk-team" data-box="t1" data-label="Arsenal"><i style="background:#EF0107"></i><b>Arsenal</b></div>
+      <div class="mk-mid"><b data-box="sc" data-label="Stand 1:1">1 – 1</b><span data-box="mn" data-label="63. Minute">63'</span></div>
+      <div class="mk-team" data-box="t2" data-label="Chelsea"><i style="background:#034694"></i><b>Chelsea</b></div></div>
+    <div class="mk-ev"><span>⚽ Saka 21'</span><span>Palmer 48' ⚽</span></div>
+    <div class="mk-stats">${[['54 %', 'Ballbesitz', '46 %'], ['11', 'Schüsse', '7'], ['1,42', 'xG', '0,88'], ['5', 'Ecken', '3']].map(([x, l, y]) => `<div><b>${x}</b><span>${l}</span><b>${y}</b></div>`).join('')}</div></div>`;
   function vScan() {
-    if (!S.url) return '<h1 class="ptitle">Analyse</h1><div class="empty" style="margin-top:18px">Kein Screenshot gewählt.</div><div style="margin-top:12px"><button class="btn" data-act="home">Zum Start</button></div>';
-    return `<div class="scan-frame" id="frame"><img src="${S.url}" alt="Dein Screenshot"><span class="grid"></span><span class="beam"></span>
+    if (!S.url && !S.demo) return '<h1 class="ptitle">Analyse</h1><div class="empty" style="margin-top:18px">Kein Screenshot gewählt.</div><div style="margin-top:12px"><button class="btn" data-act="home">Zum Start</button></div>';
+    return `<div class="scan-frame${S.demo ? ' demo' : ''}" id="frame">${S.demo ? demoShot() : `<img src="${S.url}" alt="Dein Screenshot">`}<span class="grid"></span><span class="beam"></span>
         <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
       <div class="steps">${['Screenshot geladen', 'Teams, Spielstand und Minute erkennen', 'Stärken und Quoten nachschlagen', 'Alle Ergebnisse durchrechnen']
         .map((t, i) => `<div class="step"><i>${i + 1}</i><span>${t}</span></div>`).join('')}</div>
@@ -248,13 +258,28 @@
     fr.classList.add('scanning');
     const steps = $$('.step', el);
     const at = (ms, fn) => S.timers.push(setTimeout(fn, reduce ? 0 : ms));
-    // Abgehakt wird nur, was wirklich passiert ist: Screenshot geladen. Lesen kann ihn erst die KI auf dem Server.
+    const done = (i) => { steps[i].classList.add('done'); $('i', steps[i]).textContent = '✓'; if (steps[i + 1]) steps[i + 1].classList.add('on'); };
     at(150, () => steps[0].classList.add('on'));
-    at(750, () => { steps[0].classList.add('done'); $('i', steps[0]).textContent = '✓'; steps[1].classList.add('on'); });
-    at(2000, () => {
+    at(750, () => done(0));
+    if (S.demo) {
+      // Beispiel: die erkannten Felder leuchten nacheinander auf, dann verwandelt sich der Screenshot in die Prognose
+      $$('[data-box]', fr).forEach((b, i) => at(1150 + i * 420, () => { b.classList.add('hit'); haptic(); }));
+      at(2950, () => done(1));
+      at(3550, () => done(2));
+      at(4150, () => { done(3); fr.classList.remove('scanning'); fr.classList.add('found'); });
+      at(4750, () => {
+        if (S.stack[S.stack.length - 1].el !== el) return;
+        S.morph = { el: fr, rect: fr.getBoundingClientRect(), t: performance.now() };
+        location.replace('#/r/live');
+      });
+      return;
+    }
+    // Abgehakt wird nur, was wirklich passiert ist: Screenshot geladen. Lesen kann ihn erst die KI auf dem Server.
+    at(2600, () => {
+      fr.classList.remove('scanning');
       $('.notice-slot', el).innerHTML = `<div class="notice"><b>Die KI wird gerade angeschlossen</b>
         <p>Dein Screenshot ist angekommen. Lesen kann Result AI ihn, sobald der Server mit der KI steht. Erfunden wird nichts – deshalb hier noch kein Ergebnis.</p>
-        <a class="btn" href="#/pick">Spiel selbst auswählen</a><a class="btn soft" href="#/r/live">Beispiel ansehen</a></div>`;
+        <a class="btn" href="#/pick">Spiel selbst auswählen</a><button class="btn soft" data-act="demoscan">Beispiel-Scan ansehen</button></div>`;
     });
   }
 
@@ -275,6 +300,15 @@
       <div class="split"><i style="flex:${ps[0]};background:${c.h}"></i><i style="flex:${ps[1]};background:var(--draw)"></i><i style="flex:${ps[2]};background:${c.a}"></i></div>
       <div class="nums"><span>${rr[0]} % <span class="m">${esc(names[0])}</span></span><span>${rr[1]} % <span class="m">${esc(names[1])}</span></span><span>${rr[2]} % <span class="m">${esc(names[2])}</span></span></div></div>`;
   }
+  // Sprung-Leiste: Abschnitte der Ergebnis-Seite (klebt oben, zeigt beim Scrollen, wo man ist)
+  function secNav(m, a) {
+    const hasTips = m.src === 'tips' && T.data && T.data.safe.concat(T.data.top).some((t) => t.g === m.gid);
+    const secs = [['ov', 'Übersicht'], hasTips ? ['tp', 'Tipps'] : null, ['er', 'Ergebnisse'], m.kind === 'odds' ? ['mk', 'Markt'] : null,
+      ['to', 'Tore'], ['hz', a.ht ? 'Halbzeit' : 'Doppelchance'], ['nt', 'Nächstes Tor'], ['ex', 'Erklärung']].filter(Boolean);
+    return `<nav class="snav" aria-label="Abschnitte">${secs.map(([k, l], i) => `<button class="${i ? '' : 'on'}" data-act="sec" data-sec="${k}">${l}</button>`).join('')}</nav>`;
+  }
+  const shortName = (n) => (n.length > 11 ? n.split(' ').pop() : n);
+  const miniMatch = (m) => `<span class="mm">${crest(m.home, 22)}<b>${esc(shortName(m.home))}</b><em>${m.kind === 'live' && m.score ? `${m.score[0]}:${m.score[1]}` : 'vs'}</em><b>${esc(shortName(m.away))}</b>${crest(m.away, 22)}</span>`;
   function vResult(id) {
     const m = findMatch(id);
     if (!m) return '<div class="empty" style="margin-top:24px">Diese Analyse gibt es nicht (mehr).</div>';
@@ -289,19 +323,22 @@
     const favCol = favHome ? c.h : c.a;
     const badge = k === 'draw' ? ['Offenes Spiel', 'var(--fill)', 'var(--text)']
       : favP > 0.7 ? ['Klarer Favorit', favCol, onColor(favCol)] : favP > 0.5 ? ['Favorit', favCol, onColor(favCol)] : ['Leicht vorne', favCol, onColor(favCol)];
-    let out = `<div class="res"><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
+    const hc = teamColor(m.home);
+    const ac = teamColor(m.away);
+    const fcol = favHome ? hc : ac;
+    let out = `<div class="res" style="--hgl:${rgba(hc, 0.3)};--agl:${rgba(ac, 0.3)};--hgd:${rgba(hc, 0.55)};--agd:${rgba(ac, 0.55)};--fvl:${rgba(fcol, 0.1)};--fvd:${rgba(fcol, 0.24)}"><div class="glow" aria-hidden="true"></div><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
       <div class="match-top">${live ? `<span class="chip live">LIVE ${m.minute}'</span>` : `<span class="chip glass">${m.kind === 'odds' ? 'Quoten' : 'Vor dem Spiel'}</span>`}<span class="chip glass">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
       <div class="versus"><div class="side">${plate(m.home, 80, redCards(m, 0))}<span class="nm">${esc(m.home)}</span></div>
         <div class="mid">${live ? `<div class="sc">${m.score[0]}:${m.score[1]}</div><div class="sub">${m.minute}. Minute</div>` : '<div class="vs">VS</div>'}</div>
         <div class="side">${plate(m.away, 80, redCards(m, 1))}<span class="nm">${esc(m.away)}</span></div></div></section>
-      <div class="cards" style="margin-top:14px">`;
+      ${secNav(m, a)}<div class="cards">`;
 
     // 1) Prognose mit der großen Zahl
-    out += `<section class="card prob big" style="--i:0"><div class="top"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
-        <span class="badge" style="background:${badge[1]};color:${badge[2]}">${badge[0]}</span></div>
+    out += `<section class="card prob big" data-sec="ov" style="--i:0"><div class="top"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
+        <span class="badge" style="background:${badge[1]};color:${badge[2]};--bgc:${badge[1]}">${badge[0]}</span></div>
       <div class="big-l">${esc(label)}</div><div class="big-s">${live ? `beim Stand von ${m.score[0]}:${m.score[1]} in der ${m.minute}. Minute${shortHanded(m)}` : 'vor dem Anpfiff'}</div>
       <div class="split" role="img" aria-label="Sieg ${esc(m.home)} ${r[0]} Prozent, Remis ${r[1]} Prozent, Sieg ${esc(m.away)} ${r[2]} Prozent">
-        <i style="flex:${a.probs.home};background:${c.h}"></i><i style="flex:${a.probs.draw};background:var(--draw)"></i><i style="flex:${a.probs.away};background:${c.a}"></i></div>
+        <i style="flex:${a.probs.home};background:${c.h};color:${c.h}"></i><i style="flex:${a.probs.draw};background:var(--draw);color:var(--draw)"></i><i style="flex:${a.probs.away};background:${c.a};color:${c.a}"></i></div>
       <div class="legend3"><div class="it">${crest(m.home, 24)}<div class="tx"><b>${r[0]} %</b><span>${esc(m.home)}</span></div></div>
         <div class="it"><span class="dot">X</span><div class="tx"><b>${r[1]} %</b><span>Remis</span></div></div>
         <div class="it"><div class="tx"><b>${r[2]} %</b><span>${esc(m.away)}</span></div>${crest(m.away, 24)}</div></div></section>`;
@@ -312,7 +349,7 @@
     // 2) Wahrscheinlichstes Ergebnis als Anzeigetafel, darunter die nächsten
     const t0 = a.top[0];
     const sCol = (s) => (s.h > s.a ? c.h : s.h < s.a ? c.a : 'var(--draw)');
-    out += `<section class="card tip" style="--i:1"><div class="eyebrow">Wahrscheinlichstes Ergebnis</div>
+    out += `<section class="card tip" data-sec="er" style="--i:1"><div class="eyebrow">Wahrscheinlichstes Ergebnis</div>
       <div class="board">${crest(m.home, 42)}<b>${t0.h}</b><span class="colon">:</span><b>${t0.a}</b>${crest(m.away, 42)}</div>
       <div class="meta"><span class="chip">${pct1(t0.p)}</span><span>${oneIn(t0.p)} endet so</span></div>
       <div class="scores">${a.top.slice(1).map((s) => `<div class="row srow"><span class="r">${s.h}:${s.a}</span><span class="mbar"><i style="width:${(s.p / t0.p * 100).toFixed(1)}%;background:${sCol(s)}"></i></span><span class="v">${pct1(s.p)}</span></div>`).join('')}</div></section>`;
@@ -324,24 +361,24 @@
     if (m.kind === 'odds') out += oddsBlock(m, a, 3);
 
     // 5) Tore
-    out += goalsCard(a, 4);
+    out += goalsCard(a, 4, favCol);
 
     // 6) Halbzeit & Doppelchance
-    out += `<section class="card" style="--i:5"><div class="card-h"><h3>${a.ht ? 'Halbzeit & Doppelchance' : 'Doppelchance'}</h3></div>
+    out += `<section class="card" data-sec="hz" style="--i:5"><div class="card-h"><h3>${a.ht ? 'Halbzeit & Doppelchance' : 'Doppelchance'}</h3></div>
       ${a.ht ? mini('Stand zur Halbzeit', `am ehesten ${a.ht.top[0].h}:${a.ht.top[0].a}`, [a.ht.home, a.ht.draw, a.ht.away], c, [m.home, 'Remis', m.away]) : ''}
       <div class="tiles t3" style="${a.ht ? '' : 'margin-top:0'}"><div class="tile"><span>${esc(m.home)} oder Remis</span><b>${pct0(a.double['1X'])}</b></div>
         <div class="tile"><span>kein Remis</span><b>${pct0(a.double['12'])}</b></div><div class="tile"><span>${esc(m.away)} oder Remis</span><b>${pct0(a.double.X2)}</b></div></div></section>`;
 
     // 7) Nächstes Tor: wer, und wann (Kurve)
     const nx = a.next;
-    out += `<section class="card" style="--i:6"><div class="card-h"><h3>Nächstes Tor</h3><span class="note">${live ? `ab der ${m.minute}. Minute` : 'ab Anpfiff'}</span></div>
+    out += `<section class="card" data-sec="nt" style="--i:6"><div class="card-h"><h3>Nächstes Tor</h3><span class="note">${live ? `ab der ${m.minute}. Minute` : 'ab Anpfiff'}</span></div>
       ${mini('Wer trifft als Nächstes?', '', [nx.home, nx.none, nx.away], c, [m.home, 'keins', m.away])}
-      ${curveSvg(nx, live ? m.minute : 0)}
+      ${curveSvg(nx, live ? m.minute : 0, favCol, m.id)}
       <div class="tiles t3 short"><div class="tile"><span>in 10 Min.</span><b>${pct0(nx.in10)}</b></div><div class="tile"><span>in 20 Min.</span><b>${pct0(nx.in20)}</b></div><div class="tile"><span>in 30 Min.</span><b>${pct0(nx.in30)}</b></div></div>
       <p class="muted" style="font-size:13px;margin-top:12px">${nx.median != null ? `50:50-Marke: Bis zur ${nx.median}. Minute ist mit halber Chance ein Tor gefallen.` : 'Eher fällt in diesem Spiel kein Tor mehr.'}</p></section>`;
 
     // 8) Erklärung
-    out += `<section class="card explain" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
+    out += `<section class="card explain" data-sec="ex" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
     out += `</div><p class="foot">${m.src === 'tips' ? 'Chancen aus den Buchmacher-Quoten (DraftKings über ESPN), Tore zusätzlich mit Result AI · jede Stunde neu gesucht.<br>' : ''}${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (38 Ligen + Europapokal).<br>` : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
     return out;
   }
@@ -355,23 +392,24 @@
         const p = (a.matrix[x] || [])[y] || 0;
         const k = p / mx;
         const col = tint(x, y);
-        h += `<span class="c"><i style="background:${col};opacity:${(0.1 + 0.9 * k).toFixed(3)}"></i><em style="color:${k > 0.55 ? onColor(col) : 'var(--text)'}">${p >= 0.005 ? Math.round(p * 100) : ''}</em></span>`;
+        h += `<span class="c${p === mx ? ' top' : ''}" style="--tc:${col}"><i style="background:${col};opacity:${(0.1 + 0.9 * k).toFixed(3)}"></i><em style="color:${k > 0.55 ? onColor(col) : 'var(--text)'}">${p >= 0.005 ? Math.round(p * 100) : ''}</em></span>`;
       }
     }
     return h + `</div><div class="heat-cap"><span>${crest(m.home, 18)}↓ Tore ${esc(m.home)}</span><span>Tore ${esc(m.away)} →${crest(m.away, 18)}</span></div>`;
   }
   // Tore im Spiel: Balken für 0, 1, … 6+ Tore, dazu Über/Unter und „beide treffen“
-  function goalsCard(a, i) {
+  function goalsCard(a, i, col) {
     const mx = Math.max(...a.totals);
     const cols = a.totals.map((p, n) => `<div class="col ${p === mx ? 'max' : ''}"><span class="pv">${p < 0.0005 ? '–' : pct0(p)}</span><i style="height:${Math.max(4, Math.round(p / mx * 108))}px"></i><span class="lb">${n === 6 ? '6+' : n}</span></div>`).join('');
     const ov = a.over.length > 3 ? a.over.slice(1, 4) : a.over.slice(0, 3); // „über 0,5“ sagt wenig – lieber 1,5 bis 3,5
     const tiles = ov.map((o) => `<div class="tile"><span>Über ${nf1.format(o.line)} Tore</span><b>${pct0(o.over)}</b></div>`).join('')
       + `<div class="tile"><span>Beide treffen</span><b>${a.btts > 0.9995 ? '✓' : pct0(a.btts)}</b></div>`;
-    return `<section class="card" style="--i:${i}"><div class="card-h"><h3>Tore im Spiel</h3><span class="note">insgesamt am Ende</span></div>
-      <div class="bars7" role="img" aria-label="Wahrscheinlichkeit für die Gesamtzahl der Tore">${cols}</div><div class="tiles">${tiles}</div></section>`;
+    return `<section class="card" data-sec="to" style="--i:${i}"><div class="card-h"><h3>Tore im Spiel</h3><span class="note">insgesamt am Ende</span></div>
+      <div class="bars7" style="--bc:${col || 'var(--text)'}" role="img" aria-label="Wahrscheinlichkeit für die Gesamtzahl der Tore">${cols}</div><div class="tiles">${tiles}</div></section>`;
   }
   // Kurve: Chance, dass bis zur Minute x (noch) ein Tor fällt
-  function curveSvg(nx, from) {
+  function curveSvg(nx, from, col = 'var(--text)', uid = 'x') {
+    const gid = 'cg-' + String(uid).replace(/[^a-z0-9_-]/gi, '');
     const pts = nx.curve || [];
     if (!pts.length) return '';
     const W = 330;
@@ -390,9 +428,10 @@
     const ticks = [from, 45, 90].filter((t, i, arr) => t >= from && arr.indexOf(t) === i && !(i > 0 && t - from < 12));
     return `<svg class="curve" viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance auf ein Tor bis zur jeweiligen Minute">
       ${[0, 0.5, 1].map((p) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(p).toFixed(1)}" y2="${Y(p).toFixed(1)}"/><text x="${L - 6}" y="${(Y(p) + 4).toFixed(1)}" text-anchor="end">${Math.round(p * 100)} %</text>`).join('')}
-      <path class="area" d="${area}"/><path class="ln" d="${d}"/>
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".34"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+      <path class="area" d="${area}" style="fill:url(#${gid});opacity:1"/><path class="ln" d="${d}" style="stroke:${col}"/>
       ${ticks.map((t) => `<text x="${X(t).toFixed(1)}" y="${H - 4}" text-anchor="middle">${t}'</text>`).join('')}
-      <circle class="pt" cx="${X(95).toFixed(1)}" cy="${Y(end.p).toFixed(1)}" r="4.5"/>
+      <circle class="pt" cx="${X(95).toFixed(1)}" cy="${Y(end.p).toFixed(1)}" r="4.5" style="stroke:${col}"/>
       <text class="pl" x="${(X(95) - 8).toFixed(1)}" y="${(Y(end.p) - 9).toFixed(1)}" text-anchor="end">${Math.round(end.p * 100)} % bis Abpfiff</text></svg>`;
   }
   function oddsBlock(m, a, i) {
@@ -403,7 +442,7 @@
     const v = (x) => (x == null ? '–' : pct0(x));
     const ov = (r) => { const o = r && r.over.find((x) => x.line === 2.5); return o ? o.over : null; };
     const row = (l, x, y) => `<div class="cmp-row"><span>${l}</span><span class="v">${v(x)}</span><span class="v">${v(y)}</span></div>`;
-    return `<section class="card" style="--i:${i}"><div class="card-h"><h3>Markt vs. Result AI</h3><span class="note">${nf2.format(m.odds.home)} · ${nf2.format(m.odds.draw)} · ${nf2.format(m.odds.away)}</span></div>
+    return `<section class="card" data-sec="mk" style="--i:${i}"><div class="card-h"><h3>Markt vs. Result AI</h3><span class="note">${nf2.format(m.odds.home)} · ${nf2.format(m.odds.draw)} · ${nf2.format(m.odds.away)}</span></div>
       <div class="cmp-row h"><span>Ausgang</span><span class="v">Markt</span><span class="v">Result AI</span></div>
       ${row(`Sieg ${esc(m.home)}`, q.market.home, own && own.probs.home)}${row('Remis', q.market.draw, own && own.probs.draw)}${row(`Sieg ${esc(m.away)}`, q.market.away, own && own.probs.away)}
       ${row('Über 2,5 Tore', ov(mk), ov(own))}
@@ -513,7 +552,8 @@
     if (!d) return '<h1 class="ptitle">Spiel auswählen</h1><div class="empty" style="margin-top:18px">Die Team-Stärken werden geladen …</div>';
     const slot = (side, label) => {
       const t = P[side] && R.byId[P[side]];
-      return `<button class="slot ${t ? 'set' : ''}" data-act="slot" data-side="${side}">${t ? crest(reg(t), 46) : `<span class="slot-ph">${I.search}</span>`}
+      const sc = t ? teamColor(reg(t)) : null;
+      return `<button class="slot ${t ? 'set' : ''}" data-act="slot" data-side="${side}"${sc ? ` style="--sg:${rgba(sc, 0.16)};--sgd:${rgba(sc, 0.32)}"` : ''}>${t ? crest(reg(t), 46) : `<span class="slot-ph">${I.search}</span>`}
         <span class="grow"><span class="slot-l">${label}</span><span class="slot-n">${t ? esc(tName(t)) : 'Team suchen'}</span>${t ? `<span class="slot-s">${esc(lgName(t.lg))}</span>` : ''}</span><span class="chev">›</span></button>`;
     };
     return `<h1 class="ptitle">Spiel auswählen</h1><p class="psub">Zwei Teams suchen – Result AI rechnet mit den Stärken von heute.</p>
@@ -594,6 +634,7 @@
     const y = p.el.scrollTop;
     p.el.innerHTML = barHtml(p.path) + `<div class="wrap">${viewHtml(p.path)}</div>`;
     p.drawn = { tips: T.at, ratings: !!R.data, err: T.err };
+    p.el._geo = null;
     p.el.scrollTop = y;
   }
 
@@ -663,7 +704,7 @@
     const list = [['safe', 'Sicher'], ['top', 'Top-Quote']].flatMap(([k, l]) => T.data[k].filter((t) => t.g === m.gid).map((t) => [t, l]))
       .filter(([t]) => !seen.has(t.m) && seen.add(t.m));
     if (!list.length) return '';
-    return `<section class="card" style="--i:${i}"><div class="card-h"><h3>Top-Tipps zu diesem Spiel</h3><span class="note">jede Stunde neu</span></div>
+    return `<section class="card" data-sec="tp" style="--i:${i}"><div class="card-h"><h3>Top-Tipps zu diesem Spiel</h3><span class="note">jede Stunde neu</span></div>
       ${list.map(([t, l]) => `<div class="tg-row"><span class="grow"><span class="k">${l} · ${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, m.home, m.away))}</b></span>${ring(t.p)}<span class="tg-q"><span>Quote</span><b>${qTxt(t)}</b></span></div>`).join('')}</section>`;
   }
 
@@ -671,7 +712,9 @@
     const g = T.data.games[t.g];
     const h = tipTeam(g.home);
     const a = tipTeam(g.away);
-    return `<a class="tcard ${list}" href="#/r/t_${esc(g.id)}" style="--i:${Math.min(i, 8)}">
+    const hcl = teamColor(h);
+    const acl = teamColor(a);
+    return `<a class="tcard ${list}" href="#/r/t_${esc(g.id)}" style="--i:${Math.min(i, 8)};--hg:${rgba(hcl, 0.1)};--ag:${rgba(acl, 0.1)};--hgd:${rgba(hcl, 0.22)};--agd:${rgba(acl, 0.22)}">
       <div class="tc-top"><span class="tc-comp">${esc(g.comp)}</span><span class="tc-time">${esc(kickoff(g.t))}</span></div>
       <div class="tc-main"><div class="tc-teams"><span class="tm">${crest(h, 24)}<span>${esc(h)}</span></span><span class="tm">${crest(a, 24)}<span>${esc(a)}</span></span></div>${ring(t.p)}</div>
       <div class="tc-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="tc-q"><span class="k">Quote</span><b>${qTxt(t)}</b></div></div>
@@ -811,6 +854,7 @@
     const root = S.stack[0] ? S.stack[0].path : '/';
     const i = Math.max(0, TABS.findIndex((t) => t[0] === root));
     tabbar.style.setProperty('--i', i);
+    tabbar.dataset.tab = TABS[i][0];
     $$('button', tabbar).forEach((b, k) => { b.classList.toggle('on', k === i); if (k === i) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   // Bereich wechseln: ohne Schieben (wie bei iPhone-Apps), der Scrollstand je Bereich bleibt
@@ -843,13 +887,40 @@
     el._raf = requestAnimationFrame(() => {
       el._raf = 0;
       const b = el.firstElementChild;
-      b.classList.toggle('scrolled', el.scrollTop > 4);
-      b.classList.toggle('titled', el.scrollTop > 64);
+      const y = el.scrollTop;
+      if (!el._geo) el._geo = pageGeo(el);
+      const g = el._geo;
+      b.classList.toggle('scrolled', y > 4);
+      b.classList.toggle('titled', y > g.title);
+      if (g.nav) { g.nav.classList.toggle('stuck', y >= g.navAt); spy(el, g, y); }
+    });
+  }
+  // Maße einer Seite (einmal je Seite, aus dem Layout – Animationen zählen nicht): ab wann der kleine Titel erscheint,
+  // wann die Sprung-Leiste klebt und wo die Abschnitte liegen
+  function pageGeo(el) {
+    const pos = (x) => { let t = 0; for (let n = x; n && n !== el; n = n.offsetParent) t += n.offsetTop; return t; };
+    const bar = el.firstElementChild.offsetHeight;
+    const mc = $('.match', el);
+    const nav = $('.snav', el);
+    const navTop = nav ? (mc ? pos(mc) + mc.offsetHeight + parseFloat(getComputedStyle(nav).marginTop || 0) : pos(nav)) : 0;
+    return { title: mc ? pos(mc) + mc.offsetHeight - bar - 10 : 64, nav, navAt: nav ? navTop - bar - 1 : 0, off: bar + (nav ? nav.offsetHeight : 0) + 8,
+      secs: nav ? $$('[data-sec]', el).filter((x) => !x.closest('.snav')).map((x) => [x.dataset.sec, pos(x)]) : [], cur: null };
+  }
+  function spy(el, g, y) {
+    let cur = g.secs.length ? g.secs[0][0] : null;
+    g.secs.forEach(([k, t]) => { if (t - g.off <= y + 4) cur = k; });
+    if (g.secs.length && y + el.clientHeight >= el.scrollHeight - 4) cur = g.secs[g.secs.length - 1][0]; // ganz unten: letzter Abschnitt
+    if (!cur || g.cur === cur) return;
+    g.cur = cur;
+    $$('button', g.nav).forEach((bt) => {
+      const on = bt.dataset.sec === cur;
+      bt.classList.toggle('on', on);
+      if (on) g.nav.scrollTo({ left: Math.max(0, bt.offsetLeft - (g.nav.clientWidth - bt.offsetWidth) / 2), behavior: reduce ? 'auto' : 'smooth' });
     });
   }
   function makePage(path) {
     const el = document.createElement('section');
-    el.className = 'page';
+    el.className = 'page' + (path.startsWith('/r/') ? ' rp' : '');
     el.innerHTML = barHtml(path) + `<div class="wrap">${viewHtml(path)}</div>`;
     el.addEventListener('scroll', onPageScroll, { passive: true });
     return { path, el, shown: false, drawn: { tips: T.at, ratings: !!R.data, err: T.err } };
@@ -882,6 +953,9 @@
     stackEl.appendChild(to.el);
     S.stack.push(to);
     if (!from || reduce) { if (from) from.el.classList.add('hide'); afterShow(to, !from); return; }
+    const mo = S.morph;
+    S.morph = null;
+    if (mo && performance.now() - mo.t < 900 && path.startsWith('/r/') && mo.el.isConnected && $('.match', to.el)) { await morphPush(from, to, mo); return; }
     S.busy = true;
     stackEl.classList.add('busy');
     const shade = makeShade();
@@ -903,6 +977,84 @@
     stackEl.classList.remove('busy');
     afterShow(to, false);
   }
+  // Karte wächst in die Seite (wie im App Store): ein Abbild der Spiel-Karte fliegt von der angetippten Karte an ihren
+  // Platz, die neue Seite blendet darunter ein – gleichmäßig skaliert (nichts verzerrt), nur transform/opacity.
+  const MORPH = { duration: 560, easing: 'cubic-bezier(.32,.72,0,1)' };
+  document.addEventListener('click', (e) => {
+    const c = e.target.closest && e.target.closest('a.gcard[href^="#/r/"], a.tcard, a.tmini, a.k-leg, a.row[href^="#/r/"]');
+    if (c) S.morph = { el: c, rect: c.getBoundingClientRect(), t: performance.now() };
+  }, true);
+  function ghostOf(card, r) {
+    const g = card.cloneNode(true);
+    g.classList.add('ghost');
+    g.setAttribute('aria-hidden', 'true');
+    Object.assign(g.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+    document.body.appendChild(g);
+    return g;
+  }
+  // Lage der Spiel-Karte (dst), verkleinert auf die Fläche der angetippten Karte (src)
+  const flyFrom = (src, dst) => {
+    const k = Math.min(src.width / dst.width, src.height / dst.height);
+    return `translate(${(src.left + (src.width - dst.width * k) / 2 - dst.left).toFixed(1)}px, ${(src.top + (src.height - dst.height * k) / 2 - dst.top).toFixed(1)}px) scale(${k.toFixed(4)})`;
+  };
+  async function morphPush(from, to, mo) {
+    S.busy = true;
+    stackEl.classList.add('busy');
+    const card = $('.match', to.el);
+    $('.res', to.el).classList.add('morphed');
+    const dst = card.getBoundingClientRect();
+    const g = ghostOf(card, dst);
+    card.style.visibility = 'hidden';
+    mo.el.style.visibility = 'hidden';
+    to.morphSrc = mo.el.id === 'frame' ? null : mo.el;
+    const anims = [
+      g.animate([{ transform: flyFrom(mo.rect, dst), opacity: 0 }, { opacity: 1, offset: 0.2 }, { transform: 'none', opacity: 1 }], Object.assign({ fill: 'both' }, MORPH)),
+      to.el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 340, delay: 90, easing: 'ease-out', fill: 'both' }),
+    ];
+    const t = setTimeout(() => afterShow(to, false), 180); // die Karten darunter steigen schon auf, während die Karte fliegt
+    await settle(anims, MORPH.duration + 600);
+    clearTimeout(t);
+    card.style.visibility = '';
+    g.remove();
+    anims.forEach((x) => x.cancel());
+    mo.el.style.visibility = '';
+    from.el.classList.add('hide');
+    S.busy = false;
+    stackEl.classList.remove('busy');
+    afterShow(to, false);
+  }
+  // zurück: nur wenn die Karte sichtbar ist und die angetippte Karte noch auf der Seite darunter liegt
+  function canMorphBack(top, target) {
+    const src = top.morphSrc;
+    const card = $('.match', top.el);
+    if (!src || !card || !src.isConnected || !target.el.contains(src)) return false;
+    const r = card.getBoundingClientRect();
+    const s = src.getBoundingClientRect();
+    return r.bottom > 60 && r.top < innerHeight - 60 && s.width > 0 && s.bottom > 0 && s.top < innerHeight;
+  }
+  async function morphPop(top, target) {
+    S.busy = true;
+    stackEl.classList.add('busy');
+    const card = $('.match', top.el);
+    const src = top.morphSrc;
+    const dst = card.getBoundingClientRect();
+    const g = ghostOf(card, dst);
+    card.style.visibility = 'hidden';
+    src.style.visibility = 'hidden';
+    const back = flyFrom(src.getBoundingClientRect(), dst);
+    const anims = [
+      g.animate([{ transform: 'none', opacity: 1 }, { opacity: 1, offset: 0.72 }, { transform: back, opacity: 0 }], { duration: 480, easing: MORPH.easing, fill: 'both' }),
+      top.el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: 'ease-out', fill: 'both' }),
+    ];
+    const t = setTimeout(() => { src.style.visibility = ''; }, 330); // die echte Karte blendet unter dem Abbild ein
+    await settle(anims, 480 + 600);
+    clearTimeout(t);
+    src.style.visibility = '';
+    top.el.remove();
+    g.remove();
+    S.busy = false;
+    stackEl.classList.remove('busy');
+  }
   async function popTo(idx) {
     const top = S.stack[S.stack.length - 1];
     const target = S.stack[idx];
@@ -912,6 +1064,7 @@
     const sw = S.swipe;
     S.swipe = null;
     if (reduce) { top.el.remove(); if (sw) sw.shade.remove(); return; }
+    if (!sw && canMorphBack(top, target)) { await morphPop(top, target); return; }
     S.busy = true;
     stackEl.classList.add('busy');
     const w = stackEl.clientWidth;
@@ -956,6 +1109,7 @@
       const y = p.el.scrollTop;
       p.el.classList.add('still');
       p.el.innerHTML = barHtml(p.path) + `<div class="wrap">${viewHtml(p.path)}</div>`;
+      p.el._geo = null;
       const big = $('.big', p.el);
       if (big) big.classList.add('go');
       p.el.scrollTop = y;
@@ -1099,6 +1253,21 @@
       redrawTop();
     }
     else if (act === 'calc') calcPick();
+    else if (act === 'sec') {
+      const pg = a.closest('.page');
+      const sec = pg && $$(`[data-sec="${a.dataset.sec}"]`, pg).find((x) => !x.closest('.snav'));
+      if (sec) {
+        if (!pg._geo) pg._geo = pageGeo(pg);
+        const t = pg._geo.secs.find(([k]) => k === a.dataset.sec);
+        pg.scrollTo({ top: Math.max(0, (t ? t[1] : 0) - pg._geo.off + 2), behavior: reduce ? 'auto' : 'smooth' });
+      }
+    }
+    else if (act === 'demoscan') {
+      if (S.url) { URL.revokeObjectURL(S.url); S.url = null; }
+      S.demo = true;
+      if (curPath() === '/scan') { const p = S.stack[S.stack.length - 1]; p.el.innerHTML = barHtml('/scan') + `<div class="wrap">${vScan()}</div>`; runScan(p.el); }
+      else location.hash = '#/scan';
+    }
     else if (act === 'tab') {
       const to = a.dataset.tab;
       if (S.stack[0] && S.stack[0].path === to) {
@@ -1135,6 +1304,7 @@
     if (!inp || !inp.files || !inp.files[0]) return;
     if (S.url) URL.revokeObjectURL(S.url);
     S.url = URL.createObjectURL(inp.files[0]);
+    S.demo = false;
     inp.value = '';
     location.hash = '#/scan';
   });
@@ -1148,7 +1318,7 @@
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel aus der BVB-App); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg';
+    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .demo-scan';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };
