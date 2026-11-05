@@ -46,6 +46,8 @@
     target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>',
     flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.6 3.2 5.5 5.6 5.5 10.6A5.5 5.5 0 0 1 12 19.1a5.5 5.5 0 0 1-5.5-5.5c0-2.6 1.4-4.3 2.6-5.4.2 1.9 1 3 2.1 3.4C11 8.6 10.6 5.6 12 3z"/></svg>',
+    spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 2.5l1.7 5.1 5.1 1.7-5.1 1.7L10 16.1l-1.7-5.1-5.1-1.7 5.1-1.7z"/><path d="M18 13.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   };
   const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 18 18)">
@@ -181,7 +183,7 @@
   // Leiste unten: vier Bereiche mit eigener Startseite (wie die Tab-Leiste einer iPhone-App)
   const TABS = [['/', 'Start', 'home'], ['/tips', 'Top-Tipps', 'flame'], ['/pick', 'Auswählen', 'search'], ['/hist', 'Verlauf', 'clock']];
   const isTab = (p) => TABS.some((t) => t[0] === p);
-  const TITLES = { '/': '', '/scan': 'Analyse', '/md': 'Spieltag', '/acc': 'Treffsicherheit', '/pick': 'Spiel auswählen', '/tips': 'Top-Tipps', '/hist': 'Verlauf' };
+  const TITLES = { '/': '', '/ki': 'KI-Zentrale', '/scan': 'Analyse', '/md': 'Spieltag', '/acc': 'Treffsicherheit', '/pick': 'Spiel auswählen', '/tips': 'Top-Tipps', '/hist': 'Verlauf' };
   const titleOf = (path) => (path in TITLES ? TITLES[path] : 'Ergebnis');
   function barHtml(path) {
     let tt = esc(titleOf(path));
@@ -189,7 +191,7 @@
     const lead = path === '/' ? `<span class="brand">${logo('intro-logo')}<span>Result AI</span></span>`
       : isTab(path) ? '' : `<button class="round" data-act="back" aria-label="Zurück">${I.back}</button>`;
     return `<header class="bar">${lead}<span class="tt">${tt}</span>
-      <span class="end"><button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span></header>`;
+      <span class="end">${path === '/' ? `<button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button>` : ''}<button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span></header>`;
   }
   function viewHtml(path) {
     if (path === '/') return vHome();
@@ -199,6 +201,7 @@
     if (path === '/pick') return vPick();
     if (path === '/tips') return vTips();
     if (path === '/hist') return vHist();
+    if (path === '/ki') return vKI();
     if (path.startsWith('/r/')) return vResult(decodeURIComponent(path.slice(3)));
     return vHome();
   }
@@ -815,7 +818,7 @@
       const now = { tips: T.at, ratings: !!R.data, err: T.err };
       if (p.drawn && p.drawn.tips === now.tips && p.drawn.ratings === now.ratings && p.drawn.err === now.err) return;
       if (p.path.startsWith('/r/') && p.drawn && p.drawn.tips) return; // Ergebnis-Seite steht schon
-      if (p.path === '/') { $$('.tips-prev', p.el).forEach((x) => { x.innerHTML = tipsPreview(); }); p.drawn = now; } else redrawPage(p);
+      if (p.path === '/') { $$('.tips-prev', p.el).forEach((x) => { x.innerHTML = tipsPreview(); }); $$('.kib', p.el).forEach((x) => { x.innerHTML = kiBadge(); }); p.drawn = now; } else redrawPage(p);
     });
   }
 
@@ -826,6 +829,131 @@
       <div class="group" style="margin-top:18px"><a class="row" href="#/acc"><span class="round">${I.target}</span><span class="grow"><div class="t">Wie oft lag Result AI richtig?</div><div class="s">${hist.length ? `${hist.length} ${hist.length === 1 ? 'Prognose' : 'Prognosen'} gespeichert · noch keine ausgewertet` : 'Nur deine Prognosen · noch keine ausgewertet'}</div></span><span class="chev">›</span></a></div>
       <section class="sec"><div class="sec-h"><h2>Deine Prognosen</h2>${hist.length ? `<span class="note">${hist.length}</span>` : ''}</div>
         ${hist.length ? `<div class="group">${hist.map(histRow).join('')}</div>` : '<div class="empty">Noch keine Prognosen. Wähl ein Spiel aus oder scanne einen Screenshot – alles landet hier.</div>'}</section>`;
+  }
+
+  // ------------------------------------------------------------------ KI-Zentrale: Protokoll der automatischen Rechner
+  // (scripts/activity.py: jede Tipp-Suche und jeder Stärken-Lauf schreibt, was neu dazukam)
+  const A = { data: null, loading: null, at: 0, err: false, open: {} };
+  function loadActivity(maxAge) {
+    if (A.data && Date.now() - A.at < (maxAge == null ? 60e3 : maxAge)) return Promise.resolve(A.data);
+    if (!A.loading) {
+      A.loading = fetch('data/activity.json', { cache: 'no-cache' })
+        .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then((d) => { A.data = d; A.at = Date.now(); A.err = false; return d; })
+        .catch((e) => { A.err = true; throw e; })
+        .finally(() => { A.loading = null; });
+    }
+    return A.loading;
+  }
+  const JOBS = {
+    tips: { name: 'Tipp-Suche', every: 'jede Stunde', icon: 'flame', warn: 2.5, bad: 6 },
+    ratings: { name: 'Stärken-Rechner', every: 'jeden Morgen', icon: 'chart', warn: 30, bad: 50 },
+  };
+  function ago(iso) {
+    const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60e3));
+    if (m < 1) return 'gerade eben';
+    if (m < 60) return `vor ${m} Min.`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `vor ${h} Std.`;
+    return agoText(new Date(iso).getTime());
+  }
+  const hm = (iso) => new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  function runLine(r) {
+    const s = r.sum || {};
+    if (r.job === 'tips') {
+      const parts = [];
+      if (s.new) parts.push(s.new === 1 ? '1 neuer Tipp' : `${s.new} neue Tipps`);
+      if (s.moved) parts.push(`${s.moved} angepasst`);
+      if (s.gone) parts.push(`${s.gone} raus`);
+      if (s.checked) parts.push(`${s.checked} ausgewertet (${s.won} ✓)`);
+      return parts.length ? parts.join(' · ') : `${s.games || 0} Spiele geprüft · keine Änderung`;
+    }
+    const parts = [`${s.teams} Teams neu berechnet`];
+    if (s.newGames) parts.push(`${s.newGames} neue Spiele`);
+    if (s.newTeams) parts.push(`${s.newTeams} neue Teams`);
+    return parts.join(' · ');
+  }
+  function runDetails(r) {
+    let h = '';
+    if (r.job === 'tips') {
+      if (r.added && r.added.length) {
+        h += `<div class="kd-h">Neu in den Listen</div>${r.added.map((t) => {
+          const hn = tipTeam({ id: t.hid, name: t.h });
+          const an = tipTeam({ id: t.aid, name: t.a });
+          return `<div class="kd-row"><span class="duo">${crest(hn, 24, true)}${crest(an, 24, true)}</span><span class="grow"><b>${esc(tipLabel(t.m, hn, an))}</b><span>${esc(hn)} – ${esc(an)} · ${esc(t.comp)} · ${esc(kickoff(t.kick))}</span></span><span class="kd-v"><b class="${t.list}">${Math.round(t.p * 100)} %</b><span>${t.real ? '' : '≈'}${nf2.format(t.q)}</span></span></div>`;
+        }).join('')}`;
+      }
+      if (r.results && r.results.length) {
+        h += `<div class="kd-h">Ausgewertet</div>${r.results.map((t) => {
+          const hn = tipTeam({ id: t.hid, name: t.h });
+          const an = tipTeam({ id: t.aid, name: t.a });
+          return `<div class="kd-row"><span class="mk ${t.won ? 'won' : 'lost'}">${t.won ? '✓' : '✗'}</span><span class="grow"><b>${esc(tipLabel(t.m, hn, an))}</b><span>${esc(hn)} ${esc(t.score)} ${esc(an)} · ${esc(t.comp)}</span></span><span class="kd-v"><b>${Math.round(t.p * 100)} %</b></span></div>`;
+        }).join('')}`;
+      }
+    } else {
+      if (r.movers && r.movers.length) {
+        h += `<div class="kd-h">Größte Sprünge der Stärke</div>${r.movers.map((t) => {
+          const team = R.byId[t.id];
+          const n = team ? reg(team) : t.name;
+          return `<div class="kd-row"><span class="crest-w">${crest(n, 26)}</span><span class="grow"><b>${esc(n)}</b><span>${esc(team ? lgName(team.lg) : '')}</span></span><span class="kd-v"><b class="${t.d > 0 ? 'up' : 'down'}">${t.d > 0 ? '▲' : '▼'} ${nf2.format(Math.abs(t.d))}</b><span>jetzt ${nf2.format(t.now)}</span></span></div>`;
+        }).join('')}`;
+      }
+      if (r.newTeams && r.newTeams.length) h += `<div class="kd-h">Neue Teams</div><p class="kd-p">${r.newTeams.map((t) => esc(t.name)).join(', ')}</p>`;
+    }
+    return h || '<p class="kd-p">Keine Einzelheiten (älter als 3 Tage oder nichts Neues).</p>';
+  }
+  function vKI() {
+    const head = '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was die automatischen Rechner hinzufügen – jeder Lauf wird hier protokolliert.</p>';
+    const d = A.data;
+    if (!d) return head + `<div class="empty" style="margin-top:18px">${A.err ? 'Das Protokoll konnte gerade nicht geladen werden.' : 'Das Protokoll wird geladen …'}</div>`;
+    const runs = (d.runs || []).slice().reverse();
+    const last = (job) => runs.find((r) => r.job === job);
+    const status = Object.keys(JOBS).map((k) => {
+      const j = JOBS[k];
+      const r = last(k);
+      const age = r ? (Date.now() - new Date(r.t).getTime()) / 36e5 : null;
+      const st = !r ? 'idle' : !r.ok ? 'bad' : age > j.bad ? 'bad' : age > j.warn ? 'warn' : 'ok';
+      const txt = { ok: 'läuft', warn: 'verspätet', bad: 'hängt', idle: 'wartet auf ersten Lauf' }[st];
+      return `<div class="ks-row"><span class="ks-ic">${I[j.icon]}</span><span class="grow"><b>${j.name}</b><span>${j.every} · ${r ? `zuletzt ${ago(r.t)}` : 'noch kein Lauf protokolliert'}</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>`;
+    }).join('');
+    const startToday = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
+    const today = runs.filter((r) => new Date(r.t).getTime() >= startToday);
+    const sum = (list, f) => list.reduce((x, r) => x + (f(r) || 0), 0);
+    const tiles = [
+      [today.length, 'Läufe heute'],
+      [sum(today.filter((r) => r.job === 'tips'), (r) => r.sum.new), 'neue Tipps heute'],
+      [sum(today.filter((r) => r.job === 'tips'), (r) => r.sum.checked), 'heute ausgewertet'],
+      [R.data ? R.data.teams.length : '–', 'Teams mit Stärken'],
+    ].map(([v, l]) => `<div class="kt"><b>${v}</b><span>${l}</span></div>`).join('');
+    // 7 Tage: neue Tipps je Tag (Balken) und Läufe je Tag
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const s0 = startToday - i * 864e5;
+      const rs = runs.filter((r) => { const t = new Date(r.t).getTime(); return t >= s0 && t < s0 + 864e5; });
+      days.push({ s0, n: sum(rs.filter((r) => r.job === 'tips'), (r) => r.sum.new), runs: rs.length });
+    }
+    const mx = Math.max(1, ...days.map((x) => x.n));
+    const chart = `<div class="kchart">${days.map((x, i) => `<div class="kc-col${i === 6 ? ' now' : ''}"><span class="kc-v">${x.n || ''}</span><i style="height:${Math.max(4, Math.round(x.n / mx * 92))}px"></i><span class="kc-l">${i === 6 ? 'Heute' : ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(x.s0).getDay()]}</span><span class="kc-r">${x.runs}×</span></div>`).join('')}</div>`;
+    // Protokoll nach Tagen
+    let log = '';
+    let lastDay = '';
+    runs.slice(0, 120).forEach((r, i) => {
+      const dk = new Date(r.t).toDateString();
+      if (dk !== lastDay) { log += `${lastDay ? '</div>' : ''}<div class="kl-day">${esc(dayDiff(r.t) === 0 ? 'Heute' : dayDiff(r.t) === -1 ? 'Gestern' : new Date(r.t).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</div><div class="group">`; lastDay = dk; }
+      const open = A.open[r.t + r.job];
+      log += `<button class="row kl-row${open ? ' open' : ''}" data-act="kirun" data-k="${esc(r.t + r.job)}"><span class="kl-ic ${r.job}">${I[JOBS[r.job] ? JOBS[r.job].icon : 'spark']}</span><span class="grow"><div class="t">${JOBS[r.job] ? JOBS[r.job].name : esc(r.job)} <span class="kl-t">${hm(r.t)}</span></div><div class="s">${esc(runLine(r))}</div></span><span class="chev">›</span></button>${open ? `<div class="kl-det">${runDetails(r)}</div>` : ''}`;
+    });
+    if (lastDay) log += '</div>';
+    return head + `<div class="card ks" style="margin-top:18px">${status}</div><div class="ktiles">${tiles}</div>
+      <section class="sec"><div class="sec-h"><h2>Neue Tipps · 7 Tage</h2><span class="note">Balken = neue Tipps · ×  = Läufe</span></div><div class="card">${chart}</div></section>
+      <section class="sec"><div class="sec-h"><h2>Protokoll</h2><span class="note">antippen für Einzelheiten</span></div>${log || '<div class="empty">Noch keine Läufe protokolliert.</div>'}</section>
+      <p class="foot">Die Rechner arbeiten ohne Sprach-KI: Mathe aus Ergebnissen, Toren und Buchmacher-Quoten – bei Zahlen genauer und ohne Erfundenes.<br>Gemini & Co. kommen mit dem Screenshot-Scan dazu und erscheinen dann ebenfalls hier.</p>`;
+  }
+  // Knopf oben rechts auf der Startseite: grüner Punkt (alles läuft) + neue Tipps heute
+  function kiBadge() {
+    const k = T.data && T.data.ki;
+    const fresh = T.data && Date.now() - new Date(T.data.updatedAt).getTime() < 3 * 36e5;
+    return `<i class="kib-dot${T.data ? (fresh ? ' ok' : ' warn') : ''}"></i><span>KI</span>${k && k.newTips ? `<b class="kib-n">+${k.newTips}</b>` : ''}`;
   }
 
   // ------------------------------------------------------------------ Spieltag
@@ -953,6 +1081,10 @@
     if (p.path === '/scan') runScan(p.el);
     if (p.path === '/pick' && !R.data) loadRatings().then(() => { if (S.stack[S.stack.length - 1] === p) redrawTop(); }).catch(() => {});
     if (p.path === '/' || p.path === '/tips' || p.path.startsWith('/r/t_')) freshTips(p);
+    if (p.path === '/ki') {
+      Promise.all([loadActivity(20e3), loadTips().catch(() => {}), loadRatings().catch(() => {})]).catch(() => {})
+        .then(() => { if (p.el.isConnected) redrawPage(p); });
+    }
     if (p.path.startsWith('/r/')) reveal(p.el);
   }
   // Ergebnis-Auftritt: Karte → Zahl rollt → Balken → Liste (einmalig)
@@ -1270,6 +1402,8 @@
       redrawTop();
     }
     else if (act === 'calc') calcPick();
+    else if (act === 'ki') location.hash = '#/ki';
+    else if (act === 'kirun') { A.open[a.dataset.k] = !A.open[a.dataset.k]; redrawTop(); }
     else if (act === 'sec') {
       const pg = a.closest('.page');
       const sec = pg && $$(`[data-sec="${a.dataset.sec}"]`, pg).find((x) => !x.closest('.snav'));
@@ -1337,7 +1471,7 @@
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel aus der BVB-App); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .demo-scan';
+    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .demo-scan, .kib, .kl-row';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };

@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v11`).
+  hochzählen (zuletzt `ra-shell-v13`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -290,6 +290,24 @@ Design, Übergänge, Animationen.
 - Tipps: FotMob-Ligen haben bei ESPN keine Spiele/Quoten → `tips.py` überspringt Ligen mit `src: 'fotmob'`.
 - Noch offen: Quoten der Europapokal-Spiele archivieren (die Tipp-Suche sieht sie jede Stunde) → als Markt-Beobachtung ins
   Modell, damit wenige Europapokal-Spiele Teams aus Ligen ohne Quoten nicht so stark verschieben.
+
+### KI-Zentrale + Champions League in den Tipps (05.11.2026, nachts – Niklas: „oben rechts ne Zentrale von der KI, wo ich gucken kann,
+wie oft die AIs was geadded haben und auch was“ · „bei Top-Matches nicht nur Samstag/Sonntag, sonst gibt's keine UCL“)
+
+- **Protokoll** `scripts/activity.py` → `web/data/activity.json`: jeder Lauf von Tipp-Suche (`tips.py`) und Stärken-Rechner (`ratings.py`)
+  hängt einen Eintrag an (Zeit, Dauer, ok, Zahlen; Tipps: neu / raus / angepasst ≥ 2 Punkte / ausgewertet + ✓; Stärken: Teams,
+  neue Spiele seit dem letzten Lauf, neue Teams, größte Sprünge ≥ 0,03). 14 Tage, Einzelheiten 3 Tage. Die Workflows speichern
+  die Datei mit (`git add … activity.json`). `tips.json` bekommt `ki` (heutige Läufe/neue Tipps) für den Knopf.
+- **App:** Knopf „KI“ oben rechts auf dem Start (grüner Punkt = Tipps jünger als 3 Std., Zahl = neue Tipps heute) → `#/ki`
+  (`vKI`): Status je Rechner (läuft / verspätet / hängt nach Alter), Kacheln heute, 7-Tage-Diagramm (neue Tipps, Läufe),
+  Protokoll nach Tagen zum Aufklappen (neue Tipps mit Chance/Quote, ausgewertete Tipps ✓/✗ mit Endstand, Stärke-Sprünge).
+  Ehrlich im Fuß: die Rechner sind Mathe ohne Sprach-KI; Gemini & Co. kommen mit dem Screenshot-Scan dazu.
+- **Tipps 3 Wochen voraus** (`DAYS = 21`, Listen bis 90): der nächste Champions/Europa/Conference-League-Spieltag ist immer dabei.
+  Neue Kombis: **Champions-League-Kombi** und **Bundesliga-Kombi** (nächster Spieltag, sichere Tipps). Filter in der App: Zeitraum
+  (Heute · Morgen · Diese Woche · Später) und Wettbewerb (wichtigste zuerst, gleiche Namen mit Land); Datum ab 7 Tagen Abstand.
+- **Reihenfolge laut Niklas (05.11.2026, nachts):** 1. KI-Zentrale (erledigt) → 2. **Design deutlich upgraden, überall** →
+  3. **Automatik absichern** (alles mehrmals täglich: Tipps, Sicher, Top-Quote, Kombis, Bilanz, Stärken) → 4. **3. Liga in den
+  Top-5-Ländern** (Deutschland 3. Liga, Spanien Primera Federación, Italien Serie C, Frankreich National; England hat bis Liga 5).
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 

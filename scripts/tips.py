@@ -19,6 +19,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import activity  # noqa: E402  (Protokoll für die KI-Zentrale)
 import forecast as fc  # noqa: E402
 import ratings as rt  # noqa: E402  (get, ESPN, pick_color – gleiche Regeln wie der Stärken-Rechner)
 
@@ -261,10 +262,12 @@ def main():
             entries.append({'g': c['g'], 'm': c['m'], 'list': lst, 'p': c['p'], 'q': c['q'], 'real': c['real'], 't': g['t'],
                             'comp': g['comp'], 'home': g['home']['name'], 'away': g['away']['name'],
                             'hid': g['home']['id'], 'aid': g['away']['id'], 'res': None})
+    fresh = []  # in diesem Lauf ausgewertet (für die KI-Zentrale)
     for e in entries:
         if e.get('res') is None and e['g'] in results:
             x, y = results[e['g']]
             e['res'] = {'hs': x, 'as': y, 'won': won(e['m'], x, y)}
+            fresh.append(e)
     entries = [e for e in entries if when(e['t']) > NOW - timedelta(days=KEEP_DAYS)]
     entries.sort(key=lambda e: e['t'])
 
@@ -288,6 +291,35 @@ def main():
            'kombis': kombis,
            'record': {lst: {'7': record(7, lst), '30': record(30, lst)} for lst in ('top', 'safe')},
            'recent': recent}
+    # KI-Zentrale: was ist seit der letzten Suche neu, weggefallen, verschoben, ausgewertet?
+    try:
+        prev = json.load(open(OUT, encoding='utf-8'))
+    except (OSError, ValueError):
+        prev = {}
+    pg = prev.get('games') or {}
+    prev_tips = {(t['g'], t['m'], lst): t for lst in ('top', 'safe') for t in prev.get(lst, [])
+                 if pg.get(t['g']) and when(pg[t['g']]['t']) and when(pg[t['g']]['t']) > NOW}
+    cur_tips = {(c['g'], c['m'], lst): c for lst, items in (('top', top), ('safe', safe)) for c in items}
+    new = sorted((k for k in cur_tips if k not in prev_tips), key=lambda k: (k[2] != 'safe', -cur_tips[k]['p']))
+    gone = [k for k in prev_tips if k not in cur_tips]
+    moved = [k for k in cur_tips if k in prev_tips and abs(cur_tips[k]['p'] - prev_tips[k]['p']) >= 0.02]
+    seen_res, res_info = set(), []
+    for e in fresh:
+        if (e['g'], e['m']) in seen_res:
+            continue
+        seen_res.add((e['g'], e['m']))
+        res_info.append({'m': e['m'], 'list': e['list'], 'p': e['p'], 'q': e['q'], 'comp': e['comp'], 'h': e['home'], 'a': e['away'],
+                         'hid': e['hid'], 'aid': e['aid'], 'won': e['res']['won'], 'score': '%d:%d' % (e['res']['hs'], e['res']['as'])})
+    added = []
+    for k in new[:24]:
+        c, g = cur_tips[k], games[k[0]]
+        added.append({'g': k[0], 'm': k[1], 'list': k[2], 'p': c['p'], 'q': c['q'], 'real': c['real'], 'comp': g['comp'], 'kick': g['t'],
+                      'h': g['home']['name'], 'a': g['away']['name'], 'hid': g['home']['id'], 'aid': g['away']['id']})
+    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'kombis': len(kombis), 'new': len(new), 'gone': len(gone),
+               'moved': len(moved), 'checked': len(res_info), 'won': sum(1 for r in res_info if r['won'])}
+    runs = activity.log_run('tips', NOW, time.time() - t0, summary, {'added': added, 'results': res_info[:30]})
+    out['ki'] = activity.today_summary(runs, NOW)
+
     with open(OUT, 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
     with open(LOG, 'w', encoding='utf-8') as f:

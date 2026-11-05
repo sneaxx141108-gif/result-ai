@@ -36,5 +36,14 @@ for (const k of d.kombis || []) {
 const rec = d.record || {};
 ok(['top', 'safe'].every((l) => rec[l] && ['7', '30'].every((w) => rec[l][w] && rec[l][w].won <= rec[l][w].n)), 'Bilanz vollständig');
 
+// KI-Zentrale: Protokoll der Rechner (web/data/activity.json)
+const actPath = path.join(__dirname, '..', 'web', 'data', 'activity.json');
+if (fs.existsSync(actPath)) {
+  const act = JSON.parse(fs.readFileSync(actPath, 'utf8'));
+  const badRun = (act.runs || []).filter((r) => isNaN(new Date(r.t)) || !['tips', 'ratings'].includes(r.job) || typeof r.sum !== 'object');
+  ok(Array.isArray(act.runs) && badRun.length === 0, `Protokoll der KI-Zentrale lesbar (${(act.runs || []).length} Läufe)`);
+}
+ok(!d.ki || (typeof d.ki.runs === 'number' && typeof d.ki.newTips === 'number'), 'Zahlen für den KI-Knopf auf der Startseite');
+
 console.log(fails ? `\n${fails} FEHLER` : '\nALLE TESTS OK');
 process.exit(fails ? 1 : 0);

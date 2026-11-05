@@ -27,6 +27,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import activity  # noqa: E402  (Protokoll für die KI-Zentrale)
 import forecast as fc  # noqa: E402
 
 # Einstellungen per Backtest bestimmt (04.11.2026, 38 Ligen, je 1.406 bzw. 2.246 Spiele aus den letzten 28/56 Tagen
@@ -690,6 +691,25 @@ def main(quick=False):
     for L in leagues:
         gs = [t['grp'] for t in teams if t['lg'] == L['id']]
         L['grp'] = max(set(gs), key=gs.count) if gs else None
+    # KI-Zentrale: was hat sich seit dem letzten Lauf getan?
+    try:
+        prev = json.load(open(OUT, encoding='utf-8'))
+    except (OSError, ValueError):
+        prev = {}
+    pv = {t['id']: t for t in prev.get('teams', [])}
+    since = datetime.fromisoformat(prev['updatedAt'].replace('Z', '+00:00')) if prev.get('updatedAt') else NOW - timedelta(days=1)
+    new_games = sum(1 for _c, _l, _n, _co, gs, _s in data['loaded'] for g in gs if g['hg'] is not None and since < g['t'] <= NOW)
+    new_games += sum(1 for dt, e in data['cup_events'] if since < dt <= NOW)
+    strength = lambda t: t['att'] + t['def']  # noqa: E731
+    moves = sorted(((t, strength(t) - strength(pv[t['id']])) for t in teams if t['id'] in pv), key=lambda td: -abs(td[1]))
+    movers = [{'id': t['id'], 'name': t['short'] or t['name'], 'lg': t['lg'], 'd': round(d, 3), 'now': round(strength(t), 3)}
+              for t, d in moves[:12] if abs(d) >= 0.03]
+    fresh_teams = [{'id': t['id'], 'name': t['short'] or t['name'], 'lg': t['lg']} for t in teams if t['id'] not in pv]
+    activity.log_run('ratings', NOW, time.time() - t0, {
+        'teams': len(teams), 'leagues': len(leagues), 'newGames': new_games, 'newTeams': len(fresh_teams),
+        'goneTeams': sum(1 for i in pv if i not in {t['id'] for t in teams}), 'hidden': stale},
+        {'movers': movers, 'newTeams': fresh_teams[:20]})
+
     out = {'updatedAt': NOW.strftime('%Y-%m-%dT%H:%M:%SZ'), 'season': START,
            'model': {'mu': round(fit['mu'], 4), 'h': round(fit['h'], 4), 'rho': fc.DC_RHO, 'halfLife': fc.HALF_LIFE, 'spread': SPREAD},
            'leagues': leagues, 'cups': cups, 'groups': len(order), 'teams': teams}
