@@ -921,7 +921,7 @@
       }
       if (r.newTeams && r.newTeams.length) h += `<div class="kd-h">Neue Teams</div><p class="kd-p">${r.newTeams.map((t) => esc(t.name)).join(', ')}</p>`;
     }
-    return h || '<p class="kd-p">Keine Einzelheiten (älter als 3 Tage oder nichts Neues).</p>';
+    return h || '<p class="kd-p">Keine Einzelheiten (älterer Lauf oder nichts Neues).</p>';
   }
   function vKI() {
     const head = aura('ki') + '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was die automatischen Rechner hinzufügen – jeder Lauf wird hier protokolliert.</p>';

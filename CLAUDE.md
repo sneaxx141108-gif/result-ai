@@ -327,6 +327,29 @@ wie oft die AIs was geadded haben und auch was“ · „bei Top-Matches nicht nu
 - **Startbild** fürs iPhone (`icons/splash-1170x2532.png`, `-1284x2778`): Ring-Logo auf `#F2F2F7` (mit PIL gezeichnet); greift bei
   neu zum Home-Bildschirm hinzugefügter App.
 
+### Automatik abgesichert (05.11.2026, nachts – Niklas: „sicher gehen, dass alles in der App wirklich jeden Tag mehrmals automatisch läuft“)
+
+Was automatisch läuft (alles ohne KI, alles auf GitHub Actions, Protokoll in der KI-Zentrale):
+
+| Was | Wie oft | Workflow |
+|---|---|---|
+| Top-Tipps: Sicher, Top-Quote, alle Kombis (inkl. Champions-League- und Bundesliga-Kombi), Tipp des Tages, Bilanz-Auswertung, KI-Zentrale | jede Stunde (:17), Ersatz-Termin :47 | `tips.yml` |
+| Team-Stärken (57 Ligen + Europapokal, Wappen, Farben) | 1× pro Tag gültig, bis zu 5 Versuche (1:35, 5:35, 9:35, 14:35, 19:35 UTC) + Nachholen durch die Tipp-Suche | `ratings.yml` |
+| App-Änderungen | bei jedem Push | `pages.yml` |
+
+- **GitHub verschluckt/verzögert geplante Läufe** (05.11.2026: Stärken-Lauf 3:30 kam um 11:21, die neue stündliche Tipp-Suche lief
+  die ersten Stunden gar nicht). Darum: Ersatz-Termin :47 läuft nur, wenn die veröffentlichte Suche älter als 50 Min. ist
+  (`scripts/stale.py`); `ratings.py --if-stale` rechnet nur, wenn die Stärken von heute (deutsche Zeit, `berlin_date`) fehlen –
+  die Tipp-Suche ruft das vor jeder Suche auf (fehlender Stärken-Lauf wird nachgeholt, aber nie zweimal am Tag gerechnet →
+  gleiches Spiel am selben Tag = gleiche Zahlen).
+- Alle drei Workflows in **einer Warteschlange** (`concurrency: pages`, nichts wird abgebrochen); veröffentlicht wird nur bei Änderungen.
+- **Tipp-Datei wird nur veröffentlicht, nicht gespeichert** (hält das Repository klein); `pages.yml` und `ratings.yml` holen vor dem
+  Veröffentlichen die aktuelle Tipp-Datei von der Seite (sonst würde ein App-Update ältere Tipps zurückspielen). Gespeichert werden
+  Bilanz (`tips_log.json`, 31 Tage), Protokoll (`activity.json`, 8 Tage, Einzelheiten für die letzten 30 Läufe) und die Stärken.
+- Kontrolle: KI-Zentrale zeigt je Rechner „läuft / verspätet / hängt“; schlägt ein Lauf fehl, schickt GitHub Niklas eine E-Mail.
+- Ganz sicher wird es erst mit einem **externen Zeitgeber** (z. B. cron-job.org oder später ein Cloudflare-Cron), der den Workflow
+  über die GitHub-API anstößt – dafür bräuchte Niklas dort ein Konto und einen GitHub-Schlüssel (macht er selbst, nicht Claude).
+
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 
 1. **Kurz mit Niklas klären**, was ihn am meisten stört (konkrete Stellen; gern Screenshots von Apps, die er schön findet).

@@ -1,10 +1,17 @@
 name: Top-Tipps aktualisieren
 
-# Jede Stunde, rund um die Uhr (Niklas: „die KI soll immer neu nach Top-Matches suchen“): alle kommenden Spiele mit
-# Quoten neu holen (ESPN, 40+ Ligen und Pokale), Tipps neu rechnen (scripts/tips.py, ohne KI), Bilanz auswerten, veröffentlichen.
+# Jede Stunde, rund um die Uhr (Niklas: „die KI soll immer neu nach Top-Matches suchen“): alle kommenden Spiele mit Quoten neu
+# holen (ESPN, 40+ Ligen und Pokale, 3 Wochen voraus), Tipps, Sicher, Top-Quote und Kombis neu rechnen, Bilanz auswerten,
+# KI-Zentrale fortschreiben, veröffentlichen.
+# Absicherung, weil GitHub geplante Läufe manchmal verschluckt oder stundenlang verzögert:
+#  - Ersatz-Termin zur Minute 47 – läuft nur, wenn die veröffentlichte Suche älter als 50 Minuten ist
+#  - fehlen die Stärken von heute (Stärken-Lauf ausgefallen), rechnet dieser Lauf sie zuerst nach
+#  - die Tipp-Datei selbst wird nur veröffentlicht, nicht gespeichert (hält das Repository klein); gespeichert werden Bilanz,
+#    Protokoll und ggf. die Stärken
 on:
   schedule:
     - cron: '17 * * * *'
+    - cron: '47 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -24,25 +31,50 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Tipps rechnen
+      - name: Nötig? (Ersatz-Termin nur, wenn die letzte Suche älter als 50 Minuten ist)
+        id: need
+        run: |
+          age=$(python3 scripts/stale.py https://sneaxx141108-gif.github.io/result-ai/data/tips.json)
+          echo "Letzte veröffentlichte Suche vor $age Minuten"
+          if [ "${{ github.event.schedule }}" = "47 * * * *" ] && [ "$age" -lt 50 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Stärken nachholen, falls die von heute fehlen
+        if: steps.need.outputs.run == 'true'
+        run: python3 scripts/ratings.py --if-stale
+      - name: Tipps rechnen (Sicher, Top-Quote, Kombis, Bilanz)
+        if: steps.need.outputs.run == 'true'
         run: python3 scripts/tips.py
-      - name: Tipps prüfen (bei Fehlern bleibt die alte Version online)
-        run: node tests/tips.test.js
-      - name: Speichern
+      - name: Prüfen (bei Fehlern bleibt die alte Version online)
+        if: steps.need.outputs.run == 'true'
+        run: |
+          node tests/engine.test.js
+          node tests/ratings.test.js
+          node tests/tips.test.js
+      - name: Speichern (Bilanz, Protokoll, ggf. Stärken)
+        if: steps.need.outputs.run == 'true'
         run: |
           git config user.name "result-ai-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add web/data/tips.json web/data/tips_log.json web/data/activity.json
+          git add web/data/tips_log.json web/data/activity.json web/data/ratings.json
           if git diff --cached --quiet; then
             echo "Keine Änderung"
           else
             git commit -m "Tipps $(TZ=Europe/Berlin date '+%d.%m.%Y %H:%M')"
+            cp web/data/tips.json /tmp/tips.json
+            git checkout -- web/data/tips.json
             git pull --rebase -X theirs origin main
             git push
+            cp /tmp/tips.json web/data/tips.json
           fi
       - uses: actions/configure-pages@v5
+        if: steps.need.outputs.run == 'true'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.need.outputs.run == 'true'
         with:
           path: web
       - id: deployment
+        if: steps.need.outputs.run == 'true'
         uses: actions/deploy-pages@v4

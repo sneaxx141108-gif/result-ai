@@ -29,6 +29,11 @@ jobs:
         run: node tests/ratings.test.js
       - name: Tipp-Datei prüfen
         run: node tests/tips.test.js
+      - name: Frische Tipps behalten (die veröffentlichte Tipp-Datei ist neuer als die im Repository)
+        run: |
+          if curl -sf -o /tmp/tips.json "https://sneaxx141108-gif.github.io/result-ai/data/tips.json?nc=$(date +%s)" && python3 -c "import json; json.load(open('/tmp/tips.json'))"; then
+            cp /tmp/tips.json web/data/tips.json
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

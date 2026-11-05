@@ -721,5 +721,27 @@ def main(quick=False):
     return out
 
 
+def berlin_date(dt):
+    """Kalendertag in Deutschland (Sommerzeit: letzter Sonntag im März bis letzter Sonntag im Oktober, je 1 Uhr UTC)."""
+    def last_sunday(month):
+        d = datetime(dt.year, month, 31, 1, tzinfo=timezone.utc)
+        return d - timedelta(days=(d.weekday() + 1) % 7)
+    return (dt + timedelta(hours=2 if last_sunday(3) <= dt < last_sunday(10) else 1)).date()
+
+
+def fresh_today():
+    """Gibt es die Stärken von heute schon? (Stand der Datei = heutiger Tag in Deutschland)"""
+    try:
+        with open(OUT, encoding='utf-8') as f:
+            t = datetime.fromisoformat(json.load(f)['updatedAt'].replace('Z', '+00:00'))
+        return berlin_date(t) == berlin_date(NOW)
+    except (OSError, ValueError, KeyError):
+        return False
+
+
 if __name__ == '__main__':
-    main(quick='--quick' in sys.argv)
+    # --if-stale: für die vielen Versuche am Tag (Workflows): nur rechnen, wenn die Stärken von heute noch fehlen
+    if '--if-stale' in sys.argv and fresh_today():
+        log('Die Stärken von heute sind schon da – nichts zu tun.')
+    else:
+        main(quick='--quick' in sys.argv)
