@@ -111,7 +111,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v13`).
+  hochzählen (zuletzt `ra-shell-v14`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -308,6 +308,24 @@ wie oft die AIs was geadded haben und auch was“ · „bei Top-Matches nicht nu
 - **Reihenfolge laut Niklas (05.11.2026, nachts):** 1. KI-Zentrale (erledigt) → 2. **Design deutlich upgraden, überall** →
   3. **Automatik absichern** (alles mehrmals täglich: Tipps, Sicher, Top-Quote, Kombis, Bilanz, Stärken) → 4. **3. Liga in den
   Top-5-Ländern** (Deutschland 3. Liga, Spanien Primera Federación, Italien Serie C, Frankreich National; England hat bis Liga 5).
+
+### Design-Runde 4 (05.11.2026, nachts – Niklas: „alles in der App nochmal vom Design sehr upgraden, deutlich“)
+
+- **Startseite neu:** Begrüßung mit Namen (Einstellungen → „Dein Name“, `store name`) und Datum; großer **„Tipp des Tages“**
+  (`spotlight`: sicherster Tipp heute/morgen, Spiel-Karte in Vereinsfarben mit Wappen-Tellern, Tipp + Chance + Quote, fliegt beim
+  Antippen in die Spielseite); **Top-Tipps als wischbare Karten** mit Verlaufs-Ringen (`tipCarousel`); Scan-Karte mit Slogan
+  „Screenshot rein. Prozente raus.“ und einem schräg gestellten Mini-Handy, das gerade einen Spielstand liest (ruhend).
+- **Lichtschein je Seite** (`aura(kind)`: home grün/blau, tips orange/pink, pick violett/blau, hist türkis, ki violett) – ruhende
+  Verläufe hinter dem Inhalt, Kopfleiste oben durchsichtig bis man scrollt. Feinere Kanten: `--shadow` mit Haarlinie,
+  dunkel `--card #18181A` mit Lichtkante.
+- **Top-Tipps:** Zahlen-Leiste (sicher · Top-Quote · Kombis · „vor x Min.“), Ringe mit Farbverlauf (`#rg-safe` grün→türkis,
+  `#rg-top` orange→pink, einmal als SVG-defs im Dokument), Vergleichsbalken Buchmacher / Result AI, Bilanz mit Treffer-Ring.
+- **Auswählen:** sobald beide Teams stehen, Vorschau-Karte in Vereinsfarben mit Sieg/Remis/Niederlage (`matchPreview`).
+- **Verlauf:** nach Tagen gruppiert, rechts die Prognose in der Farbe des Favoriten (`histGrouped`).
+- **KI-Zentrale:** farbige Kacheln mit Symbolen. **Leiste unten:** gefüllte Symbole im aktiven Bereich (`I.*F`).
+- **Einstellungen:** Name + Darstellung **Hell · Dunkel · Automatisch** (`theme auto` folgt dem iPhone, auch beim Start in index.html).
+- **Startbild** fürs iPhone (`icons/splash-1170x2532.png`, `-1284x2778`): Ring-Logo auf `#F2F2F7` (mit PIL gezeichnet); greift bei
+  neu zum Home-Bildschirm hinzugefügter App.
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 

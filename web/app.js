@@ -48,6 +48,10 @@
     flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.6 3.2 5.5 5.6 5.5 10.6A5.5 5.5 0 0 1 12 19.1a5.5 5.5 0 0 1-5.5-5.5c0-2.6 1.4-4.3 2.6-5.4.2 1.9 1 3 2.1 3.4C11 8.6 10.6 5.6 12 3z"/></svg>',
     spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 2.5l1.7 5.1 5.1 1.7-5.1 1.7L10 16.1l-1.7-5.1-5.1-1.7 5.1-1.7z"/><path d="M18 13.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></svg>',
     chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>',
+    homeF: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.3 3.6a1 1 0 0 1 1.4 0l7.7 6.4c.4.3.6.8.6 1.3V19a1.5 1.5 0 0 1-1.5 1.5h-4v-5.2a1 1 0 0 0-1-1h-5a1 1 0 0 0-1 1v5.2h-4A1.5 1.5 0 0 1 3 19v-7.7c0-.5.2-1 .6-1.3z"/></svg>',
+    flameF: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6c.7 3.4 5.9 5.9 5.9 11.1A5.9 5.9 0 0 1 12 19.6a5.9 5.9 0 0 1-5.9-5.9c0-2.8 1.5-4.6 2.8-5.8.2 2 1.1 3.2 2.2 3.6C10.9 8.4 10.5 5.2 12 2.6z"/></svg>',
+    searchF: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="11" cy="11" r="6.8"/><path d="M20 20l-3.6-3.6"/></svg>',
+    clockF: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.6" fill="currentColor"/><path d="M12 7.2V12l3.2 2.1" fill="none" stroke="var(--card)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   };
   const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 18 18)">
@@ -58,13 +62,16 @@
 
   // ------------------------------------------------------------------ Darstellung: hell (Standard) oder dunkel
   const isDark = () => document.documentElement.dataset.theme === 'dark';
+  const mqDark = matchMedia('(prefers-color-scheme: dark)');
   function applyTheme(t) {
-    const dark = t === 'dark';
+    const dark = t === 'dark' || (t === 'auto' && mqDark.matches);
     if (dark) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
     const mt = $('meta[name="theme-color"]');
     if (mt) mt.setAttribute('content', dark ? '#000000' : '#FFFFFF');
-    store.set('theme', dark ? 'dark' : 'light');
+    store.set('theme', t === 'auto' ? 'auto' : dark ? 'dark' : 'light');
   }
+  // „Automatisch“: folgt dem iPhone (hell am Tag, dunkel nachts – je nach Einstellung)
+  try { mqDark.addEventListener('change', () => { if (store.get('theme') === 'auto') { applyTheme('auto'); redrawAll(); } }); } catch (e) { /* ältere Browser */ }
 
   // ------------------------------------------------------------------ Teams: Wappen (ESPN) und Vereinsfarben
   const TEAMS = {
@@ -222,14 +229,16 @@
     const mdCard = `<a class="gcard md" href="#/md"><div class="gt"><span class="muted">${esc(MD.comp.split(' · ')[0])}</span><span class="chip">${MD.games.length} Spiele</span></div>
       <div class="mdl">${MD.games.slice(0, 3).map((g) => `<div>${crest(g.home, 24)}${esc(g.home)} <span class="faint">–</span> ${esc(g.away)}</div>`).join('')}</div>
       <div class="gf"><b style="font-size:24px">Ganzer Spieltag</b><span class="muted">›</span></div></a>`;
-    return `<section class="hero"><h1>Screenshot rein.<br><span>Prozente raus.</span></h1></section>
-      <section class="scan-card">${decoRing}<span class="ic">${I.scan}</span>
-        <div><h2>Spiel scannen</h2><p>Live-Spiel, Paarung, ganzer Spieltag oder Quoten – Result AI rechnet, wer gewinnt.</p></div>
+    return `${aura('home')}<section class="hello"><h1>${esc(greet())}</h1><p>${esc(todayLong())}</p></section>
+      <div class="spot-slot">${spotlight()}</div>
+      <section class="sec"><div class="sec-h"><h2>Top-Tipps</h2><button class="note link" data-act="tab" data-tab="/tips">Alle ›</button></div><div class="tips-prev">${tipCarousel()}</div></section>
+      <section class="scan-card">${decoRing}
+        <div class="sc-phone" aria-hidden="true"><div class="sc-screen"><span class="sc-lg">PREMIER LEAGUE</span><div class="sc-sb"><i style="background:#EF0107"></i><b>1 – 1</b><i style="background:#034694"></i></div><span class="sc-min">63'</span><span class="sc-box"></span><span class="sc-line"></span></div></div>
+        <div class="sc-text"><span class="sc-eb">${I.scan}Spiel scannen</span><h2>Screenshot rein.<br><span>Prozente raus.</span></h2><p>Live-Spiel, Paarung, Spieltag oder Quoten – Result AI liest und rechnet.</p></div>
         <div class="acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="pick" aria-label="Screenshot aus Fotos wählen"></label>
           <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="pick" aria-label="Foto mit der Kamera machen"></label></div>
         <button class="demo-scan" data-act="demoscan">${I.scan}<span>Beispiel-Scan ansehen</span><span class="chev">›</span></button></section>
       <a class="card pickrow" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Teams aus 38 Ligen · ohne Screenshot</div></span><span class="chev">›</span></a>
-      <section class="sec"><div class="sec-h"><h2>Top-Tipps</h2><button class="note link" data-act="tab" data-tab="/tips">Alle ›</button></div><div class="tips-prev">${tipsPreview()}</div></section>
       <section class="sec"><div class="sec-h"><h2>Beispiele</h2><span class="note">ausgedacht · echte Rechnung</span></div>
         <div class="ex-row">${card(DEMO.live)}${card(DEMO.pre)}${card(DEMO.odds)}${mdCard}</div></section>
       <section class="sec"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="note link" data-act="tab" data-tab="/hist">Alle ›</button>' : ''}</div>
@@ -561,8 +570,9 @@
       return `<button class="slot ${t ? 'set' : ''}" data-act="slot" data-side="${side}"${sc ? ` style="--sg:${rgba(sc, 0.16)};--sgd:${rgba(sc, 0.32)}"` : ''}>${t ? crest(reg(t), 46) : `<span class="slot-ph">${I.search}</span>`}
         <span class="grow"><span class="slot-l">${label}</span><span class="slot-n">${t ? esc(tName(t)) : 'Team suchen'}</span>${t ? `<span class="slot-s">${esc(lgName(t.lg))}</span>` : ''}</span><span class="chev">›</span></button>`;
     };
-    return `<h1 class="ptitle">Spiel auswählen</h1><p class="psub">Zwei Teams suchen – Result AI rechnet mit den Stärken von heute.</p>
+    return `${aura('pick')}<h1 class="ptitle">Spiel auswählen</h1><p class="psub">Zwei Teams suchen – Result AI rechnet mit den Stärken von heute.</p>
       <div class="card pick" style="margin-top:18px">${slot('home', 'Heim')}<div class="pick-vs"><span>gegen</span>${P.home || P.away ? `<button class="swap" data-act="swap" aria-label="Heim und Gast tauschen">${I.swap}</button>` : ''}</div>${slot('away', 'Gast')}</div>
+      ${matchPreview()}
       <div class="card opts" style="margin-top:14px">
         <label class="tgl"><span class="grow"><b>Neutraler Platz</b><small>z. B. ein Finale – ohne Heimvorteil</small></span><input type="checkbox" data-act="opt" data-k="neutral" ${P.neutral ? 'checked' : ''}><i></i></label>
         <label class="tgl"><span class="grow"><b>Spiel läuft schon</b><small>Spielstand, Minute und rote Karten eingeben</small></span><input type="checkbox" data-act="opt" data-k="live" ${P.live ? 'checked' : ''}><i></i></label>
@@ -724,7 +734,8 @@
       <div class="tc-top"><span class="tc-comp">${esc(g.comp)}</span><span class="tc-time">${esc(kickoff(g.t))}</span></div>
       <div class="tc-main"><div class="tc-teams"><span class="tm">${crest(h, 24)}<span>${esc(h)}</span></span><span class="tm">${crest(a, 24)}<span>${esc(a)}</span></span></div>${ring(t.p)}</div>
       <div class="tc-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="tc-q"><span class="k">Quote</span><b>${qTxt(t)}</b></div></div>
-      <div class="tc-foot"><span>Buchmacher ${Math.round(t.p * 100)} %</span><span>${t.pm != null ? `Result AI ${Math.round(t.pm * 100)} %` : 'Result AI: zu wenig Daten'}</span></div></a>`;
+      <div class="cmp2"><div><span>Buchmacher</span><i><em style="width:${Math.round(t.p * 100)}%"></em></i><b>${Math.round(t.p * 100)} %</b></div>
+        <div class="ai"><span>Result AI</span><i><em style="width:${t.pm != null ? Math.round(t.pm * 100) : 0}%"></em></i><b>${t.pm != null ? Math.round(t.pm * 100) + ' %' : '–'}</b></div></div></a>`;
   }
   function kombisHtml(d) {
     const all = d.top.concat(d.safe);
@@ -783,17 +794,22 @@
       const a = tipTeam({ id: e.aid, name: e.away });
       return `<div class="rec-it ${e.res.won ? 'won' : 'lost'}"><span class="mk">${e.res.won ? '✓' : '✗'}</span><span class="grow"><b>${esc(tipLabel(e.m, h, a))}</b><span>${esc(h)} ${e.res.hs}:${e.res.as} ${esc(a)}</span></span><span class="rp2">${pct0(e.p)}</span></div>`;
     }).join('');
-    return `<section class="sec"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="card rec">${line('safe', 'Sicher')}${line('top', 'Top-Quote')}
+    const all30 = ['safe', 'top'].map((k) => (r[k] || {})['30'] || { n: 0, won: 0, exp: 0 });
+    const n30 = all30[0].n + all30[1].n;
+    const w30 = all30[0].won + all30[1].won;
+    const hero = n30 ? `<div class="rec-hero">${ring(w30 / n30)}<div><b>${w30} von ${n30}</b><span>Tipps aufgegangen · erwartet waren ${pct0((all30[0].exp + all30[1].exp) / n30)}</span></div></div>` : '';
+    return `<section class="sec"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="card rec">${hero}${line('safe', 'Sicher')}${line('top', 'Top-Quote')}
       ${recent ? `<div class="rec-list">${recent}</div>` : '<p class="muted rec-empty">Läuft seit dem 5. November: Jeder angezeigte Tipp wird festgehalten und nach dem Spiel ehrlich ausgewertet – auch die, die danebengehen.</p>'}</div></section>`;
   }
   function vTips() {
-    const head = '<h1 class="ptitle">Top-Tipps</h1><p class="psub">Jede Stunde neu gesucht – über 40 Ligen und Pokale, 3 Wochen voraus, inklusive Champions League.</p>';
+    const head = aura('tips') + '<h1 class="ptitle">Top-Tipps</h1><p class="psub">Jede Stunde neu gesucht – über 40 Ligen und Pokale, 3 Wochen voraus, inklusive Champions League.</p>';
     const d = T.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${T.err ? 'Die Tipps konnten gerade nicht geladen werden – prüf die Verbindung.' : 'Die Tipps werden geladen …'}</div>`;
     const tabs = [['safe', 'Sicher'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
     const k = Math.max(0, tabs.findIndex((x) => x[0] === T.list));
     const upd = new Date(d.updatedAt);
-    return head + `<div class="seg s3" style="--k:${k};margin-top:18px"><span class="ind"></span>${tabs.map(([v, l]) => `<button class="${T.list === v ? 'on' : ''}" data-act="tlist" data-val="${v}">${l}</button>`).join('')}</div>
+    const stats = `<div class="stat-pills"><span><b>${d.safe.filter(upcoming).length}</b>sicher</span><span><b>${d.top.filter(upcoming).length}</b>Top-Quote</span><span><b>${d.kombis.length}</b>Kombis</span><span class="sp-live"><i></i>${esc(ago(d.updatedAt))}</span></div>`;
+    return head + stats + `<div class="seg s3" style="--k:${k};margin-top:16px"><span class="ind"></span>${tabs.map(([v, l]) => `<button class="${T.list === v ? 'on' : ''}" data-act="tlist" data-val="${v}">${l}</button>`).join('')}</div>
       <div class="tips-body">${tipsBody()}</div>${recordHtml(d)}
       <p class="foot">Gesucht ${esc(isNaN(upd) ? '' : (dayDiff(d.updatedAt) === 0 ? 'heute' : 'am ' + upd.toLocaleDateString('de-DE')) + ' um ' + upd.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))} · ${esc(d.source)}<br>
       Chance aus den Quoten der Buchmacher (ohne ihre Marge), Tore zusätzlich mit Result AI. „≈“ = geschätzte Quote, beim Buchmacher kann sie etwas abweichen.<br>
@@ -818,17 +834,22 @@
       const now = { tips: T.at, ratings: !!R.data, err: T.err };
       if (p.drawn && p.drawn.tips === now.tips && p.drawn.ratings === now.ratings && p.drawn.err === now.err) return;
       if (p.path.startsWith('/r/') && p.drawn && p.drawn.tips) return; // Ergebnis-Seite steht schon
-      if (p.path === '/') { $$('.tips-prev', p.el).forEach((x) => { x.innerHTML = tipsPreview(); }); $$('.kib', p.el).forEach((x) => { x.innerHTML = kiBadge(); }); p.drawn = now; } else redrawPage(p);
+      if (p.path === '/') {
+        $$('.tips-prev', p.el).forEach((x) => { x.innerHTML = tipCarousel(); });
+        $$('.spot-slot', p.el).forEach((x) => { x.innerHTML = spotlight(); });
+        $$('.kib', p.el).forEach((x) => { x.innerHTML = kiBadge(); });
+        p.drawn = now;
+      } else redrawPage(p);
     });
   }
 
   // ------------------------------------------------------------------ Verlauf (eigener Bereich in der Leiste unten)
   function vHist() {
     const hist = store.get('history', []);
-    return `<h1 class="ptitle">Verlauf</h1><p class="psub">Alle deine Prognosen – nur auf diesem Handy gespeichert.</p>
+    return `${aura('hist')}<h1 class="ptitle">Verlauf</h1><p class="psub">Alle deine Prognosen – nur auf diesem Handy gespeichert.</p>
       <div class="group" style="margin-top:18px"><a class="row" href="#/acc"><span class="round">${I.target}</span><span class="grow"><div class="t">Wie oft lag Result AI richtig?</div><div class="s">${hist.length ? `${hist.length} ${hist.length === 1 ? 'Prognose' : 'Prognosen'} gespeichert · noch keine ausgewertet` : 'Nur deine Prognosen · noch keine ausgewertet'}</div></span><span class="chev">›</span></a></div>
       <section class="sec"><div class="sec-h"><h2>Deine Prognosen</h2>${hist.length ? `<span class="note">${hist.length}</span>` : ''}</div>
-        ${hist.length ? `<div class="group">${hist.map(histRow).join('')}</div>` : '<div class="empty">Noch keine Prognosen. Wähl ein Spiel aus oder scanne einen Screenshot – alles landet hier.</div>'}</section>`;
+        ${hist.length ? histGrouped(hist) : '<div class="empty">Noch keine Prognosen. Wähl ein Spiel aus oder scanne einen Screenshot – alles landet hier.</div>'}</section>`;
   }
 
   // ------------------------------------------------------------------ KI-Zentrale: Protokoll der automatischen Rechner
@@ -903,7 +924,7 @@
     return h || '<p class="kd-p">Keine Einzelheiten (älter als 3 Tage oder nichts Neues).</p>';
   }
   function vKI() {
-    const head = '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was die automatischen Rechner hinzufügen – jeder Lauf wird hier protokolliert.</p>';
+    const head = aura('ki') + '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was die automatischen Rechner hinzufügen – jeder Lauf wird hier protokolliert.</p>';
     const d = A.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${A.err ? 'Das Protokoll konnte gerade nicht geladen werden.' : 'Das Protokoll wird geladen …'}</div>`;
     const runs = (d.runs || []).slice().reverse();
@@ -920,11 +941,11 @@
     const today = runs.filter((r) => new Date(r.t).getTime() >= startToday);
     const sum = (list, f) => list.reduce((x, r) => x + (f(r) || 0), 0);
     const tiles = [
-      [today.length, 'Läufe heute'],
-      [sum(today.filter((r) => r.job === 'tips'), (r) => r.sum.new), 'neue Tipps heute'],
-      [sum(today.filter((r) => r.job === 'tips'), (r) => r.sum.checked), 'heute ausgewertet'],
-      [R.data ? R.data.teams.length : '–', 'Teams mit Stärken'],
-    ].map(([v, l]) => `<div class="kt"><b>${v}</b><span>${l}</span></div>`).join('');
+      [today.length, 'Läufe heute', 'spark', 'v'],
+      [sum(today.filter((r) => r.job === 'tips'), (r) => r.sum.new), 'neue Tipps heute', 'flame', 'o'],
+      [sum(today.filter((r) => r.job === 'tips'), (r) => r.sum.checked), 'heute ausgewertet', 'target', 'g'],
+      [R.data ? R.data.teams.length : '–', 'Teams mit Stärken', 'chart', 'b'],
+    ].map(([v, l, ic, c]) => `<div class="kt kt-${c}"><span class="kt-i">${I[ic]}</span><b>${v}</b><span>${l}</span></div>`).join('');
     // 7 Tage: neue Tipps je Tag (Balken) und Läufe je Tag
     const days = [];
     for (let i = 6; i >= 0; i--) {
@@ -945,7 +966,7 @@
     });
     if (lastDay) log += '</div>';
     return head + `<div class="card ks" style="margin-top:18px">${status}</div><div class="ktiles">${tiles}</div>
-      <section class="sec"><div class="sec-h"><h2>Neue Tipps · 7 Tage</h2><span class="note">Balken = neue Tipps · ×  = Läufe</span></div><div class="card">${chart}</div></section>
+      <section class="sec"><div class="sec-h"><h2>Letzte 7 Tage</h2><span class="note">neue Tipps</span></div><div class="card">${chart}<p class="kc-cap">Balken = neue Tipps · darunter, wie oft gesucht wurde</p></div></section>
       <section class="sec"><div class="sec-h"><h2>Protokoll</h2><span class="note">antippen für Einzelheiten</span></div>${log || '<div class="empty">Noch keine Läufe protokolliert.</div>'}</section>
       <p class="foot">Die Rechner arbeiten ohne Sprach-KI: Mathe aus Ergebnissen, Toren und Buchmacher-Quoten – bei Zahlen genauer und ohne Erfundenes.<br>Gemini & Co. kommen mit dem Screenshot-Scan dazu und erscheinen dann ebenfalls hier.</p>`;
   }
@@ -954,6 +975,97 @@
     const k = T.data && T.data.ki;
     const fresh = T.data && Date.now() - new Date(T.data.updatedAt).getTime() < 3 * 36e5;
     return `<i class="kib-dot${T.data ? (fresh ? ' ok' : ' warn') : ''}"></i><span>KI</span>${k && k.newTips ? `<b class="kib-n">+${k.newTips}</b>` : ''}`;
+  }
+
+  // ------------------------------------------------------------------ Design-Runde 4: Begrüßung, Tipp des Tages, Karussell, Lichtschein
+  // farbiger Lichtschein oben auf jeder Seite (ruhender Verlauf, scrollt mit – keine Animation, kein Filter)
+  const aura = (kind) => `<div class="aura aura-${kind}" aria-hidden="true"></div>`;
+  function greet() {
+    const h = new Date().getHours();
+    const g = h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 18 ? 'Hallo' : h < 23 ? 'Guten Abend' : 'Gute Nacht';
+    const name = String(store.get('name', '') || '').trim();
+    return name ? `${g}, ${name}` : g;
+  }
+  const todayLong = () => new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+  // der sicherste Tipp für heute/morgen (sonst der nächste) – groß in Vereinsfarben
+  function spotTip() {
+    if (!T.data) return null;
+    const list = T.data.safe.filter(upcoming);
+    return list.find((x) => dayDiff(T.data.games[x.g].t) <= 1) || list[0] || null;
+  }
+  function spotlight() {
+    const t = spotTip();
+    if (!t) return T.data ? '' : '<div class="spot spot-ph"><span>Tipp des Tages wird gesucht …</span></div>';
+    const g = T.data.games[t.g];
+    const h = tipTeam(g.home);
+    const a = tipTeam(g.away);
+    const hc = teamColor(h);
+    const ac = teamColor(a);
+    return `<a class="spot teamcard" href="#/r/t_${esc(g.id)}" style="background:${teamBg({ home: h, away: a })};--gl:${rgba(hc, 0.65)};--gr:${rgba(ac, 0.65)}">${wm(h, 'l')}${wm(a, 'r')}
+      <div class="sp-top"><span class="chip glass">${I.flame}Tipp des Tages</span><span class="sp-when">${esc(kickoff(g.t))}</span></div>
+      <div class="sp-mid"><div class="sp-side">${plate(h, 66)}<b>${esc(h)}</b></div><div class="sp-c"><span class="sp-comp">${esc(g.comp)}</span><span class="sp-vs">VS</span></div><div class="sp-side">${plate(a, 66)}<b>${esc(a)}</b></div></div>
+      <div class="sp-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="sp-p"><b>${Math.round(t.p * 100)}<small>%</small></b><span>Quote ${qTxt(t)}</span></div></div></a>`;
+  }
+  // Startseite: die besten Tipps als wischbare Karten
+  function tipCarousel() {
+    if (!T.data) return `<div class="empty">${T.err ? 'Die Tipps sind gerade nicht erreichbar.' : 'Die Top-Tipps werden geladen …'}</div>`;
+    const first = spotTip();
+    const list = T.data.safe.filter((t) => upcoming(t) && t !== first).slice(0, 6);
+    if (!list.length) return '<div class="empty">Gerade keine Tipps – die nächste Suche läuft in spätestens einer Stunde.</div>';
+    return `<div class="tcar">${list.map((t) => {
+      const g = T.data.games[t.g];
+      const h = tipTeam(g.home);
+      const a = tipTeam(g.away);
+      return `<a class="tmc" href="#/r/t_${esc(g.id)}" style="--hg:${rgba(teamColor(h), 0.12)};--ag:${rgba(teamColor(a), 0.12)};--hgd:${rgba(teamColor(h), 0.26)};--agd:${rgba(teamColor(a), 0.26)}">
+        <div class="tmc-top"><span>${esc(g.comp)}</span><span>${esc(kickoff(g.t))}</span></div>
+        <div class="tmc-teams"><span>${crest(h, 22)}${esc(h)}</span><span>${crest(a, 22)}${esc(a)}</span></div>
+        <div class="tmc-bet">${esc(tipLabel(t.m, h, a))}</div>
+        <div class="tmc-foot">${ring(t.p)}<span class="tmc-q"><span>Quote</span><b>${qTxt(t)}</b></span></div></a>`;
+    }).join('')}</div>`;
+  }
+  // Auswählen: sobald beide Teams stehen, sofort eine Spiel-Karte mit Vorschau-Prozenten
+  function matchPreview() {
+    const h = P.home && R.byId[P.home];
+    const a = P.away && R.byId[P.away];
+    if (!h || !a || h.id === a.id) return '';
+    const hn = reg(h);
+    const an = reg(a);
+    const head = `<div class="mp-top"><span class="chip glass">${P.live ? `LIVE ${P.minute}'` : 'Vorschau'}</span><span class="chip glass">${esc(h.lg && h.lg === a.lg && R.leagues[h.lg] ? R.leagues[h.lg].name : 'Ligen-Duell')}</span>${P.neutral ? '<span class="mp-n">neutraler Platz</span>' : ''}</div>`;
+    let probs = '';
+    if (h.grp === a.grp) {
+      const md = R.data.model;
+      const m = { lh: Math.exp(md.mu + (P.neutral ? 0 : md.h) + h.att - a.def), la: Math.exp(md.mu + a.att - h.def) };
+      if (P.live) Object.assign(m, { minute: P.minute, half: P.minute > 45 ? 2 : 1, score: P.score.slice(), reds: P.reds.slice() });
+      const an2 = analyze(m);
+      const r = round100([an2.probs.home, an2.probs.draw, an2.probs.away]);
+      probs = `<div class="mp-pr"><div><b>${r[0]} %</b><span>${esc(hn)}</span></div><div><b>${r[1]} %</b><span>Remis</span></div><div><b>${r[2]} %</b><span>${esc(an)}</span></div></div>`;
+    } else probs = '<div class="mp-pr mp-x">Ligen ohne gemeinsame Gegner – hier rechnet Result AI nicht.</div>';
+    return `<div class="mp teamcard" style="background:${teamBg({ home: hn, away: an })};--gl:${rgba(teamColor(hn), 0.6)};--gr:${rgba(teamColor(an), 0.6)}">${wm(hn, 'l')}${wm(an, 'r')}${head}
+      <div class="mp-mid"><div class="sp-side">${plate(hn, 62)}<b>${esc(hn)}</b></div><div class="mp-sc">${P.live ? `${P.score[0]}:${P.score[1]}` : 'VS'}</div><div class="sp-side">${plate(an, 62)}<b>${esc(an)}</b></div></div>${probs}</div>`;
+  }
+  // Verlauf: nach Tagen gruppiert, jede Zeile mit der Prognose (Favorit in Vereinsfarbe)
+  function histGrouped(hist) {
+    let out = '';
+    let day = '';
+    hist.forEach((h) => {
+      const d = new Date(h.at || Date.now());
+      const dk = d.toDateString();
+      if (dk !== day) {
+        const dd = dayDiff(d.toISOString());
+        out += `${day ? '</div>' : ''}<div class="kl-day">${esc(dd === 0 ? 'Heute' : dd === -1 ? 'Gestern' : d.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</div><div class="group">`;
+        day = dk;
+      }
+      regTeams(h);
+      let pill = '';
+      try {
+        const an2 = analyze(h);
+        const [k, p] = lead(h, an2);
+        const col = k === 'home' ? teamColor(h.home) : k === 'away' ? teamColor(h.away) : '#8E8E93';
+        pill = `<span class="hp" style="--pc:${col}"><b>${Math.round(p * 100)} %</b><span>${k === 'draw' ? 'Remis' : esc(k === 'home' ? h.home : h.away)}</span></span>`;
+      } catch (e) { /* alte Einträge ohne Zahlen */ }
+      out += `<a class="row hrow" href="#/r/${esc(h.id)}"><span class="duo">${crest(h.home, 30, true)}${crest(h.away, 30, true)}</span><span class="grow"><div class="t">${esc(h.home)} – ${esc(h.away)}</div><div class="s">${esc(histSub(h))}</div></span>${pill}</a>`;
+    });
+    return day ? out + '</div>' : '';
   }
 
   // ------------------------------------------------------------------ Spieltag
@@ -987,13 +1099,16 @@
   }
 
   // ------------------------------------------------------------------ Seiten-Stapel: neue Seite schiebt sich von rechts herein
+  document.body.insertAdjacentHTML('beforeend', '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>'
+    + '<linearGradient id="rg-safe" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34C759"/><stop offset="1" stop-color="#00B39B"/></linearGradient>'
+    + '<linearGradient id="rg-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB020"/><stop offset="1" stop-color="#FF375F"/></linearGradient></defs></svg>');
   const stackEl = document.createElement('div');
   stackEl.className = 'stack';
   document.body.appendChild(stackEl);
   const tabbar = document.createElement('nav');
   tabbar.className = 'tabbar';
   tabbar.setAttribute('aria-label', 'Bereiche');
-  tabbar.innerHTML = '<span class="tab-ind" aria-hidden="true"></span>' + TABS.map(([p, label, ic]) => `<button data-act="tab" data-tab="${p}"><span class="ti">${I[ic]}</span><span class="tl">${label}</span></button>`).join('');
+  tabbar.innerHTML = '<span class="tab-ind" aria-hidden="true"></span>' + TABS.map(([p, label, ic]) => `<button data-act="tab" data-tab="${p}"><span class="ti"><span class="o">${I[ic]}</span><span class="f">${I[ic + 'F'] || I[ic]}</span></span><span class="tl">${label}</span></button>`).join('');
   document.body.appendChild(tabbar);
   function syncTabs() {
     const root = S.stack[0] ? S.stack[0].path : '/';
@@ -1130,7 +1245,7 @@
   // Platz, die neue Seite blendet darunter ein – gleichmäßig skaliert (nichts verzerrt), nur transform/opacity.
   const MORPH = { duration: 560, easing: 'cubic-bezier(.32,.72,0,1)' };
   document.addEventListener('click', (e) => {
-    const c = e.target.closest && e.target.closest('a.gcard[href^="#/r/"], a.tcard, a.tmini, a.k-leg, a.row[href^="#/r/"]');
+    const c = e.target.closest && e.target.closest('a.gcard[href^="#/r/"], a.tcard, a.tmini, a.k-leg, a.row[href^="#/r/"], a.spot, a.tmc');
     if (c) S.morph = { el: c, rect: c.getBoundingClientRect(), t: performance.now() };
   }, true);
   function ghostOf(card, r) {
@@ -1338,12 +1453,15 @@
   // ------------------------------------------------------------------ Einstellungen (Blatt von unten, mit Federung)
   function openSettings() {
     if ($('.sheet')) return;
-    const dark = isDark();
+    const th = store.get('theme', 'light');
+    const k = Math.max(0, ['light', 'dark', 'auto'].indexOf(th));
     const sh = document.createElement('div');
     sh.className = 'sheet';
     sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel" role="dialog" aria-label="Einstellungen"><div class="grip" data-grip></div>
-      <h2>Einstellungen</h2><div class="lab">DARSTELLUNG</div>
-      <div class="seg" data-v="${dark ? 'dark' : 'light'}"><span class="ind"></span><button class="${dark ? '' : 'on'}" data-act="theme" data-val="light">Hell</button><button class="${dark ? 'on' : ''}" data-act="theme" data-val="dark">Dunkel</button></div>
+      <h2>Einstellungen</h2><div class="lab">DEIN NAME</div>
+      <input class="search name-in" type="text" placeholder="für die Begrüßung, z. B. Niklas" value="${esc(store.get('name', ''))}" data-act="name" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+      <div class="lab" style="margin-top:20px">DARSTELLUNG</div>
+      <div class="seg s3" data-v="${th}" style="--k:${k}"><span class="ind"></span>${[['light', 'Hell'], ['dark', 'Dunkel'], ['auto', 'Automatisch']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-val="${v}">${l}</button>`).join('')}</div>
       <p class="foot" style="margin-top:24px">Result AI · Vorschau-Version</p></div>`;
     document.body.appendChild(sh);
   }
@@ -1443,10 +1561,12 @@
     else if (act === 'theme') {
       const seg = a.closest('.seg');
       if (seg.dataset.v === a.dataset.val) return;
+      const wasDark = isDark();
       applyTheme(a.dataset.val);
       seg.dataset.v = a.dataset.val;
+      seg.style.setProperty('--k', $$('button', seg).indexOf(a));
       $$('button', seg).forEach((b) => b.classList.toggle('on', b === a));
-      redrawAll();
+      if (isDark() !== wasDark) redrawAll();
     }
   });
   document.addEventListener('change', (e) => {
@@ -1466,12 +1586,13 @@
     const t = e.target;
     if (!t.dataset) return;
     if (t.dataset.act === 'search') renderResults(t.closest('.sheet'), t.value);
+    else if (t.dataset.act === 'name') { store.set('name', t.value.trim()); $$('.hello h1').forEach((x) => { x.textContent = greet(); }); }
     else if (t.dataset.act === 'minute') { const b = $('.li-min', t.closest('.live-in')); if (b) b.textContent = t.value + "'"; }
   });
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel aus der BVB-App); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .demo-scan, .kib, .kl-row';
+    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .demo-scan, .kib, .kl-row, a.spot, a.tmc';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };

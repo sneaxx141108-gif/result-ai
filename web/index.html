@@ -18,7 +18,9 @@
 <link rel="preconnect" href="https://a.espncdn.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="app.css">
-<script>try { if (JSON.parse(localStorage.getItem('ra_theme')) === 'dark') { document.documentElement.dataset.theme = 'dark'; document.querySelector('meta[name="theme-color"]').content = '#000000'; } } catch (e) {}</script>
+<link rel="apple-touch-startup-image" media="screen and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash-1170x2532.png">
+<link rel="apple-touch-startup-image" media="screen and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="icons/splash-1284x2778.png">
+<script>try { var th = JSON.parse(localStorage.getItem('ra_theme')); if (th === 'dark' || (th === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.dataset.theme = 'dark'; document.querySelector('meta[name="theme-color"]').content = '#000000'; } } catch (e) {}</script>
 </head>
 <body>
 <script src="engine.js"></script>
