@@ -1,6 +1,7 @@
-/* Result AI – App. Hash-Routen: #/ Start, #/scan Screenshot wird gelesen, #/r/<id> Ergebnis, #/md Spieltag, #/acc Treffsicherheit.
-   Die Prozente rechnet engine.js (RE) – exakt, ohne Zufall, ohne KI. Die KI (Screenshot lesen, Internet-Recherche) läuft
-   später über den Cloudflare-Server; bis dahin zeigt die App Beispiel-Spiele.
+/* Result AI – App. Hash-Routen: #/ Start, #/scan Screenshot wird gelesen, #/r/<id> Ergebnis, #/md Spieltag, #/acc Erfolgsquote,
+   #/tips Top-Tipps, #/bets Wetten (Tracker mit Guthaben), #/pick Spiel auswählen, #/hist Verlauf, #/ki KI-Zentrale.
+   Die Prozente rechnet engine.js (RE) – exakt, ohne Zufall, ohne KI. Die KI (Screenshots lesen, Internet-Recherche) läuft
+   über den Cloudflare-Server (worker/worker.js, Adresse in API); bis der steht, zeigt die App Beispiel-Spiele.
    Seiten liegen wie in einer iPhone-App übereinander: neue Seiten schieben sich von rechts herein, zurück geht es per Knopf
    oder Wischen vom linken Rand. Animiert wird nur transform/opacity (iPhone-12-Regeln aus der BVB-App). */
 (() => {
@@ -13,10 +14,23 @@
     get(k, d) { try { const v = localStorage.getItem('ra_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('ra_' + k, JSON.stringify(v)); } catch (e) { /* privater Modus */ } },
   };
+  // Cloudflare-Server (worker/worker.js): liest Wettscheine mit Gemini und stößt die Tipp-Suche an – leer = noch nicht eingerichtet
+  const API = '';
   const nf1 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const nf2 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const eurF = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  const eur = (v) => eurF.format(v || 0);
+  const signed = (v) => (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + eurF.format(Math.abs(v || 0));
+  // Eingaben wie „1,85“, „10 €“ oder „1.234,50“ → Zahl
+  const dec = (s) => {
+    let x = String(s == null ? '' : s).replace(/[\s€]/g, '');
+    if (x.includes(',')) x = x.replace(/\./g, '').replace(',', '.');
+    const v = parseFloat(x);
+    return Number.isFinite(v) ? v : null;
+  };
   const pct1 = (p) => (p < 0.001 ? '<0,1 %' : nf1.format(p * 100) + ' %');
   const pct0 = (p) => (p < 0.005 ? '<1 %' : Math.round(p * 100) + ' %');
+  const pctR = (p) => Math.round(p * 100) + ' %'; // Trefferquoten: 0 von 3 = „0 %“, nicht „<1 %“
   // Ganze Prozente, die zusammen genau 100 ergeben (größter Rest bekommt den Punkt)
   function round100(ps) {
     const raw = ps.map((p) => p * 100);
@@ -53,6 +67,11 @@
     searchF: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><circle cx="11" cy="11" r="6.8"/><path d="M20 20l-3.6-3.6"/></svg>',
     clockF: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.6" fill="currentColor"/><path d="M12 7.2V12l3.2 2.1" fill="none" stroke="var(--card)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+    ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6h15a1 1 0 0 1 1 1v3a2 2 0 0 0 0 4v3a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-3a2 2 0 0 0 0-4V7a1 1 0 0 1 1-1z"/><path d="M15 6.5v2M15 11v2M15 15.5v2"/></svg>',
+    ticketF: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4.5 5.4h15A1.6 1.6 0 0 1 21.1 7v3.4a1.7 1.7 0 0 0 0 3.2V17a1.6 1.6 0 0 1-1.6 1.6h-15A1.6 1.6 0 0 1 2.9 17v-3.4a1.7 1.7 0 0 0 0-3.2V7a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M15 7.2v1.6M15 11.2v1.6M15 15.2v1.6" stroke="var(--card)" stroke-width="2" stroke-linecap="round"/></svg>',
+    save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.2 8.8a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   };
   const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 18 18)">
     <circle class="ring-a" cx="18" cy="18" r="13" pathLength="100" stroke="var(--text)" stroke-dasharray="44 56"/>
@@ -188,9 +207,9 @@
   // ------------------------------------------------------------------ Seiten
   const S = { stack: [], busy: false, pending: false, swipe: null, url: null, timers: [], tabScroll: {} };
   // Leiste unten: vier Bereiche mit eigener Startseite (wie die Tab-Leiste einer iPhone-App)
-  const TABS = [['/', 'Start', 'home'], ['/tips', 'Top-Tipps', 'flame'], ['/pick', 'Auswählen', 'search'], ['/hist', 'Verlauf', 'clock']];
+  const TABS = [['/', 'Start', 'home'], ['/tips', 'Top-Tipps', 'flame'], ['/bets', 'Wetten', 'ticket'], ['/pick', 'Auswählen', 'search'], ['/hist', 'Verlauf', 'clock']];
   const isTab = (p) => TABS.some((t) => t[0] === p);
-  const TITLES = { '/': '', '/ki': 'KI-Zentrale', '/scan': 'Analyse', '/md': 'Spieltag', '/acc': 'Treffsicherheit', '/pick': 'Spiel auswählen', '/tips': 'Top-Tipps', '/hist': 'Verlauf' };
+  const TITLES = { '/': '', '/ki': 'KI-Zentrale', '/scan': 'Analyse', '/md': 'Spieltag', '/acc': 'Erfolgsquote', '/pick': 'Spiel auswählen', '/tips': 'Top-Tipps', '/hist': 'Verlauf', '/bets': 'Wetten' };
   const titleOf = (path) => (path in TITLES ? TITLES[path] : 'Ergebnis');
   function barHtml(path) {
     let tt = esc(titleOf(path));
@@ -208,6 +227,7 @@
     if (path === '/pick') return vPick();
     if (path === '/tips') return vTips();
     if (path === '/hist') return vHist();
+    if (path === '/bets') return vBets();
     if (path === '/ki') return vKI();
     if (path.startsWith('/r/')) return vResult(decodeURIComponent(path.slice(3)));
     return vHome();
@@ -239,6 +259,7 @@
           <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="pick" aria-label="Foto mit der Kamera machen"></label></div>
         <button class="demo-scan" data-act="demoscan">${I.scan}<span>Beispiel-Scan ansehen</span><span class="chev">›</span></button></section>
       <a class="card pickrow" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Teams aus ${Object.keys(R.leagues).length || 'über 50'} Ligen · ohne Screenshot</div></span><span class="chev">›</span></a>
+      ${homeBets()}
       <section class="sec"><div class="sec-h"><h2>Beispiele</h2><span class="note">ausgedacht · echte Rechnung</span></div>
         <div class="ex-row">${card(DEMO.live)}${card(DEMO.pre)}${card(DEMO.odds)}${mdCard}</div></section>
       <section class="sec"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="note link" data-act="tab" data-tab="/hist">Alle ›</button>' : ''}</div>
@@ -655,7 +676,9 @@
 
   // ------------------------------------------------------------------ Top-Tipps (scripts/tips.py sucht jede Stunde neu)
   // Chance = aus den Buchmacher-Quoten (Backtest: am genauesten), Tore zusätzlich mit Result AI; „≈“ = geschätzte Quote.
-  const T = { data: null, loading: null, at: 0, err: false, list: 'safe', day: 'all', comp: 'all', seen: {} };
+  const T = { data: null, loading: null, at: 0, err: false, list: 'safe', day: 'all', seen: {} };
+  // wie frisch ist die letzte Tipp-Suche? ok (unter 1,5 Std.) · warn (unter 6 Std.) · bad – ehrlich statt immer grün
+  const freshness = (iso) => { const h = (Date.now() - new Date(iso).getTime()) / 36e5; return h < 1.5 ? 'ok' : h < 6 ? 'warn' : 'bad'; };
   function loadTips(maxAge) {
     if (T.data && Date.now() - T.at < (maxAge == null ? 10 * 60e3 : maxAge)) return Promise.resolve(T.data);
     if (!T.loading) {
@@ -713,15 +736,18 @@
     T.seen[id] = m;
     return m;
   }
-  // „Tipps zu diesem Spiel“ auf der Ergebnis-Seite
+  // „Tipps zu diesem Spiel“ auf der Ergebnis-Seite – jeder Tipp lässt sich als Wette speichern
+  const LISTS = [['safe', 'Sicher'], ['rec', 'Empfohlen'], ['top', 'Top-Quote']];
   function tipsForGame(m, i) {
     if (!T.data) return '';
     const seen = new Set();
-    const list = [['safe', 'Sicher'], ['top', 'Top-Quote']].flatMap(([k, l]) => T.data[k].filter((t) => t.g === m.gid).map((t) => [t, l]))
+    const keys = savedKeys();
+    const list = LISTS.flatMap(([k, l]) => (T.data[k] || []).filter((t) => t.g === m.gid).map((t) => [t, l, k]))
       .filter(([t]) => !seen.has(t.m) && seen.add(t.m));
     if (!list.length) return '';
     return `<section class="card" data-sec="tp" style="--i:${i}"><div class="card-h"><h3>Top-Tipps zu diesem Spiel</h3><span class="note">jede Stunde neu</span></div>
-      ${list.map(([t, l]) => `<div class="tg-row"><span class="grow"><span class="k">${l} · ${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, m.home, m.away))}</b></span>${ring(t.p)}<span class="tg-q"><span>Quote</span><b>${qTxt(t)}</b></span></div>`).join('')}</section>`;
+      ${list.map(([t, l, k]) => { const on = keys.has(`${t.g}|${t.m}`); return `<div class="tg-row"><span class="grow"><span class="k">${l} · ${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, m.home, m.away))}</b></span>${ring(t.p)}<span class="tg-q"><span>Quote</span><b>${qTxt(t)}</b></span>
+        <button class="gsave${on ? ' on' : ''}" data-act="savetip" data-list="${k}" data-g="${esc(t.g)}" data-m="${esc(t.m)}" aria-label="${on ? 'Gespeichert – zu den Wetten' : 'Als Wette speichern'}">${on ? I.check : I.save}</button></div>`; }).join('')}</section>`;
   }
 
   function tipCard(t, i, list) {
@@ -735,11 +761,14 @@
       <div class="tc-main"><div class="tc-teams"><span class="tm">${crest(h, 24)}<span>${esc(h)}</span></span><span class="tm">${crest(a, 24)}<span>${esc(a)}</span></span></div>${ring(t.p)}</div>
       <div class="tc-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="tc-q"><span class="k">Quote</span><b>${qTxt(t)}</b></div></div>
       <div class="cmp2"><div><span>Buchmacher</span><i><em style="width:${Math.round(t.p * 100)}%"></em></i><b>${Math.round(t.p * 100)} %</b></div>
-        <div class="ai"><span>Result AI</span><i><em style="width:${t.pm != null ? Math.round(t.pm * 100) : 0}%"></em></i><b>${t.pm != null ? Math.round(t.pm * 100) + ' %' : '–'}</b></div></div></a>`;
+        <div class="ai"><span>Result AI</span><i><em style="width:${t.pm != null ? Math.round(t.pm * 100) : 0}%"></em></i><b>${t.pm != null ? Math.round(t.pm * 100) + ' %' : '–'}</b></div></div>
+      ${saveBtn(B.keys.has(`${t.g}|${t.m}`), `data-act="savetip" data-list="${list}" data-g="${esc(t.g)}" data-m="${esc(t.m)}"`, 'Wette speichern')}</a>`;
   }
+  // Speichern-Knopf auf Tipp- und Kombi-Karten: einmal gespeichert → „Gespeichert“ (Antippen öffnet die Wetten)
+  const saveBtn = (on, attrs, label) => `<button class="tsave${on ? ' on' : ''}" ${attrs}>${on ? I.check : I.save}<span>${on ? 'Gespeichert · in Wetten' : label}</span></button>`;
   function kombisHtml(d) {
-    const all = d.top.concat(d.safe);
-    const cards = d.kombis.map((k) => {
+    const all = d.top.concat(d.safe, d.rec || []);
+    const cards = d.kombis.map((k, idx) => {
       const legs = k.legs.map((l) => all.find((t) => t.g === l.g && t.m === l.m));
       if (!legs.length || !legs.every((t) => t && upcoming(t))) return ''; // ein Spiel läuft schon → nicht mehr spielbar
       return `<section class="kombi ${k.kind}"><div class="k-head"><div><span class="k-eb">${esc(k.name)}</span><h3>${legs.length} Tipps auf einem Schein</h3></div>
@@ -750,43 +779,38 @@
           const a = tipTeam(g.away);
           return `<a class="k-leg" href="#/r/t_${esc(g.id)}"><span class="duo">${crest(h, 26, true)}${crest(a, 26, true)}</span><span class="grow"><b>${esc(tipLabel(t.m, h, a))}</b><span>${esc(h)} – ${esc(a)} · ${esc(kickoff(g.t))}</span></span><span class="k-lp"><b>${Math.round(t.p * 100)} %</b><span>${qTxt(t)}</span></span></a>`;
         }).join('')}</div>
-        <div class="k-foot"><span>Chance, dass alle aufgehen</span><b>${pct0(k.p)}</b></div></section>`;
+        <div class="k-foot"><span>Chance, dass alle aufgehen</span><b>${pct0(k.p)}</b></div>
+        <div class="k-save">${saveBtn(B.keys.has(kombiKey(k)), `data-act="savekombi" data-i="${idx}"`, 'Kombi speichern')}</div></section>`;
     }).join('');
     return '<p class="tl-note">Kombi = mehrere Tipps auf einem Schein: Die Quoten werden malgenommen – aber jeder einzelne Tipp muss aufgehen.</p>'
       + (cards || '<div class="empty" style="margin-top:14px">Gerade keine Kombi – die nächste Suche läuft in spätestens einer Stunde.</div>');
   }
-  // Filter der Tipp-Listen: Zeitraum (3 Wochen voraus) und Wettbewerb (die wichtigsten zuerst)
+  // Filter der Tipp-Listen: nur der Zeitraum (3 Wochen voraus) – die Wettbewerbs-Leiste hat Niklas am 06.11.2026 rausgenommen
   const PERIODS = [['all', 'Alle Tage'], ['0', 'Heute'], ['1', 'Morgen'], ['week', 'Diese Woche'], ['later', 'Später']];
   const inPeriod = (iso, k) => { const dd = dayDiff(iso); return k === 'all' || (k === 'week' ? dd <= 6 : k === 'later' ? dd > 6 : String(dd) === k); };
-  const COMP_ORDER = ['uefa.champions', 'uefa.europa', 'uefa.europa.conf', 'ger.1', 'eng.1', 'esp.1', 'ita.1', 'fra.1', 'ger.dfb_pokal', 'ger.2',
-    'eng.2', 'eng.fa', 'eng.league_cup', 'esp.copa_del_rey', 'ita.coppa_italia', 'fra.coupe_de_france', 'ned.1', 'por.1', 'tur.1'];
+  const NOTES = {
+    safe: 'Chance ab 70 % bei einer Quote ab 1,20 – oben steht, worin sich Buchmacher und Result AI am einigsten sind.',
+    rec: 'Von Result AI empfohlen: echte Quote ab 1,50 bei mindestens 55 % Chance – und Result AI sieht die Wette mindestens so gut wie der Buchmacher. Die beste Mischung aus guter Quote und ordentlicher Erfolgsquote.',
+    top: 'Quote ab 1,60 bei über 50 % Chance – hier zählt vor allem die hohe Quote.',
+  };
   function tipsBody() {
     const d = T.data;
+    B.keys = savedKeys();
     if (T.list === 'kombi') return kombisHtml(d);
+    if (!d[T.list]) return '<div class="empty" style="margin-top:14px">„Empfohlen“ kommt mit der nächsten Tipp-Suche – spätestens in einer Stunde.</div>';
     const all = d[T.list].filter(upcoming);
     const per = PERIODS.filter(([k]) => k === 'all' || all.some((t) => inPeriod(d.games[t.g].t, k)));
     if (!per.some(([k]) => k === T.day)) T.day = 'all';
-    const byTime = all.filter((t) => inPeriod(d.games[t.g].t, T.day));
-    const comps = {};
-    byTime.forEach((t) => { const g = d.games[t.g]; (comps[g.slug] = comps[g.slug] || { name: g.comp, n: 0 }).n++; });
-    const rank = (k) => { const x = COMP_ORDER.indexOf(k); return x < 0 ? 99 : x; };
-    const order = Object.keys(comps).sort((x, y) => (rank(x) - rank(y)) || (comps[y].n - comps[x].n));
-    // gleicher Name in mehreren Ländern (z. B. „Super League“) → mit Land
-    const label = (k) => (order.some((o) => o !== k && comps[o].name === comps[k].name) && R.leagues[k] ? `${comps[k].name} (${R.leagues[k].country})` : comps[k].name);
-    if (T.comp !== 'all' && !comps[T.comp]) T.comp = 'all';
-    const shown = T.comp === 'all' ? byTime : byTime.filter((t) => d.games[t.g].slug === T.comp);
-    const chips = (list, act, cur) => `<div class="chips">${list.map(([k, l]) => `<button class="${cur === k ? 'on' : ''}" data-act="${act}" data-val="${esc(k)}">${esc(l)}</button>`).join('')}</div>`;
-    const note = T.list === 'safe' ? 'Chance ab 70 % bei einer Quote ab 1,20 – oben steht, worin sich Buchmacher und Result AI am einigsten sind.'
-      : 'Quote ab 1,60 bei über 50 % Chance – die beste Mischung aus Quote und Chance.';
-    return chips(per, 'tday', T.day) + (order.length > 1 ? chips([['all', 'Alle Wettbewerbe']].concat(order.map((k) => [k, `${label(k)} · ${comps[k].n}`])), 'tcomp', T.comp) : '')
-      + `<p class="tl-note">${note}</p>` + (shown.length ? `<div class="tlist">${shown.slice(0, 40).map((t, i) => tipCard(t, i, T.list)).join('')}</div>`
+    const shown = all.filter((t) => inPeriod(d.games[t.g].t, T.day));
+    return `<div class="chips">${per.map(([k, l]) => `<button class="${T.day === k ? 'on' : ''}" data-act="tday" data-val="${esc(k)}">${esc(l)}</button>`).join('')}</div>`
+      + `<p class="tl-note">${NOTES[T.list]}</p>` + (shown.length ? `<div class="tlist">${shown.slice(0, 40).map((t, i) => tipCard(t, i, T.list)).join('')}</div>`
       : '<div class="empty" style="margin-top:14px">Gerade keine passenden Tipps – die nächste Suche läuft in spätestens einer Stunde.</div>');
   }
   function recordHtml(d) {
     const r = d.record || {};
     const line = (key, label) => {
       const x = (r[key] || {})['30'] || { n: 0 };
-      return x.n ? `<div class="rec-row"><span class="rl">${label}</span><b>${x.won} von ${x.n} richtig</b><span class="rp">${pct0(x.won / x.n)}<small>erwartet ${pct0(x.exp / x.n)}</small></span></div>`
+      return x.n ? `<div class="rec-row"><span class="rl">${label}</span><b>${x.won} von ${x.n} richtig</b><span class="rp">${pctR(x.won / x.n)}<small>erwartet ${pct0(x.exp / x.n)}</small></span></div>`
         : `<div class="rec-row"><span class="rl">${label}</span><span class="muted">noch keine beendeten Spiele</span></div>`;
     };
     const recent = (d.recent || []).slice(0, 8).map((e) => {
@@ -794,22 +818,22 @@
       const a = tipTeam({ id: e.aid, name: e.away });
       return `<div class="rec-it ${e.res.won ? 'won' : 'lost'}"><span class="mk">${e.res.won ? '✓' : '✗'}</span><span class="grow"><b>${esc(tipLabel(e.m, h, a))}</b><span>${esc(h)} ${e.res.hs}:${e.res.as} ${esc(a)}</span></span><span class="rp2">${pct0(e.p)}</span></div>`;
     }).join('');
-    const all30 = ['safe', 'top'].map((k) => (r[k] || {})['30'] || { n: 0, won: 0, exp: 0 });
-    const n30 = all30[0].n + all30[1].n;
-    const w30 = all30[0].won + all30[1].won;
-    const hero = n30 ? `<div class="rec-hero">${ring(w30 / n30)}<div><b>${w30} von ${n30}</b><span>Tipps aufgegangen · erwartet waren ${pct0((all30[0].exp + all30[1].exp) / n30)}</span></div></div>` : '';
-    return `<section class="sec"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="card rec">${hero}${line('safe', 'Sicher')}${line('top', 'Top-Quote')}
+    const all30 = ['safe', 'top'].concat(r.rec ? ['rec'] : []).map((k) => (r[k] || {})['30'] || { n: 0, won: 0, exp: 0 });
+    const n30 = all30.reduce((s, x) => s + x.n, 0);
+    const w30 = all30.reduce((s, x) => s + x.won, 0);
+    const hero = n30 ? `<div class="rec-hero">${ring(w30 / n30)}<div><b>${w30} von ${n30}</b><span>Tipps aufgegangen · erwartet waren ${pct0(all30.reduce((s, x) => s + x.exp, 0) / n30)}</span></div></div>` : '';
+    return `<section class="sec"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="card rec">${hero}${line('safe', 'Sicher')}${r.rec ? line('rec', 'Empfohlen') : ''}${line('top', 'Top-Quote')}
       ${recent ? `<div class="rec-list">${recent}</div>` : '<p class="muted rec-empty">Läuft seit dem 5. November: Jeder angezeigte Tipp wird festgehalten und nach dem Spiel ehrlich ausgewertet – auch die, die danebengehen.</p>'}</div></section>`;
   }
   function vTips() {
     const head = aura('tips') + '<h1 class="ptitle">Top-Tipps</h1><p class="psub">Jede Stunde neu gesucht – über 40 Ligen und Pokale, 3 Wochen voraus, inklusive Champions League.</p>';
     const d = T.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${T.err ? 'Die Tipps konnten gerade nicht geladen werden – prüf die Verbindung.' : 'Die Tipps werden geladen …'}</div>`;
-    const tabs = [['safe', 'Sicher'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
+    const tabs = [['safe', 'Sicher'], ['rec', 'Empfohlen'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
     const k = Math.max(0, tabs.findIndex((x) => x[0] === T.list));
     const upd = new Date(d.updatedAt);
-    const stats = `<div class="stat-pills"><span><b>${d.safe.filter(upcoming).length}</b>sicher</span><span><b>${d.top.filter(upcoming).length}</b>Top-Quote</span><span><b>${d.kombis.length}</b>Kombis</span><span class="sp-live"><i></i>${esc(ago(d.updatedAt))}</span></div>`;
-    return head + stats + `<div class="seg s3" style="--k:${k};margin-top:16px"><span class="ind"></span>${tabs.map(([v, l]) => `<button class="${T.list === v ? 'on' : ''}" data-act="tlist" data-val="${v}">${l}</button>`).join('')}</div>
+    const stats = `<div class="stat-pills"><span><b>${d.safe.filter(upcoming).length}</b>sicher</span>${d.rec ? `<span><b>${d.rec.filter(upcoming).length}</b>empfohlen</span>` : ''}<span><b>${d.top.filter(upcoming).length}</b>Top-Quote</span><span><b>${d.kombis.length}</b>Kombis</span><span class="sp-live ${freshness(d.updatedAt)}"><i></i>${esc(ago(d.updatedAt))}</span></div>`;
+    return head + stats + `<div class="seg s4" style="--k:${k};margin-top:16px"><span class="ind"></span>${tabs.map(([v, l]) => `<button class="${T.list === v ? 'on' : ''}" data-act="tlist" data-val="${v}">${l}</button>`).join('')}</div>
       <div class="tips-body">${tipsBody()}</div>${recordHtml(d)}
       <p class="foot">Gesucht ${esc(isNaN(upd) ? '' : (dayDiff(d.updatedAt) === 0 ? 'heute' : 'am ' + upd.toLocaleDateString('de-DE')) + ' um ' + upd.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))} · ${esc(d.source)}<br>
       Chance aus den Quoten der Buchmacher (ohne ihre Marge), Tore zusätzlich mit Result AI. „≈“ = geschätzte Quote, beim Buchmacher kann sie etwas abweichen.<br>
@@ -846,8 +870,13 @@
   // ------------------------------------------------------------------ Verlauf (eigener Bereich in der Leiste unten)
   function vHist() {
     const hist = store.get('history', []);
-    return `${aura('hist')}<h1 class="ptitle">Verlauf</h1><p class="psub">Alle deine Prognosen – nur auf diesem Handy gespeichert.</p>
-      <div class="group" style="margin-top:18px"><a class="row" href="#/acc"><span class="round">${I.target}</span><span class="grow"><div class="t">Wie oft lag Result AI richtig?</div><div class="s">${hist.length ? `${hist.length} ${hist.length === 1 ? 'Prognose' : 'Prognosen'} gespeichert · noch keine ausgewertet` : 'Nur deine Prognosen · noch keine ausgewertet'}</div></span><span class="chev">›</span></a></div>
+    const auto = betsAll().filter((b) => b.auto);
+    const s = betStats();
+    const nOpen = auto.filter((b) => b.status === 'open').length;
+    return `${aura('hist')}<h1 class="ptitle">Verlauf</h1><p class="psub">Deine Wetten aus den Top-Tipps und deine Prognosen – nur auf diesem Handy gespeichert.</p>
+      <a class="card accrow" href="#/acc">${s.n ? ring(s.won / s.n) : `<span class="round">${I.target}</span>`}<span class="grow"><b>Erfolgsquote</b><span>${s.n ? `${s.won} von ${s.n} Wetten gewonnen · ${signed(s.pl)}` : nOpen ? `${nOpen} ${nOpen === 1 ? 'Wette wartet' : 'Wetten warten'} auf den Abpfiff` : 'Noch keine Wette ausgewertet'}</span></span><span class="chev">›</span></a>
+      <section class="sec"><div class="sec-h"><h2>Deine Wetten</h2><span class="note">aus den Top-Tipps</span></div>
+        ${auto.length ? histBets(auto) : '<div class="empty">Noch keine gespeichert. Tipp in den Top-Tipps bei einer Wette auf „Wette speichern“ – Result AI prüft sie nach dem Abpfiff selbst.</div>'}</section>
       <section class="sec"><div class="sec-h"><h2>Deine Prognosen</h2>${hist.length ? `<span class="note">${hist.length}</span>` : ''}</div>
         ${hist.length ? histGrouped(hist) : '<div class="empty">Noch keine Prognosen. Wähl ein Spiel aus oder scanne einen Screenshot – alles landet hier.</div>'}</section>`;
   }
@@ -929,14 +958,18 @@
     if (!d) return head + `<div class="empty" style="margin-top:18px">${A.err ? 'Das Protokoll konnte gerade nicht geladen werden.' : 'Das Protokoll wird geladen …'}</div>`;
     const runs = (d.runs || []).slice().reverse();
     const last = (job) => runs.find((r) => r.job === job);
+    const sts = {};
     const status = Object.keys(JOBS).map((k) => {
       const j = JOBS[k];
       const r = last(k);
-      const age = r ? (Date.now() - new Date(r.t).getTime()) / 36e5 : null;
-      const st = !r ? 'idle' : !r.ok ? 'bad' : age > j.bad ? 'bad' : age > j.warn ? 'warn' : 'ok';
+      // die Tipp-Suche zählt ab der veröffentlichten Datei (ein Lauf kann schon fertig sein, bevor das Protokoll hier ankommt)
+      const t = k === 'tips' && T.data && (!r || T.data.updatedAt > r.t) ? T.data.updatedAt : r && r.t;
+      const age = t ? (Date.now() - new Date(t).getTime()) / 36e5 : null;
+      const st = !t ? 'idle' : r && !r.ok ? 'bad' : age > j.bad ? 'bad' : age > j.warn ? 'warn' : 'ok';
+      sts[k] = st;
       const txt = { ok: 'läuft', warn: 'verspätet', bad: 'hängt', idle: 'wartet auf ersten Lauf' }[st];
-      return `<div class="ks-row"><span class="ks-ic">${I[j.icon]}</span><span class="grow"><b>${j.name}</b><span>${j.every} · ${r ? `zuletzt ${ago(r.t)}` : 'noch kein Lauf protokolliert'}</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>`;
-    }).join('');
+      return `<div class="ks-row"><span class="ks-ic">${I[j.icon]}</span><span class="grow"><b>${j.name}</b><span>${j.every} · ${t ? `zuletzt ${ago(t)}` : 'noch kein Lauf protokolliert'}</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>`;
+    }).join('') + serverRow(sts.tips);
     const startToday = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
     const today = runs.filter((r) => new Date(r.t).getTime() >= startToday);
     const sum = (list, f) => list.reduce((x, r) => x + (f(r) || 0), 0);
@@ -962,19 +995,47 @@
       const dk = new Date(r.t).toDateString();
       if (dk !== lastDay) { log += `${lastDay ? '</div>' : ''}<div class="kl-day">${esc(dayDiff(r.t) === 0 ? 'Heute' : dayDiff(r.t) === -1 ? 'Gestern' : new Date(r.t).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</div><div class="group">`; lastDay = dk; }
       const open = A.open[r.t + r.job];
-      log += `<button class="row kl-row${open ? ' open' : ''}" data-act="kirun" data-k="${esc(r.t + r.job)}"><span class="kl-ic ${r.job}">${I[JOBS[r.job] ? JOBS[r.job].icon : 'spark']}</span><span class="grow"><div class="t">${JOBS[r.job] ? JOBS[r.job].name : esc(r.job)} <span class="kl-t">${hm(r.t)}</span></div><div class="s">${esc(runLine(r))}</div></span><span class="chev">›</span></button>${open ? `<div class="kl-det">${runDetails(r)}</div>` : ''}`;
+      const via = r.sum && VIA[r.sum.via] ? ` · ${VIA[r.sum.via]}` : '';
+      log += `<button class="row kl-row${open ? ' open' : ''}" data-act="kirun" data-k="${esc(r.t + r.job)}"><span class="kl-ic ${r.job}">${I[JOBS[r.job] ? JOBS[r.job].icon : 'spark']}</span><span class="grow"><div class="t">${JOBS[r.job] ? JOBS[r.job].name : esc(r.job)} <span class="kl-t">${hm(r.t)}${via}</span></div><div class="s">${esc(runLine(r))}</div></span><span class="chev">›</span></button>${open ? `<div class="kl-det">${runDetails(r)}</div>` : ''}`;
     });
     if (lastDay) log += '</div>';
     return head + `<div class="card ks" style="margin-top:18px">${status}</div><div class="ktiles">${tiles}</div>
       <section class="sec"><div class="sec-h"><h2>Letzte 7 Tage</h2><span class="note">neue Tipps</span></div><div class="card">${chart}<p class="kc-cap">Balken = neue Tipps · darunter, wie oft gesucht wurde</p></div></section>
       <section class="sec"><div class="sec-h"><h2>Protokoll</h2><span class="note">antippen für Einzelheiten</span></div>${log || '<div class="empty">Noch keine Läufe protokolliert.</div>'}</section>
-      <p class="foot">Die Rechner arbeiten ohne Sprach-KI: Mathe aus Ergebnissen, Toren und Buchmacher-Quoten – bei Zahlen genauer und ohne Erfundenes.<br>Gemini & Co. kommen mit dem Screenshot-Scan dazu und erscheinen dann ebenfalls hier.</p>`;
+      <p class="foot">Die Rechner arbeiten ohne Sprach-KI: Mathe aus Ergebnissen, Toren und Buchmacher-Quoten – bei Zahlen genauer und ohne Erfundenes.<br>Gemini liest auf dem Cloudflare-Server deine Wettschein-Screenshots. Der Server startet auch die Tipp-Suche, wenn GitHub sie auslässt.</p>`;
   }
-  // Knopf oben rechts auf der Startseite: grüner Punkt (alles läuft) + neue Tipps heute
+  const VIA = { zeitgeber: 'vom Zeitgeber', github: 'von GitHub', hand: 'von Hand' };
+  // Cloudflare-Server: erreichbar? Zeitgeber eingerichtet? (nur Ja/Nein – die Schlüssel selbst sieht die App nie)
+  const Z = { st: null, at: 0, loading: null };
+  function loadServer() {
+    if (!API) return Promise.resolve(null);
+    if (Z.st && Date.now() - Z.at < 60e3) return Promise.resolve(Z.st);
+    if (!Z.loading) {
+      Z.loading = fetch(API + '/', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ ok: false }))
+        .then((d) => { Z.st = d; Z.at = Date.now(); return d; }).finally(() => { Z.loading = null; });
+    }
+    return Z.loading;
+  }
+  function serverRow(tipsSt) {
+    const s = Z.st;
+    const st = !API ? 'idle' : !s ? 'idle' : !s.ok ? 'bad' : s.zeitgeber ? 'ok' : 'warn';
+    const txt = !API ? 'noch nicht eingerichtet' : !s ? 'wird geprüft …' : !s.ok ? 'nicht erreichbar' : s.zeitgeber ? 'verbunden' : 'GitHub-Schlüssel fehlt';
+    const kick = API && s && s.ok && s.zeitgeber && (tipsSt === 'warn' || tipsSt === 'bad') && store.get('invite', '')
+      ? '<button class="btn soft ks-kick" data-act="kick">Tipp-Suche jetzt starten</button>' : '';
+    return `<div class="ks-row"><span class="ks-ic">${I.clock}</span><span class="grow"><b>Zeitgeber</b><span>Cloudflare · startet die Tipp-Suche, wenn sie älter als 50 Min. ist</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>${kick}`;
+  }
+  function kickNow() {
+    const code = store.get('invite', '');
+    if (!API || !code) return;
+    toast('Zeitgeber wird angestoßen …');
+    fetch(API + '/kick', { headers: { 'X-Invite': code } }).then((r) => r.json()).then((d) => toast(d.ok ? d.info : d.error || 'Das hat nicht geklappt.'))
+      .catch(() => toast('Der Server ist gerade nicht erreichbar.'));
+  }
+  // Knopf oben rechts auf der Startseite: Punkt grün/orange/rot je nach Alter der letzten Tipp-Suche + neue Tipps heute
   function kiBadge() {
     const k = T.data && T.data.ki;
-    const fresh = T.data && Date.now() - new Date(T.data.updatedAt).getTime() < 3 * 36e5;
-    return `<i class="kib-dot${T.data ? (fresh ? ' ok' : ' warn') : ''}"></i><span>KI</span>${k && k.newTips ? `<b class="kib-n">+${k.newTips}</b>` : ''}`;
+    const n = k && k.newTips && k.last && dayDiff(k.last) === 0 ? k.newTips : 0;
+    return `<i class="kib-dot${T.data ? ' ' + freshness(T.data.updatedAt) : ''}"></i><span>KI</span>${n ? `<b class="kib-n">+${n}</b>` : ''}`;
   }
 
   // ------------------------------------------------------------------ Design-Runde 4: Begrüßung, Tipp des Tages, Karussell, Lichtschein
@@ -1079,29 +1140,496 @@
       }).join('')}</div><p class="foot">Beispiel-Spieltag (ausgedacht). Mit der KI liest Result AI alle Spiele direkt aus einem Screenshot.</p>`;
   }
 
-  // ------------------------------------------------------------------ Treffsicherheit
+  // ------------------------------------------------------------------ Erfolgsquote (Niklas, 06.11.2026): nur Wetten aus den Top-Tipps,
+  // ausgewertet von Result AI selbst nach dem Abpfiff (offizieller Endstand) – von Hand lässt sich hier nichts ändern
   function vAccuracy() {
-    const pts = [10, 30, 50, 70, 90];
-    const svg = `<svg class="calib" viewBox="0 0 300 200" role="img" aria-label="Beispiel: Ehrlichkeits-Diagramm">
-      <line x1="40" y1="170" x2="290" y2="170" stroke="var(--line)"/><line x1="40" y1="10" x2="40" y2="170" stroke="var(--line)"/>
-      <line x1="40" y1="170" x2="290" y2="10" stroke="var(--faint)" stroke-dasharray="4 5"/>
-      ${pts.map((v) => `<circle cx="${40 + v * 2.5}" cy="${170 - v * 1.6}" r="5" fill="var(--text)"/>`).join('')}
-      <text x="165" y="194" text-anchor="middle" font-size="11" fill="var(--muted)" font-weight="600">Result AI sagt … %</text>
-      <text x="14" y="90" text-anchor="middle" font-size="11" fill="var(--muted)" font-weight="600" transform="rotate(-90 14 90)">passiert in … %</text></svg>`;
-    const metric = (n, t, s) => `<div class="row metric" style="align-items:flex-start"><span class="n">${n}</span><span class="grow"><div class="t" style="white-space:normal">${t}</div><div class="s" style="font-size:14px;margin-top:2px">${s}</div></span></div>`;
-    return `<h1 class="ptitle">Wie oft lag Result AI richtig?</h1>
-      <p class="psub">Jede Analyse wird auf deinem Handy gespeichert. Nach dem Spiel holt sich die App das echte Ergebnis und rechnet ehrlich nach.</p>
-      <div class="group" style="margin-top:22px">${metric(1, 'Favorit gewonnen', 'Wie oft hat das Team mit der höheren Siegchance wirklich gewonnen – z. B. „63 von 100“.')}
-        ${metric(2, 'Ergebnis unter den Top 3', 'Wie oft war der echte Endstand unter den drei wahrscheinlichsten Ergebnissen.')}
-        ${metric(3, 'Ehrlichkeit', 'Sagt Result AI 70 %, sollte es auch in etwa 70 % der Fälle passieren. Liegen die Punkte auf der Linie, kann man den Zahlen trauen.')}</div>
-      <section class="sec"><div class="sec-h"><h2>Ehrlichkeits-Diagramm</h2><span class="note">so sieht es aus</span></div><div class="group" style="padding:14px">${svg}</div>
-        <div class="empty" style="margin-top:10px">Noch keine Scans ausgewertet. Sobald die ersten gescannten Spiele vorbei sind, stehen hier deine echten Zahlen.</div></section>`;
+    const s = betStats();
+    const nOpen = betsAll().filter((b) => b.auto && b.status === 'open').length;
+    const head = `${aura('hist')}<h1 class="ptitle">Erfolgsquote</h1><p class="psub">Nur Wetten, die du aus den Top-Tipps gespeichert hast. Result AI prüft sie nach dem Abpfiff selbst mit dem offiziellen Endstand – von Hand lässt sich hier nichts ändern.</p>`;
+    const wait = nOpen ? `<p class="tl-note" style="margin-top:14px">${nOpen} ${nOpen === 1 ? 'Wette wartet' : 'Wetten warten'} noch auf den Abpfiff.</p>` : '';
+    if (!s.n) return head + `<div class="empty" style="margin-top:18px">Noch keine Wette ausgewertet. Speichere in den Top-Tipps eine Wette – nach dem Abpfiff steht hier, ob sie aufgegangen ist.</div>${wait}`;
+    const roi = s.stake ? s.pl / s.stake : 0;
+    const NAMES = { safe: 'Sicher', rec: 'Empfohlen', top: 'Top-Quote', kombi: 'Kombi' };
+    const lines = Object.keys(NAMES).filter((k) => s.by[k]).map((k) => { const x = s.by[k]; return `<div class="rec-row"><span class="rl">${NAMES[k]}</span><b>${x.won} von ${x.n}</b><span class="rp">${pctR(x.won / x.n)}<small>erwartet ${pct0(x.exp / x.n)}</small></span></div>`; }).join('');
+    const recent = s.list.slice(0, 12).map((b) => `<div class="rec-it ${b.status === 'won' ? 'won' : 'lost'}"><span class="mk">${b.status === 'won' ? '✓' : '✗'}</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc(betSub(b))}</span></span><span class="rp2 ${b.status === 'won' ? 'up' : 'down'}">${signed(payout(b) - b.stake)}</span></div>`).join('');
+    // Ehrlichkeit: stimmen die Prozente? (erst ab 20 Wetten aussagekräftig)
+    const bins = [[0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9], [0.9, 1.01]].map(([lo, hi]) => {
+      const xs = s.list.filter((b) => b.p >= lo && b.p < hi);
+      return { lo, n: xs.length, exp: xs.reduce((a, b) => a + b.p, 0), won: xs.filter((b) => b.status === 'won').length };
+    }).filter((x) => x.n);
+    const calib = s.n >= 20 ? `<section class="sec"><div class="sec-h"><h2>Ehrlichkeit</h2><span class="note">sagt Result AI x %, passiert es auch?</span></div><div class="card rec">${bins.map((x) => `<div class="rec-row"><span class="rl">${Math.round(x.lo * 100)}–${Math.min(100, Math.round(x.lo * 100) + 10)} %</span><b>${x.won} von ${x.n}</b><span class="rp">${pctR(x.won / x.n)}<small>erwartet ${pct0(x.exp / x.n)}</small></span></div>`).join('')}</div></section>`
+      : `<p class="tl-note" style="margin-top:14px">Ab 20 ausgewerteten Wetten zeigt Result AI hier auch, ob die Prozente ehrlich sind (gerade: ${s.n}).</p>`;
+    return head + `<div class="card rec" style="margin-top:18px"><div class="rec-hero">${ring(s.won / s.n)}<div><b>${s.won} von ${s.n} gewonnen</b><span>erwartet waren ${pct0(s.exp / s.n)} (laut Buchmacher-Chance)</span></div></div>
+        <div class="acc-money"><div><span>Einsatz</span><b>${eur(s.stake)}</b></div><div><span>Ausgezahlt</span><b>${eur(s.back)}</b></div><div><span>Gewinn/Verlust</span><b class="${s.pl > 0 ? 'up' : s.pl < 0 ? 'down' : ''}">${signed(s.pl)}</b></div><div><span>Rendite</span><b class="${roi > 0 ? 'up' : roi < 0 ? 'down' : ''}">${roi > 0 ? '+' : roi < 0 ? '−' : ''}${nf1.format(Math.abs(roi) * 100)} %</b></div></div></div>${wait}
+      <section class="sec"><div class="sec-h"><h2>Nach Kategorie</h2></div><div class="card rec">${lines}</div></section>
+      <section class="sec"><div class="sec-h"><h2>Zuletzt ausgewertet</h2></div><div class="card rec"><div class="rec-list" style="border-top:0">${recent}</div></div></section>${calib}
+      <p class="foot">Gezählt werden nur gewonnene und verlorene Wetten (abgesagte Spiele nicht). Gewertet wird wie beim Buchmacher nach 90 Minuten plus Nachspielzeit.</p>`;
+  }
+
+  // ------------------------------------------------------------------ Wetten: Tracker mit Einsatz, Gewinn und Guthaben (nur auf diesem Handy)
+  // Wette: { id, at, src: tip|manual|scan, auto (nur Top-Tipps: Result AI prüft nach Abpfiff), list, key, title, legs, q, p, stake,
+  //          win (Auszahlung inkl. Einsatz), status: open|won|lost|void, done, bookie, teams }
+  // Tipp der Wette (leg): { g (ESPN-Spiel), slug (ESPN-Liga), m (Wett-Code), home, away, comp, t (Anpfiff), pick, q, p, res }
+  const B = { tab: 'open', keys: new Set(), draft: null };
+  const betsAll = () => { const x = store.get('bets', []); return Array.isArray(x) ? x : []; };
+  const betsSave = (list) => store.set('bets', list.slice(0, 500));
+  const savedKeys = () => new Set(betsAll().map((b) => b.key).filter(Boolean));
+  const kombiKey = (k) => 'k|' + k.legs.map((l) => l.g + ':' + l.m).join(',');
+  const payout = (b) => (b.status === 'won' ? b.win : b.status === 'void' ? b.stake : 0);
+  const legTeams = (l) => (l.home && l.away ? `${l.home} – ${l.away}` : l.event || '');
+  const betTitle = (b) => (b.legs.length > 1 ? `${b.title || 'Kombi'} · ${b.legs.length} Tipps` : (b.legs[0] && b.legs[0].pick) || b.title || 'Wette');
+  const betSub = (b) => (b.legs.length > 1 ? b.legs.map((l) => l.pick).join(' · ')
+    : [legTeams(b.legs[0] || {}), b.legs[0] && b.legs[0].res && b.legs[0].res.hs != null ? `${b.legs[0].res.hs}:${b.legs[0].res.as}` : ''].filter(Boolean).join(' · '));
+  const firstKick = (b) => Math.min(...b.legs.map((l) => (l.t ? new Date(l.t).getTime() : Infinity)));
+  const lastKick = (b) => Math.max(0, ...b.legs.map((l) => (l.t ? new Date(l.t).getTime() : 0)));
+  // Automatisch geprüfte Wetten lassen sich nur vor dem Anpfiff löschen (sonst könnte man die Erfolgsquote schönen)
+  const canDelete = (b) => !b.auto || (b.status === 'open' && b.legs.every((l) => !l.t || new Date(l.t).getTime() > Date.now()));
+  const teamsOf = (legs) => { const o = {}; legs.forEach((l) => [l.home, l.away].forEach((n) => { if (n && REG[n]) o[n] = REG[n]; })); return o; };
+
+  // Guthaben: „Guthaben jetzt“ (wie beim Wettanbieter) + alles danach – neue Einsätze ab, Auszahlungen dazu, Ein-/Auszahlungen
+  function walletState() {
+    const w = store.get('wallet', {}) || {};
+    const bets = betsAll();
+    const at = w.at || 0;
+    let bal = typeof w.base === 'number' ? w.base : null;
+    let open = 0;
+    let openWin = 0;
+    let pl = 0;
+    bets.forEach((b) => {
+      if (b.status === 'open') { open += b.stake; openWin += b.win; } else pl += payout(b) - b.stake;
+      if (bal != null) {
+        if (b.at > at) bal -= b.stake;
+        if (b.done && b.done > at) bal += payout(b);
+      }
+    });
+    if (bal != null) (w.moves || []).forEach((m) => { if (m.t > at) bal += m.v; });
+    return { balance: bal, open, openWin, pl, n: bets.length, nOpen: bets.filter((b) => b.status === 'open').length };
+  }
+  // Erfolgsquote: nur automatisch geprüfte Wetten (aus den Top-Tipps), nur gewonnen/verloren
+  function betStats() {
+    const list = betsAll().filter((b) => b.auto && (b.status === 'won' || b.status === 'lost')).sort((x, y) => (y.done || 0) - (x.done || 0));
+    const by = {};
+    let won = 0;
+    let exp = 0;
+    let stake = 0;
+    let back = 0;
+    list.forEach((b) => {
+      const w = b.status === 'won' ? 1 : 0;
+      const x = (by[b.list || 'safe'] = by[b.list || 'safe'] || { n: 0, won: 0, exp: 0 });
+      won += w; exp += b.p || 0; stake += b.stake; back += payout(b);
+      x.n++; x.won += w; x.exp += b.p || 0;
+    });
+    return { n: list.length, won, exp, stake, back, pl: back - stake, by, list };
+  }
+
+  // Start: kleine Zeile zu den eigenen Wetten
+  function homeBets() {
+    const ws = walletState();
+    if (!ws.n && ws.balance == null) return '';
+    return `<a class="card pickrow" href="#/bets"><span class="round">${I.ticket}</span><span class="grow"><div class="t">Meine Wetten</div><div class="s">${ws.nOpen} offen${ws.balance != null ? ` · Guthaben ${eur(ws.balance)}` : ''}</div></span><span class="chev">›</span></a>`;
+  }
+  // Stand einer offenen Wette: läuft gerade (mit Spielstand), nächster Anpfiff oder „wird geprüft“
+  function liveText(b) {
+    const now = Date.now();
+    const run = b.legs.map((l) => !l.res && l.g && LIVE[l.g]).find((x) => x && x.state === 'in');
+    if (run) return `läuft · ${run.hs}:${run.as}${run.clock ? ' · ' + run.clock : ''}`;
+    const next = b.legs.filter((l) => !l.res && l.t && new Date(l.t).getTime() > now).map((l) => l.t).sort()[0];
+    if (next) return kickoff(next);
+    return b.auto ? 'wird nach Abpfiff geprüft' : 'offen';
+  }
+  function legRow(l) {
+    const lv = l.g && LIVE[l.g];
+    let info = '';
+    if (l.res) info = l.res.void ? 'abgesagt · zählt nicht' : l.res.hs != null ? `Endstand ${l.res.hs}:${l.res.as}${l.res.et ? ' nach 90 Min.' : ''}` : 'nach 90 Min. unentschieden';
+    else if (lv && lv.state === 'in') info = `läuft · ${lv.hs}:${lv.as}${lv.clock ? ' · ' + lv.clock : ''}`;
+    else if (lv && lv.cancelled) info = 'verschoben';
+    else if (l.t) info = kickoff(l.t);
+    const mk = l.res ? (l.res.void ? ['–', 'void'] : l.res.won ? ['✓', 'won'] : ['✗', 'lost']) : null;
+    const sub = [legTeams(l), info].filter(Boolean).join(' · ');
+    return `<div class="bleg">${l.home && l.away ? `<span class="duo">${crest(l.home, 26, true)}${crest(l.away, 26, true)}</span>` : `<span class="bl-ic">${I.ticket}</span>`}<span class="grow"><b>${esc(l.pick)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</span>${l.q ? `<span class="bl-q">${nf2.format(l.q)}</span>` : ''}${mk ? `<span class="bl-mk ${mk[1]}">${mk[0]}</span>` : ''}</div>`;
+  }
+  function betCard(b) {
+    regTeams(b);
+    const ST = { open: 'Offen', won: 'Gewonnen', lost: 'Verloren', void: 'Storniert' };
+    const src = b.auto ? `<span class="bc-src ai">${I.spark}Result AI prüft automatisch</span>` : `<span class="bc-src">${b.src === 'scan' ? 'gescannt' : 'selbst eingetragen'}</span>`;
+    const third = b.status === 'open' ? ['Mögl. Gewinn', eur(b.win), ''] : b.status === 'won' ? ['Gewinn', signed(b.win - b.stake), 'up']
+      : b.status === 'lost' ? ['Verlust', signed(-b.stake), 'down'] : ['Zurück', eur(b.stake), ''];
+    const acts = b.auto ? '' : b.status === 'open'
+      ? `<div class="bc-acts"><button class="won" data-act="settle" data-id="${b.id}" data-val="won">${I.check}Gewonnen</button><button class="lost" data-act="settle" data-id="${b.id}" data-val="lost">Verloren</button><button data-act="settle" data-id="${b.id}" data-val="void">Storniert</button></div>`
+      : `<div class="bc-acts"><button data-act="settle" data-id="${b.id}" data-val="open">Wieder auf offen</button></div>`;
+    return `<article class="bcard ${b.status}"><div class="bc-top">${src}<span class="bc-st ${b.status}">${ST[b.status]}</span></div>
+      ${b.legs.length > 1 ? `<div class="bc-title">${esc(b.title || 'Kombi')} · ${b.legs.length} Tipps</div>` : ''}<div class="bc-legs">${b.legs.map(legRow).join('')}</div>
+      <div class="bc-money"><div><span>Einsatz</span><b>${eur(b.stake)}</b></div><div><span>Quote</span><b>${nf2.format(b.q)}</b></div><div><span>${third[0]}</span><b class="${third[2]}">${third[1]}</b></div></div>
+      ${acts}<div class="bc-foot"><span>Gespeichert ${esc(agoText(b.at))}${b.bookie ? ' · ' + esc(b.bookie) : ''}</span>${canDelete(b) ? `<button class="bc-del" data-act="delbet" data-id="${b.id}">Löschen</button>` : ''}</div></article>`;
+  }
+  function vBets() {
+    const ws = walletState();
+    const bets = betsAll();
+    const open = bets.filter((b) => b.status === 'open').sort((x, y) => (firstKick(x) - firstKick(y)) || (y.at - x.at));
+    const done = bets.filter((b) => b.status !== 'open').sort((x, y) => (y.done || 0) - (x.done || 0));
+    const list = B.tab === 'done' ? done : open;
+    const wallet = `<section class="wallet"><div class="wl-top"><span class="eyebrow">Guthaben</span><button class="note link" data-act="wallet">${ws.balance == null ? 'Eintragen' : 'Ändern'}</button></div>
+        <div class="wl-n">${ws.balance == null ? '<button class="wl-ph" data-act="wallet">Guthaben eintragen ›</button>' : eur(ws.balance)}</div>
+        <div class="wl-row"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Mögl. Gewinn</span><b>${eur(ws.openWin)}</b></div><div><span>Gewinn/Verlust</span><b class="${ws.pl > 0.004 ? 'up' : ws.pl < -0.004 ? 'down' : ''}">${signed(ws.pl)}</b></div></div></section>`;
+    return `${aura('bets')}<h1 class="ptitle">Wetten</h1><p class="psub">Einsatz, möglicher Gewinn und dein Guthaben – nur auf diesem Handy gespeichert.</p>${wallet}
+      <div class="bet-acts"><button class="bact" data-act="newbet">${I.pen}<span>Wette eintragen</span></button><label class="bact">${I.photo}<span>Wettschein scannen</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein-Screenshot wählen"></label></div>
+      <div class="seg s2" style="--k:${B.tab === 'done' ? 1 : 0};margin-top:20px"><span class="ind"></span><button class="${B.tab !== 'done' ? 'on' : ''}" data-act="btab" data-val="open">Offen · ${open.length}</button><button class="${B.tab === 'done' ? 'on' : ''}" data-act="btab" data-val="done">Erledigt · ${done.length}</button></div>
+      <div class="blist">${list.length ? list.map(betCard).join('') : `<div class="empty">${B.tab === 'done' ? 'Noch keine erledigten Wetten.' : 'Keine offenen Wetten. Speichere einen Top-Tipp, trag eine Wette ein oder scanne deinen Wettschein.'}</div>`}</div>
+      <p class="foot">Wetten aus den Top-Tipps prüft Result AI nach dem Abpfiff selbst (offizieller Endstand) – sie zählen für die Erfolgsquote im Verlauf. Selbst eingetragene und gescannte Wetten markierst du selbst.<br>Wetten erst ab 18 · Glücksspiel kann süchtig machen – Hilfe gibt es bei check-dein-spiel.de oder kostenlos unter 0800 1 37 27 00 (BZgA).</p>`;
+  }
+  // Verlauf: Wetten aus den Top-Tipps nach Anstoß-Tag, mit ✓/✗ von Result AI
+  function histBets(list) {
+    let out = '';
+    let day = '';
+    list.slice().sort((x, y) => (lastKick(y) || y.at) - (lastKick(x) || x.at)).forEach((b) => {
+      regTeams(b);
+      const t = lastKick(b) || b.at;
+      const dk = new Date(t).toDateString();
+      if (dk !== day) {
+        const dd = dayDiff(new Date(t).toISOString());
+        out += `${day ? '</div>' : ''}<div class="kl-day">${esc(dd === 0 ? 'Heute' : dd === -1 ? 'Gestern' : dd === 1 ? 'Morgen' : new Date(t).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }))}</div><div class="group">`;
+        day = dk;
+      }
+      const l = b.legs[0] || {};
+      const mk = { won: '✓', lost: '✗', void: '–', open: '' }[b.status];
+      const right = b.status === 'open' ? `<span class="hp"><b>${eur(b.win)}</b><span>möglich</span></span>`
+        : `<span class="hp ${b.status}"><b>${b.status === 'void' ? eur(b.stake) : signed(payout(b) - b.stake)}</b><span>${{ won: 'gewonnen', lost: 'verloren', void: 'zurück' }[b.status]}</span></span>`;
+      out += `<a class="row hrow hb ${b.status}" href="#/bets">${b.legs.length > 1 ? `<span class="round kb">${b.legs.length}</span>` : `<span class="duo">${crest(l.home, 30, true)}${crest(l.away, 30, true)}</span>`}<span class="grow"><div class="t">${esc(betTitle(b))}</div><div class="s">${esc(betSub(b))}${b.status === 'open' ? ' · ' + esc(liveText(b)) : ''}</div></span>${right}${mk ? `<span class="hmk ${b.status}">${mk}</span>` : ''}</a>`;
+    });
+    return day ? out + '</div>' : '';
+  }
+
+  // Speichern aus den Top-Tipps (einzelner Tipp oder Kombi) → Blatt mit Quote und Einsatz
+  const findTip = (list, g, m) => T.data && ((T.data[list] || []).find((t) => t.g === g && t.m === m)
+    || LISTS.map(([k]) => (T.data[k] || []).find((t) => t.g === g && t.m === m)).find(Boolean));
+  function tipLeg(t) {
+    const g = T.data.games[t.g];
+    const h = tipTeam(g.home);
+    const a = tipTeam(g.away);
+    return { g: g.id, slug: g.slug, m: t.m, home: h, away: a, comp: g.comp, t: g.t, pick: tipLabel(t.m, h, a), q: t.q, p: t.p, res: null };
+  }
+  function saveTip(list, g, m) {
+    if (savedKeys().has(`${g}|${m}`)) { location.replace('#/bets'); return; }
+    const t = findTip(list, g, m);
+    if (!t) { toast('Dieser Tipp ist nicht mehr in der Liste.'); return; }
+    if (!upcoming(t)) { toast('Das Spiel hat schon begonnen – nicht mehr speicherbar.'); return; }
+    const leg = tipLeg(t);
+    openBetSheet({ src: 'tip', list, key: `${g}|${m}`, legs: [leg], q: t.q, p: t.p, title: legTeams(leg) });
+  }
+  function saveKombi(i) {
+    const d = T.data;
+    const k = d && d.kombis[i];
+    if (!k) return;
+    if (savedKeys().has(kombiKey(k))) { location.replace('#/bets'); return; }
+    const all = d.top.concat(d.safe, d.rec || []);
+    const tips = k.legs.map((l) => all.find((t) => t.g === l.g && t.m === l.m));
+    if (!tips.every((t) => t && upcoming(t))) { toast('Ein Spiel dieser Kombi hat schon begonnen.'); return; }
+    openBetSheet({ src: 'tip', list: 'kombi', key: kombiKey(k), legs: tips.map(tipLeg), q: k.q, p: k.p, title: k.name });
+  }
+  function openBetSheet(o) {
+    if ($('.sheet')) return;
+    B.draft = Object.assign({ status: 'open' }, o);
+    const tip = o.src === 'tip';
+    const legs = (o.legs || []).map((l) => `<div class="bleg">${l.home && l.away ? `<span class="duo">${crest(l.home, 26, true)}${crest(l.away, 26, true)}</span>` : `<span class="bl-ic">${I.ticket}</span>`}<span class="grow"><b>${esc(l.pick)}</b><span>${esc([legTeams(l), l.t ? kickoff(l.t) : ''].filter(Boolean).join(' · '))}</span></span>${l.q ? `<span class="bl-q">${nf2.format(l.q)}</span>` : ''}</div>`).join('');
+    const what = o.src === 'manual'
+      ? `<label class="bf wide"><span>Worauf hast du gewettet?</span><input type="text" data-act="bpick" maxlength="80" placeholder="z. B. Sieg Bayern, Über 2,5 Tore" autocomplete="off" enterkeyhint="next"></label>
+        <label class="bf wide"><span>Spiel (wenn du magst)</span><input type="text" data-act="bevent" maxlength="80" placeholder="z. B. Bayern – Dortmund" autocomplete="off" enterkeyhint="next"></label>`
+      : `<div class="bf-legs">${legs}</div>`;
+    const status = o.src === 'scan' ? `<div class="lab" style="margin-top:14px">STAND DES WETTSCHEINS</div><div class="chips bf-st">${[['open', 'Offen'], ['won', 'Gewonnen'], ['lost', 'Verloren'], ['void', 'Storniert']].map(([v, l]) => `<button class="${B.draft.status === v ? 'on' : ''}" data-act="bstatus" data-val="${v}">${l}</button>`).join('')}</div>` : '';
+    const sh = document.createElement('div');
+    sh.className = 'sheet';
+    sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel bet-panel" role="dialog" aria-label="Wette"><div class="grip" data-grip></div>
+      <h2>${o.src === 'manual' ? 'Wette eintragen' : o.src === 'scan' ? 'Erkannte Wette' : o.legs.length > 1 ? 'Kombi speichern' : 'Wette speichern'}</h2>
+      ${o.note ? `<p class="bf-note" style="margin:-6px 4px 12px">${esc(o.note)}</p>` : ''}${what}
+      <div class="bf-grid"><label class="bf"><span>${tip ? 'Quote bei deinem Anbieter' : 'Quote'}</span><input type="text" inputmode="decimal" data-act="bq" value="${o.q ? nf2.format(o.q) : ''}" placeholder="z. B. 1,85" autocomplete="off"></label>
+        <label class="bf"><span>Einsatz in €</span><input type="text" inputmode="decimal" data-act="bstake" value="${o.stake ? nf2.format(o.stake) : ''}" placeholder="z. B. 5" autocomplete="off"></label></div>
+      <div class="chips bf-chips">${[2, 5, 10, 20, 50].map((v) => `<button data-act="bchip" data-val="${v}">${v} €</button>`).join('')}</div>${status}
+      <div class="bf-win"><span>Möglicher Gewinn</span><b class="bs-win">–</b></div>
+      ${tip ? '' : `<label class="bf wide"><span>Anbieter (wenn du magst)</span><input type="text" data-act="bbookie" maxlength="30" value="${esc(o.bookie || '')}" placeholder="z. B. Tipico" autocomplete="off"></label>`}
+      <p class="bf-note">${tip ? 'Result AI prüft diese Wette nach dem Abpfiff selbst und trägt das Ergebnis in Verlauf und Erfolgsquote ein.' : 'Ob sie aufgegangen ist, markierst du später selbst unter „Wetten“.'}</p>
+      <button class="btn" data-act="betsave">Speichern</button></div>`;
+    document.body.appendChild(sh);
+    updateWin();
+  }
+  // möglicher Gewinn = Einsatz × Quote (vom Wettschein übernommen, solange beides unverändert ist – dort ist z. B. die Wettsteuer schon drin)
+  function draftWin(sh) {
+    const d = B.draft;
+    const q = dec($('[data-act="bq"]', sh).value);
+    const st = dec($('[data-act="bstake"]', sh).value);
+    const fixed = !!(d && d.win && d.stake && d.q && st === d.stake && q === d.q);
+    return { q, st, fixed, win: fixed ? d.win : q && st ? q * st : null };
+  }
+  function updateWin() {
+    const sh = $('.sheet');
+    if (!sh || !B.draft || !$('.bs-win', sh)) return;
+    const w = draftWin(sh);
+    $('.bs-win', sh).textContent = w.win ? eur(w.win) + (w.fixed ? ' · laut Wettschein' : '') : '–';
+  }
+  function saveDraft() {
+    const sh = $('.sheet');
+    const d = B.draft;
+    if (!sh || !d) return;
+    const w = draftWin(sh);
+    if (!w.q || w.q < 1.01 || w.q > 10000) { toast('Bitte eine Quote eintragen (z. B. 1,85).'); return; }
+    if (!w.st || w.st <= 0 || w.st > 1e6) { toast('Bitte deinen Einsatz eintragen.'); return; }
+    let legs = d.legs || [];
+    if (d.src === 'manual') {
+      const pick = ($('[data-act="bpick"]', sh).value || '').trim();
+      if (!pick) { toast('Bitte eintragen, worauf du gewettet hast.'); return; }
+      legs = [{ pick, event: ($('[data-act="bevent"]', sh).value || '').trim() || null, res: null }];
+    }
+    const bk = $('[data-act="bbookie"]', sh);
+    const status = d.src === 'tip' ? 'open' : d.status || 'open';
+    const b = { id: 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at: Date.now(), src: d.src, auto: d.src === 'tip', list: d.list || null,
+      key: d.key || null, title: d.title || null, legs, q: Math.round(w.q * 100) / 100, p: d.p || null, stake: Math.round(w.st * 100) / 100,
+      win: Math.round(w.win * 100) / 100, status, done: status === 'open' ? null : Date.now(), bookie: bk ? bk.value.trim() || null : null, teams: teamsOf(legs) };
+    const all = betsAll();
+    all.unshift(b);
+    betsSave(all);
+    B.draft = null;
+    closeSheet();
+    haptic();
+    toast(b.auto ? 'Gespeichert · Result AI prüft nach dem Abpfiff' : 'Wette gespeichert');
+    refreshBets();
+  }
+  function settleManual(id, st) {
+    const all = betsAll();
+    const b = all.find((x) => x.id === id);
+    if (!b || b.auto) return; // Top-Tipp-Wetten wertet nur Result AI aus
+    b.status = st;
+    b.done = st === 'open' ? null : Date.now();
+    betsSave(all);
+    haptic();
+    if (st === 'won') toast(`Gewonnen: ${signed(b.win - b.stake)}`);
+    refreshBets();
+  }
+  function deleteBet(id) {
+    const all = betsAll();
+    const b = all.find((x) => x.id === id);
+    if (!b || !canDelete(b)) return;
+    betsSave(all.filter((x) => x !== b));
+    toast('Wette gelöscht');
+    refreshBets();
+  }
+  function openWalletSheet() {
+    if ($('.sheet')) return;
+    const ws = walletState();
+    const sh = document.createElement('div');
+    sh.className = 'sheet';
+    sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel bet-panel" role="dialog" aria-label="Guthaben"><div class="grip" data-grip></div>
+      <h2>Guthaben</h2><div class="lab">GUTHABEN JETZT – SO WIE BEI DEINEM WETTANBIETER</div>
+      <input class="search" type="text" inputmode="decimal" data-act="wbase" value="${ws.balance != null ? nf2.format(ws.balance) : ''}" placeholder="z. B. 50,00" autocomplete="off">
+      <button class="btn" data-act="wsave" data-mode="base" style="margin-top:10px">Übernehmen</button>
+      <div class="lab" style="margin-top:24px">EINZAHLUNG ODER AUSZAHLUNG</div>
+      <input class="search" type="text" inputmode="decimal" data-act="wmove" placeholder="Betrag, z. B. 20" autocomplete="off">
+      <div class="bf-2"><button class="btn soft" data-act="wsave" data-mode="in">Einzahlen</button><button class="btn soft" data-act="wsave" data-mode="out">Auszahlen</button></div>
+      <p class="bf-note">Ab jetzt rechnet Result AI selbst weiter: Jede neue Wette zieht den Einsatz ab, jeder Gewinn kommt dazu, eine stornierte Wette gibt den Einsatz zurück.</p></div>`;
+    document.body.appendChild(sh);
+  }
+  function saveWallet(mode) {
+    const sh = $('.sheet');
+    if (!sh) return;
+    const w = store.get('wallet', {}) || {};
+    if (mode === 'base') {
+      const v = dec($('[data-act="wbase"]', sh).value);
+      if (v == null || v < 0) { toast('Bitte einen Betrag eintragen.'); return; }
+      Object.assign(w, { base: Math.round(v * 100) / 100, at: Date.now(), moves: [] });
+    } else {
+      const v = dec($('[data-act="wmove"]', sh).value);
+      if (!v || v <= 0) { toast('Bitte einen Betrag eintragen.'); return; }
+      if (typeof w.base !== 'number') { toast('Trag zuerst oben dein Guthaben ein.'); return; }
+      (w.moves = w.moves || []).push({ t: Date.now(), v: mode === 'in' ? v : -v });
+    }
+    store.set('wallet', w);
+    closeSheet();
+    haptic();
+    refreshBets();
+  }
+
+  // Automatische Prüfung (Niklas: „die KI soll sofort nach Abpfiff prüfen“): Endstand direkt von ESPN, sobald die App offen ist –
+  // läuft ein Spiel, alle 60 Sekunden. Gewertet wird nach 90 Minuten (bei Verlängerung: Tore der zwei Halbzeiten).
+  const ESPN_API = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
+  const LIVE = {}; // Spiel-ID -> { state, done, hs, as, clock, et, cancelled, at }
+  const FAM = ['H', 'D', 'A', 'HD', 'DA', 'HA'];
+  function wonCode(code, x, y) {
+    if (FAM.includes(code)) return code.includes(x > y ? 'H' : x === y ? 'D' : 'A');
+    if (/^[OU]\d\d$/.test(code)) { const line = +code.slice(1) / 10; return code[0] === 'O' ? x + y > line : x + y < line; }
+    return { HS: x > 0, AS: y > 0, BY: x > 0 && y > 0, BN: !(x > 0 && y > 0) }[code];
+  }
+  function parseGame(d) {
+    const c = d && d.header && d.header.competitions && d.header.competitions[0];
+    if (!c) return null;
+    const st = (c.status && c.status.type) || {};
+    const side = (k) => (c.competitors || []).find((x) => x.homeAway === k) || {};
+    const h = side('home');
+    const a = side('away');
+    const int = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+    let hs = int(h.score);
+    let as = int(a.score);
+    const name = String(st.name || '');
+    const et = /AET|PEN|EXTRA|SHOOTOUT/i.test(name);
+    if (et) { // Wetten zählen nach 90 Minuten: nur die Tore der zwei Halbzeiten
+      const ls = (x) => (x.linescores || []).map((l) => int(l.displayValue != null ? l.displayValue : l.value));
+      const lh = ls(h);
+      const la = ls(a);
+      hs = lh.length >= 2 && lh[0] != null && lh[1] != null ? lh[0] + lh[1] : null;
+      as = la.length >= 2 && la[0] != null && la[1] != null ? la[0] + la[1] : null;
+    }
+    return { state: st.state, done: !!st.completed, et, hs, as, clock: (c.status && c.status.displayClock) || '', cancelled: /POSTPON|CANCEL|ABANDON|SUSPEND|FORFEIT/i.test(name) };
+  }
+  let checking = null;
+  function checkBets() {
+    if (checking) return checking;
+    const now = Date.now();
+    const due = new Map();
+    betsAll().forEach((b) => {
+      if (!b.auto || b.status !== 'open') return;
+      b.legs.forEach((l) => {
+        if (l.res || !l.g || !l.slug || !l.t || new Date(l.t).getTime() > now) return;
+        if (!LIVE[l.g] || now - LIVE[l.g].at > 50e3) due.set(l.g, l.slug);
+      });
+    });
+    if (!due.size) return Promise.resolve(false);
+    let moved = false; // hat sich ein Spielstand oder die Minute geändert? (nur dann neu zeichnen)
+    checking = Promise.all([...due].map(([g, slug]) => fetch(`${ESPN_API}/${slug}/summary?event=${encodeURIComponent(g)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null)).then((d) => {
+        const s = parseGame(d);
+        if (!s) return;
+        const o = LIVE[g];
+        if (!o || o.hs !== s.hs || o.as !== s.as || o.state !== s.state || o.clock !== s.clock) moved = true;
+        LIVE[g] = Object.assign(s, { at: Date.now() });
+      }).catch(() => {})))
+      .then(() => settleAuto(moved)).finally(() => { checking = null; });
+    return checking;
+  }
+  const liveBets = () => betsAll().some((b) => b.auto && b.status === 'open' && b.legs.some((l) => !l.res && l.t && new Date(l.t).getTime() <= Date.now()));
+  function settleAuto(moved) {
+    const all = betsAll();
+    const now = Date.now();
+    const changed = [];
+    let touched = false;
+    all.forEach((b) => {
+      if (!b.auto || b.status !== 'open') return;
+      let hit = false;
+      b.legs.forEach((l) => {
+        const s = l.g && LIVE[l.g];
+        if (l.res || !s) return;
+        if (s.cancelled && now - new Date(l.t).getTime() > 48 * 36e5) l.res = { void: true }; // abgesagt/verschoben: zählt nicht (wie beim Buchmacher)
+        else if (s.done && !s.cancelled && s.hs != null && s.as != null) l.res = { hs: s.hs, as: s.as, won: !!wonCode(l.m, s.hs, s.as), et: s.et || undefined };
+        else if (s.done && s.et && FAM.includes(l.m)) l.res = { hs: null, as: null, et: true, won: l.m.includes('D') }; // in die Verlängerung = nach 90 Min. unentschieden
+        else return;
+        hit = true;
+      });
+      if (!hit) return;
+      touched = true;
+      const rs = b.legs.map((l) => l.res);
+      const st = rs.some((r) => r && !r.void && !r.won) ? 'lost' : rs.every(Boolean) ? (rs.every((r) => r.void) ? 'void' : 'won') : 'open';
+      if (st === 'open') return;
+      b.status = st;
+      b.done = now;
+      if (st === 'won') { const f = b.legs.reduce((x, l) => x * (l.res.void && l.q ? l.q : 1), 1); b.win = Math.round((b.win / f) * 100) / 100; } // abgesagtes Spiel in der Kombi zählt wie Quote 1,0
+      changed.push(b);
+    });
+    if (touched) betsSave(all);
+    if (changed.length === 1) { const b = changed[0]; toast(b.status === 'won' ? `✓ Gewonnen: ${betTitle(b)} · ${signed(b.win - b.stake)}` : b.status === 'lost' ? `✗ Verloren: ${betTitle(b)}` : `Abgesagt: ${betTitle(b)} – Einsatz zurück`); }
+    else if (changed.length > 1) toast(`${changed.length} Wetten ausgewertet – ${changed.filter((b) => b.status === 'won').length} gewonnen`);
+    if (changed.length) haptic();
+    if (touched) refreshBets();
+    else if (moved) refreshBets(true);
+    return changed.length > 0;
+  }
+  // Seiten mit Wetten neu zeichnen (live = nur die Seiten mit Spielständen)
+  const BET_PAGES = /^\/(|tips|bets|hist|acc|r\/t_.+)$/;
+  function refreshBets(live) { redrawAll((p) => (live ? p === '/bets' || p === '/hist' : BET_PAGES.test(p))); }
+
+  // Wettschein-Screenshot → KI (Gemini auf dem Cloudflare-Server) → Wette vorausgefüllt zum Prüfen
+  function shrink(file) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file);
+      const im = new Image();
+      im.onload = () => {
+        const k = Math.min(1, 1280 / im.naturalWidth, 3600 / im.naturalHeight); // lange Wettscheine bleiben lesbar
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(im.naturalWidth * k));
+        c.height = Math.max(1, Math.round(im.naturalHeight * k));
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg', 0.85));
+      };
+      im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Bild nicht lesbar')); };
+      im.src = url;
+    });
+  }
+  const kickIso = (s) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(s || '');
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    return isNaN(d) ? null : d.toISOString();
+  };
+  function fromScan(x) {
+    const legs = (x.legs || []).map((l) => ({ home: l.home, away: l.away, event: l.event, comp: l.competition, pick: l.pick, q: l.odds, t: kickIso(l.kickoff), res: null }));
+    const prod = legs.length && legs.every((l) => l.q) ? legs.reduce((a, l) => a * l.q, 1) : null;
+    const q = x.totalOdds || prod;
+    return { src: 'scan', legs, q: q ? Math.round(q * 100) / 100 : null, stake: x.stake, win: x.potentialWin, title: legs.length > 1 ? 'Kombi' : null,
+      status: ['won', 'lost', 'void'].includes(x.status) ? x.status : 'open', bookie: x.bookmaker, note: x.note };
+  }
+  async function scanBet(file) {
+    const code = String(store.get('invite', '') || '').trim();
+    if (!API) { notice('KI-Server noch nicht verbunden', 'Sobald der Cloudflare-Server läuft, liest die KI hier deine Wettscheine. Bis dahin trägst du die Wette über „Wette eintragen“ selbst ein.'); return; }
+    if (!code) { notice('Einladungscode fehlt', 'Trag in den Einstellungen (Zahnrad oben rechts) deinen Einladungscode ein – den bekommst du von Niklas.'); return; }
+    waitSheet('Die KI liest deinen Wettschein …');
+    let d = null;
+    let ok = false;
+    try {
+      const image = await shrink(file);
+      const r = await fetch(API + '/bet', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Invite': code }, body: JSON.stringify({ image }) });
+      d = await r.json().catch(() => null);
+      ok = !!(r.ok && d && d.ok && d.bet);
+    } catch (e) { d = null; }
+    closeSheet();
+    setTimeout(() => {
+      if (!ok) notice('Das hat nicht geklappt', (d && d.error) || 'Der KI-Server ist gerade nicht erreichbar. Prüf die Verbindung und versuch es noch mal.');
+      else if (!d.bet.isBetSlip) notice('Kein Wettschein erkannt', 'Auf dem Bild hat die KI keine Wette gefunden. Nimm am besten einen Screenshot vom Wettschein in deiner Wett-App.');
+      else openBetSheet(fromScan(d.bet));
+    }, reduce ? 0 : 320);
+  }
+  function waitSheet(text) {
+    if ($('.sheet')) return;
+    const sh = document.createElement('div');
+    sh.className = 'sheet wait';
+    sh.innerHTML = `<div class="bg"></div><div class="panel wait-panel" role="dialog" aria-label="${esc(text)}"><span class="wait-spin"></span><b>${esc(text)}</b><span>Das dauert ein paar Sekunden.</span></div>`;
+    document.body.appendChild(sh);
+  }
+  function notice(title, text) {
+    if ($('.sheet')) return;
+    const sh = document.createElement('div');
+    sh.className = 'sheet';
+    sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel" role="dialog" aria-label="${esc(title)}"><div class="grip" data-grip></div><h2>${esc(title)}</h2>
+      <p class="bf-note" style="font-size:15px">${esc(text)}</p><button class="btn" data-act="close" style="margin-top:16px">Okay</button></div>`;
+    document.body.appendChild(sh);
+  }
+  let toastT = 0;
+  function toast(msg) {
+    let t = $('.toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.className = 'toast';
+      t.setAttribute('role', 'status');
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.classList.remove('show');
+    void t.offsetWidth; // neu einblenden, auch wenn gerade schon eine Meldung steht
+    t.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => t.classList.remove('show'), 2800);
   }
 
   // ------------------------------------------------------------------ Seiten-Stapel: neue Seite schiebt sich von rechts herein
   document.body.insertAdjacentHTML('beforeend', '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>'
     + '<linearGradient id="rg-safe" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34C759"/><stop offset="1" stop-color="#00B39B"/></linearGradient>'
-    + '<linearGradient id="rg-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB020"/><stop offset="1" stop-color="#FF375F"/></linearGradient></defs></svg>');
+    + '<linearGradient id="rg-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB020"/><stop offset="1" stop-color="#FF375F"/></linearGradient>'
+    + '<linearGradient id="rg-rec" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A84FF"/><stop offset="1" stop-color="#AF52DE"/></linearGradient></defs></svg>');
   const stackEl = document.createElement('div');
   stackEl.className = 'stack';
   document.body.appendChild(stackEl);
@@ -1196,8 +1724,9 @@
     if (p.path === '/scan') runScan(p.el);
     if (p.path === '/pick' && !R.data) loadRatings().then(() => { if (S.stack[S.stack.length - 1] === p) redrawTop(); }).catch(() => {});
     if (p.path === '/' || p.path === '/tips' || p.path.startsWith('/r/t_')) freshTips(p);
+    if (p.path === '/bets' || p.path === '/hist' || p.path === '/acc') checkBets();
     if (p.path === '/ki') {
-      Promise.all([loadActivity(20e3), loadTips().catch(() => {}), loadRatings().catch(() => {})]).catch(() => {})
+      Promise.all([loadActivity(20e3), loadTips().catch(() => {}), loadRatings().catch(() => {}), loadServer()]).catch(() => {})
         .then(() => { if (p.el.isConnected) redrawPage(p); });
     }
     if (p.path.startsWith('/r/')) reveal(p.el);
@@ -1245,6 +1774,7 @@
   // Platz, die neue Seite blendet darunter ein – gleichmäßig skaliert (nichts verzerrt), nur transform/opacity.
   const MORPH = { duration: 560, easing: 'cubic-bezier(.32,.72,0,1)' };
   document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('.tsave, .gsave')) return; // Speichern-Knopf in der Karte öffnet kein Spiel
     const c = e.target.closest && e.target.closest('a.gcard[href^="#/r/"], a.tcard, a.tmini, a.k-leg, a.row[href^="#/r/"], a.spot, a.tmc');
     if (c) S.morph = { el: c, rect: c.getBoundingClientRect(), t: performance.now() };
   }, true);
@@ -1366,10 +1896,10 @@
   const goBack = () => { if (S.stack.length > 1) history.back(); };
   const goHome = () => { const n = S.stack.length - 1; if (n > 0) history.go(-n); };
   window.addEventListener('hashchange', route);
-  // Darstellung gewechselt: alle offenen Seiten neu zeichnen (Wappen, Farben), ohne Auftritt und ohne Scrollsprung
-  function redrawAll() {
+  // Darstellung gewechselt (oder Wetten geändert): offene Seiten neu zeichnen, ohne Auftritt und ohne Scrollsprung; only = nur diese Pfade
+  function redrawAll(only) {
     S.stack.forEach((p) => {
-      if (p.path === '/scan') return;
+      if (p.path === '/scan' || (only && !only(p.path))) return;
       const y = p.el.scrollTop;
       p.el.classList.add('still');
       p.el.innerHTML = barHtml(p.path) + `<div class="wrap">${viewHtml(p.path)}</div>`;
@@ -1462,8 +1992,26 @@
       <input class="search name-in" type="text" placeholder="für die Begrüßung, z. B. Niklas" value="${esc(store.get('name', ''))}" data-act="name" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
       <div class="lab" style="margin-top:20px">DARSTELLUNG</div>
       <div class="seg s3" data-v="${th}" style="--k:${k}"><span class="ind"></span>${[['light', 'Hell'], ['dark', 'Dunkel'], ['auto', 'Automatisch']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-val="${v}">${l}</button>`).join('')}</div>
-      <p class="foot" style="margin-top:24px">Result AI · Vorschau-Version</p></div>`;
+      <div class="lab" style="margin-top:20px">EINLADUNGSCODE</div>
+      <input class="search" type="text" placeholder="für die KI, z. B. den Wettschein-Scan" value="${esc(store.get('invite', ''))}" data-act="invite" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
+      <p class="inv-st"></p>
+      <p class="foot" style="margin-top:18px">Result AI · Vorschau-Version</p></div>`;
     document.body.appendChild(sh);
+    checkInvite(sh);
+  }
+  // Einladungscode beim Server prüfen (schützt das Gratis-Kontingent der KI vor Fremden)
+  let invT = 0;
+  function checkInvite(sh) {
+    const el = $('.inv-st', sh);
+    if (!el) return;
+    const code = String(store.get('invite', '') || '').trim();
+    const set = (txt, cls) => { el.textContent = txt; el.className = 'inv-st' + (cls ? ' ' + cls : ''); };
+    if (!code) { set('Den Code bekommst du von Niklas. Ohne Code geht alles außer dem Wettschein-Scan.'); return; }
+    if (!API) { set('Der KI-Server ist noch nicht verbunden – der Code wird geprüft, sobald er läuft.'); return; }
+    set('Wird geprüft …');
+    fetch(API + '/check', { headers: { 'X-Invite': code } })
+      .then((r) => { if (String(store.get('invite', '')).trim() === code) set(r.ok ? '✓ Code passt – der Wettschein-Scan ist frei.' : '✗ Dieser Code passt nicht.', r.ok ? 'ok' : 'bad'); })
+      .catch(() => set('Der Server ist gerade nicht erreichbar.'));
   }
   function closeSheet() {
     const sh = $('.sheet');
@@ -1520,6 +2068,24 @@
       redrawTop();
     }
     else if (act === 'calc') calcPick();
+    else if (act === 'savetip' || act === 'savekombi') {
+      e.preventDefault(); // Knopf liegt in der Tipp-Karte (ein Link) – nicht ins Spiel springen
+      if (act === 'savetip') saveTip(a.dataset.list, a.dataset.g, a.dataset.m); else saveKombi(+a.dataset.i);
+    }
+    else if (act === 'newbet') openBetSheet({ src: 'manual', legs: [] });
+    else if (act === 'betsave') saveDraft();
+    else if (act === 'bchip') { const inp = $('[data-act="bstake"]', a.closest('.panel')); if (inp) { inp.value = nf2.format(+a.dataset.val); updateWin(); } }
+    else if (act === 'bstatus') { if (B.draft) B.draft.status = a.dataset.val; $$('[data-act="bstatus"]', a.closest('.panel')).forEach((x) => x.classList.toggle('on', x === a)); }
+    else if (act === 'btab') { B.tab = a.dataset.val; redrawTop(); }
+    else if (act === 'settle') settleManual(a.dataset.id, a.dataset.val);
+    else if (act === 'delbet') {
+      // zweimal tippen: erst „Wirklich löschen?“, dann weg
+      if (!a.classList.contains('arm')) { a.classList.add('arm'); a.textContent = 'Wirklich löschen?'; setTimeout(() => { if (a.isConnected) { a.classList.remove('arm'); a.textContent = 'Löschen'; } }, 3000); }
+      else deleteBet(a.dataset.id);
+    }
+    else if (act === 'wallet') openWalletSheet();
+    else if (act === 'wsave') saveWallet(a.dataset.mode);
+    else if (act === 'kick') kickNow();
     else if (act === 'ki') location.hash = '#/ki';
     else if (act === 'kirun') { A.open[a.dataset.k] = !A.open[a.dataset.k]; redrawTop(); }
     else if (act === 'sec') {
@@ -1544,16 +2110,14 @@
         else S.stack[0].el.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
       } else location.replace('#' + to);
     }
-    else if (act === 'tlist' || act === 'tday' || act === 'tcomp') {
+    else if (act === 'tlist' || act === 'tday') {
       if (act === 'tlist') {
         const seg = a.closest('.seg');
         seg.style.setProperty('--k', $$('button', seg).indexOf(a));
         $$('button', seg).forEach((b) => b.classList.toggle('on', b === a));
         T.list = a.dataset.val;
         T.day = 'all';
-        T.comp = 'all';
-      } else if (act === 'tday') T.day = a.dataset.val;
-      else T.comp = a.dataset.val;
+      } else T.day = a.dataset.val;
       const body = $('.tips-body', a.closest('.page'));
       if (body) body.innerHTML = tipsBody();
     }
@@ -1573,6 +2137,7 @@
     const t = e.target;
     if (t.dataset && t.dataset.act === 'opt') { P[t.dataset.k] = t.checked; P.msg = ''; redrawTop(); return; }
     if (t.dataset && t.dataset.act === 'minute') { P.minute = +t.value; redrawTop(); return; }
+    if (t.dataset && t.dataset.act === 'scanbet') { const f = t.files && t.files[0]; t.value = ''; if (f) scanBet(f); return; }
     const inp = e.target.closest('[data-act="pick"]');
     if (!inp || !inp.files || !inp.files[0]) return;
     if (S.url) URL.revokeObjectURL(S.url);
@@ -1588,11 +2153,18 @@
     if (t.dataset.act === 'search') renderResults(t.closest('.sheet'), t.value);
     else if (t.dataset.act === 'name') { store.set('name', t.value.trim()); $$('.hello h1').forEach((x) => { x.textContent = greet(); }); }
     else if (t.dataset.act === 'minute') { const b = $('.li-min', t.closest('.live-in')); if (b) b.textContent = t.value + "'"; }
+    else if (t.dataset.act === 'bq' || t.dataset.act === 'bstake') updateWin();
+    else if (t.dataset.act === 'invite') {
+      store.set('invite', t.value.trim());
+      clearTimeout(invT);
+      const sh = t.closest('.sheet');
+      invT = setTimeout(() => checkInvite(sh), 700);
+    }
   });
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel aus der BVB-App); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = 'a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .demo-scan, .kib, .kl-row, a.spot, a.tmc';
+    const PRESS = '.tsave, .gsave, .bact, .bc-acts button, .bc-del, .wl-ph, a.gcard, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .demo-scan, .kib, .kl-row, a.spot, a.tmc';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };
@@ -1622,6 +2194,9 @@
   }
 
   setTimeout(() => loadRatings().catch(() => {}), 1200);
+  // gespeicherte Top-Tipp-Wetten: gleich nach dem Start prüfen, solange ein Spiel läuft jede Minute
+  setTimeout(() => checkBets(), 1500);
+  setInterval(() => { if (!document.hidden && liveBets()) checkBets(); }, 60e3);
 
   // ------------------------------------------------------------------ Start: Startseite unten im Stapel; Direktlink obendrauf
   applyTheme(store.get('theme', 'light'));
@@ -1645,6 +2220,7 @@
   // zurück aus dem Hintergrund: neueste Tipp-Suche holen (läuft jede Stunde)
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
+    checkBets(); // nach dem Abpfiff sofort auswerten, sobald die App wieder offen ist
     const root = S.stack[0];
     if (root && S.stack.length === 1 && (root.path === '/' || root.path === '/tips')) freshTips(root, 5 * 60e3);
   });

@@ -3,18 +3,26 @@ name: Top-Tipps aktualisieren
 # Jede Stunde, rund um die Uhr (Niklas: „die KI soll immer neu nach Top-Matches suchen“): alle kommenden Spiele mit Quoten neu
 # holen (ESPN, 40+ Ligen und Pokale, 3 Wochen voraus), Tipps, Sicher, Top-Quote und Kombis neu rechnen, Bilanz auswerten,
 # KI-Zentrale fortschreiben, veröffentlichen.
-# Absicherung, weil GitHub geplante Läufe oft verschluckt oder stundenlang verzögert (06.11.2026: in 15 Stunden nur 4 von ~30
-# Läufen gestartet):
-#  - alle 10 Minuten ein Termin; gerechnet wird nur, wenn die veröffentlichte Suche älter als 50 Minuten ist (sonst endet der
-#    Lauf nach ein paar Sekunden im Prüf-Schritt) → ergibt eine Suche pro Stunde, egal welcher Termin durchkommt
-#  - von Hand oder von außen gestartet (workflow_dispatch, z. B. ein externer Zeitgeber) wird immer gerechnet
+# Absicherung, weil GitHub geplante Läufe oft verschluckt oder stundenlang verzögert (06.11.2026: 9 Stunden lang kein einziger
+# der Termine alle 10 Minuten gestartet):
+#  - Hauptzeitgeber ist der Cloudflare-Server (worker/worker.js, alle 30 Minuten): er startet diesen Workflow über die GitHub-API
+#    (workflow_dispatch, via=zeitgeber), sobald die veröffentlichte Suche älter als 50 Minuten ist – das kommt sofort an
+#  - GitHubs eigene Termine (2× pro Stunde) bleiben als Ersatz; sie rechnen nur, wenn die veröffentlichte Suche älter als
+#    50 Minuten ist (sonst endet der Lauf nach ein paar Sekunden im Prüf-Schritt)
+#  - von Hand gestartet (Actions → Run workflow) wird immer gerechnet
 #  - fehlen die Stärken von heute (Stärken-Lauf ausgefallen), rechnet dieser Lauf sie zuerst nach
 #  - die Tipp-Datei selbst wird nur veröffentlicht, nicht gespeichert (hält das Repository klein); gespeichert werden Bilanz,
 #    Protokoll und ggf. die Stärken
 on:
   schedule:
-    - cron: '7,17,27,37,47,57 * * * *'
+    - cron: '7,37 * * * *'
   workflow_dispatch:
+    inputs:
+      via:
+        description: 'Wer startet? (zeitgeber = Cloudflare-Server, hand = von Hand)'
+        required: false
+        default: 'hand'
+        type: string
 
 permissions:
   contents: write
@@ -55,7 +63,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Stärken nachholen, falls die von heute fehlen
         run: python3 scripts/ratings.py --if-stale
-      - name: Tipps rechnen (Sicher, Top-Quote, Kombis, Bilanz)
+      - name: Tipps rechnen (Sicher, Empfohlen, Top-Quote, Kombis, Bilanz)
+        env:
+          RA_VIA: ${{ github.event_name == 'schedule' && 'github' || inputs.via || 'hand' }}  # für die KI-Zentrale
         run: python3 scripts/tips.py
       - name: Prüfen (bei Fehlern bleibt die alte Version online)
         run: |
