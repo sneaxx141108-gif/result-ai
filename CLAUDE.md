@@ -119,17 +119,29 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
   Sitzungsordner der Claude-App) scheitert `git clone` mit „'$GIT_DIR' too big“ – dann einen kurzen Pfad nehmen.
 - Node.js ist auf dem Laptop nicht installiert (Tests laufen auf GitHub); lokal ansehen: `.claude/launch.json` (Python-Server, Port 8098).
 
-**Neu am 06.11.2026 abends (Zweig `wett-tracker`, siehe Abschnitt „Wetten, Empfohlen, Cloudflare-Server“):** Wett-Tracker mit
+**Neu am 06.11.2026 abends (gebaut im Zweig `wett-tracker`, seit spätabends in `main` und online; siehe Abschnitt „Wetten,
+Empfohlen, Cloudflare-Server“):** Wett-Tracker mit
 Guthaben (Bereich „Wetten“ unten), Speichern-Knopf bei Top-Tipps und Kombis, automatische Prüfung nach Abpfiff, Erfolgsquote im
 Verlauf, Kategorie „Empfohlen“, Wettbewerbs-Leiste in den Top-Tipps entfernt, Cloudflare-Server (`worker/worker.js`) für
 Wettschein-Scan und als Zeitgeber der Tipp-Suche.
 
-**Offen, in dieser Reihenfolge:**
-1. **Cloudflare fertig einrichten** (Niklas, Anleitung im Abschnitt unten): Server-Adresse in `API` (oben in `web/app.js`)
-   eintragen, Wettschein-Scan einmal mit einem echten Wettschein testen, in der KI-Zentrale prüfen, dass der Zeitgeber
-   „verbunden“ zeigt und die Tipp-Suche wieder stündlich läuft (Protokoll: „vom Zeitgeber“).
-2. **Zweig `wett-tracker` in `main` übernehmen** (erst dann ist alles online) und auf Niklas' iPhone prüfen lassen.
-3. **Morgen prüfen:** In der App unter „Auswählen“ z. B. „Viktoria Köln“, „Saarbrücken“, „Real Zaragoza“, „Bari“ suchen →
+**Erledigt am 06.11.2026 spätabends:** Cloudflare eingerichtet und der Zweig `wett-tracker` in `main` übernommen (online).
+- Server: **https://result-ai.sneaxx141108.workers.dev** (Konto von Niklas, Worker `result-ai`, Gratis-Tarif). `GET /` zeigt
+  `ki`, `zeitgeber`, `einladung` – am 06.11. alle `true`. Cron Trigger **alle 30 Minuten** (im Dashboard: Settings → Trigger events).
+- Geheimnisse hat Niklas selbst eingetragen (Settings → Variables and secrets): `GEMINI_API_KEY` (neuer Schlüssel „Result AI“
+  aus Google AI Studio, Gratis-Stufe), `GITHUB_TOKEN` (fine-grained „result-ai Zeitgeber“, nur `result-ai`, Actions: Read and
+  write – **läuft ab**, Datum unter github.com/settings/personal-access-tokens; vorher neu erzeugen und in Cloudflare ersetzen),
+  `INVITE_CODES` (Code kennt nur Niklas, er gibt ihn Freunden).
+- Worker-Code aktualisieren: Claude kann im Cloudflare-Editor nicht selbst einfügen (Einfügen aus der Zwischenablage wird
+  blockiert). Ablauf: Claude legt `worker/worker.js` in die Zwischenablage (`Get-Content -Raw … | Set-Clipboard`), Niklas klickt
+  im Editor (Workers & Pages → result-ai → Edit code) in den Code, Strg+A, Strg+V, Deploy. Schlüssel tippt Claude nie ein.
+
+**Offen, in dieser Reihenfolge (ab 07.11.2026):**
+1. **Auf Niklas' iPhone prüfen:** Bereich „Wetten“ (Guthaben eintragen, Wette eintragen, Top-Tipp speichern), „Empfohlen“,
+   Verlauf + Erfolgsquote; in den Einstellungen den **Einladungscode** eintragen (✓ „Code passt“) und den **Wettschein-Scan**
+   mit einem echten Wettschein testen (KI liest Teams, Tipps, Quoten, Einsatz).
+2. **KI-Zentrale:** Tipp-Suche läuft wieder stündlich? Im Protokoll muss „vom Zeitgeber“ stehen, Zeitgeber-Zeile „verbunden“.
+3. **3. Ligen prüfen:** In der App unter „Auswählen“ z. B. „Viktoria Köln“, „Saarbrücken“, „Real Zaragoza“, „Bari“ suchen →
    Wappen, Liga „3. Liga · Deutschland“ usw.
 4. **Cloudflare Worker ausbauen:** echter Spiel-Screenshot-Scan mit Gemini (Spielstand, Minute, Teams → Prognose).
 5. Kleinere Ideen: Quoten der Europapokal-Spiele archivieren (siehe „Vereine & Wappen“), danach Backtest.
