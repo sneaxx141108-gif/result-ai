@@ -15,7 +15,7 @@
     set(k, v) { try { localStorage.setItem('ra_' + k, JSON.stringify(v)); } catch (e) { /* privater Modus */ } },
   };
   // Cloudflare-Server (worker/worker.js): liest Wettscheine mit Gemini und stößt die Tipp-Suche an – leer = noch nicht eingerichtet
-  const API = '';
+  const API = 'https://result-ai.sneaxx141108.workers.dev';
   const nf1 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const nf2 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const eurF = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
