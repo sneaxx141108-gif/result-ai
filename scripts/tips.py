@@ -33,6 +33,11 @@ MARGIN = 0.06     # typische Buchmacher-Marge → geschätzte Quote, wo ESPN kei
 MIN_Q = 1.12      # kleinere Quoten lohnen nicht (z. B. „Über 0,5 Tore“)
 SAFE = (0.70, 1.20)  # Liste „Sicher“: Chance ab 70 %, Quote ab 1,20
 TOP = (0.50, 1.60)   # Liste „Top-Quote“: Chance über 50 %, Quote ab 1,60
+# Liste „Empfohlen“ (Niklas, 06.11.2026: „Spiele, die die KI empfiehlt wegen guter Quoten und halbwegs guter Erfolgsquote“):
+# echte Buchmacher-Quote ab 1,50, Chance ab 55 % – und Result AI sieht die Wette mindestens so gut wie der Buchmacher (höchstens
+# 2 Punkte darunter). Gereiht nach vorsichtigerer Chance × Quote. Kein Versprechen: auch hier geht fast jeder zweite Tipp schief.
+REC = (0.55, 1.50)
+REC_GAP = 0.02
 LINES = (1.5, 2.5, 3.5)
 CODES = ['H', 'D', 'A', 'HD', 'DA', 'HA', 'O15', 'U15', 'O25', 'U25', 'O35', 'U35', 'BY', 'BN', 'HS', 'AS']
 CUPS = {'uefa.champions': 'Champions League', 'uefa.europa': 'Europa League', 'uefa.europa.conf': 'Conference League',
@@ -225,16 +230,18 @@ def main():
     # Chance (echte Quote minimal bevorzugt). „Top-Quote“: Quote ab 1,60 bei über 50 % Chance, gereiht nach vorsichtiger
     # Chance × Quote. (Nur nach der Buchmacher-Chance zu reihen ergäbe lauter Tipps genau an der Grenze – die geschätzte
     # Quote hängt ja direkt an der Chance.)
-    def best(lo_p, lo_q, key):
+    def best(lo_p, lo_q, key, pool=None, n=90):
         out = {}
-        for c in cands:
+        for c in cands if pool is None else pool:
             if c['p'] >= lo_p and c['q'] >= lo_q:
                 k = key(c)
                 if c['g'] not in out or k > out[c['g']][0]:
                     out[c['g']] = (k, c)
-        return [c for k, c in sorted(out.values(), key=lambda kc: (kc[0], kc[1]['p']), reverse=True)][:90]
+        return [c for k, c in sorted(out.values(), key=lambda kc: (kc[0], kc[1]['p']), reverse=True)][:n]
     safe = best(*SAFE, key=lambda c: (round(c['sure'], 3), c['real']))
     top = best(*TOP, key=lambda c: (round(c['conf'] * c['q'], 3), c['real']))
+    rec = best(*REC, key=lambda c: round(c['conf'] * c['q'], 3), n=60,
+               pool=[c for c in cands if c['real'] and c['pm'] is not None and c['pm'] >= c['p'] - REC_GAP])
     # Kombis bevorzugt aus Spielen der nächsten 36 Stunden (heute/morgen spielbar)
     soon = lambda lst: [c for c in lst if when(games[c['g']]['t']) < NOW + timedelta(hours=36)]  # noqa: E731
     kombis = [k for k in (dict(kombi(soon(safe), 0.45, 3) or kombi(safe, 0.45, 3) or {}, name='Sichere Kombi', kind='safe'),
@@ -256,7 +263,7 @@ def main():
     except (OSError, ValueError):
         old = []
     entries = [e for e in old if when(e['t']) and when(e['t']) <= NOW]  # Anpfiff vorbei: bleibt, wie er war
-    for lst, items in (('top', top), ('safe', safe)):
+    for lst, items in (('top', top), ('safe', safe), ('rec', rec)):
         for c in items:
             g = games[c['g']]
             entries.append({'g': c['g'], 'm': c['m'], 'list': lst, 'p': c['p'], 'q': c['q'], 'real': c['real'], 't': g['t'],
@@ -283,13 +290,14 @@ def main():
         if len(recent) == 20:
             break
 
-    used = {c['g'] for c in top + safe}
+    used = {c['g'] for c in top + safe + rec}
     out = {'updatedAt': NOW.strftime('%Y-%m-%dT%H:%M:%SZ'), 'source': 'ESPN · Quoten von DraftKings', 'days': DAYS,
            'games': {g: games[g] for g in sorted(used)},
            'top': [{k: c[k] for k in ('g', 'm', 'p', 'q', 'real', 'pm')} for c in top],
            'safe': [{k: c[k] for k in ('g', 'm', 'p', 'q', 'real', 'pm')} for c in safe],
+           'rec': [{k: c[k] for k in ('g', 'm', 'p', 'q', 'real', 'pm')} for c in rec],
            'kombis': kombis,
-           'record': {lst: {'7': record(7, lst), '30': record(30, lst)} for lst in ('top', 'safe')},
+           'record': {lst: {'7': record(7, lst), '30': record(30, lst)} for lst in ('top', 'safe', 'rec')},
            'recent': recent}
     # KI-Zentrale: was ist seit der letzten Suche neu, weggefallen, verschoben, ausgewertet?
     try:
@@ -297,9 +305,9 @@ def main():
     except (OSError, ValueError):
         prev = {}
     pg = prev.get('games') or {}
-    prev_tips = {(t['g'], t['m'], lst): t for lst in ('top', 'safe') for t in prev.get(lst, [])
+    prev_tips = {(t['g'], t['m'], lst): t for lst in ('top', 'safe', 'rec') for t in prev.get(lst, [])
                  if pg.get(t['g']) and when(pg[t['g']]['t']) and when(pg[t['g']]['t']) > NOW}
-    cur_tips = {(c['g'], c['m'], lst): c for lst, items in (('top', top), ('safe', safe)) for c in items}
+    cur_tips = {(c['g'], c['m'], lst): c for lst, items in (('top', top), ('safe', safe), ('rec', rec)) for c in items}
     new = sorted((k for k in cur_tips if k not in prev_tips), key=lambda k: (k[2] != 'safe', -cur_tips[k]['p']))
     gone = [k for k in prev_tips if k not in cur_tips]
     moved = [k for k in cur_tips if k in prev_tips and abs(cur_tips[k]['p'] - prev_tips[k]['p']) >= 0.02]
@@ -315,8 +323,9 @@ def main():
         c, g = cur_tips[k], games[k[0]]
         added.append({'g': k[0], 'm': k[1], 'list': k[2], 'p': c['p'], 'q': c['q'], 'real': c['real'], 'comp': g['comp'], 'kick': g['t'],
                       'h': g['home']['name'], 'a': g['away']['name'], 'hid': g['home']['id'], 'aid': g['away']['id']})
-    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'kombis': len(kombis), 'new': len(new), 'gone': len(gone),
-               'moved': len(moved), 'checked': len(res_info), 'won': sum(1 for r in res_info if r['won'])}
+    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'rec': len(rec), 'kombis': len(kombis), 'new': len(new),
+               'gone': len(gone), 'moved': len(moved), 'checked': len(res_info), 'won': sum(1 for r in res_info if r['won']),
+               'via': os.environ.get('RA_VIA') or None}  # wer die Suche gestartet hat: zeitgeber (Cloudflare), github, hand
     runs = activity.log_run('tips', NOW, time.time() - t0, summary, {'added': added, 'results': res_info[:30]})
     out['ki'] = activity.today_summary(runs, NOW)
 
@@ -324,8 +333,8 @@ def main():
         json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
     with open(LOG, 'w', encoding='utf-8') as f:
         json.dump({'entries': entries}, f, ensure_ascii=False, separators=(',', ':'))
-    log('Fertig: %d Top-Tipps, %d sichere Tipps, %d Kombis, Bilanz %d Einträge, %.0f s, %d KB' % (
-        len(top), len(safe), len(kombis), len(entries), time.time() - t0, os.path.getsize(OUT) // 1024))
+    log('Fertig: %d Top-Tipps, %d sichere, %d empfohlene Tipps, %d Kombis, Bilanz %d Einträge, %.0f s, %d KB' % (
+        len(top), len(safe), len(rec), len(kombis), len(entries), time.time() - t0, os.path.getsize(OUT) // 1024))
 
 
 if __name__ == '__main__':

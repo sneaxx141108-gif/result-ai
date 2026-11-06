@@ -35,6 +35,8 @@ Diese Datei liest Claude in jeder neuen Sitzung automatisch. **Wer hier weiterma
 - **Treffsicherheit („wie oft lag die App richtig“) ist Niklas sehr wichtig.** Gezählt werden **nur die eigenen Scans**
   jedes Nutzers (auf seinem Handy). Anzeige: Favorit gewonnen in X von Y Spielen, exaktes Ergebnis unter den Top 3 in X %,
   und vor allem die **Ehrlichkeit** (Kalibrierung): Wenn die App 70 % sagt, passiert es auch in etwa 70 % der Fälle?
+  **Seit 06.11.2026 (Niklas):** Verlauf + **Erfolgsquote** zählen die Wetten, die man aus den Top-Tipps speichert – ausgewertet
+  nur automatisch nach dem Abpfiff (siehe „Wetten, Empfohlen, Cloudflare-Server“).
 - **Design:** „schon clean, aber auch nicht langweilig – es soll schon krass mit Wow-Effekt sein.“
   Erster Entwurf (Neon, Farbverläufe, drei Looks) gefiel Niklas **gar nicht** („sieht billig aus, wie Vorlage, zu bunt“).
   **Jetzt gilt (03.11.2026):** **weißer Hintergrund** als Standard, **Dunkelmodus** in den Einstellungen; Vorbilder
@@ -106,12 +108,33 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   am Ende kurz berichten.
 - Unter Windows: größere Änderungen per kleinem Python-Skript statt Bash-Heredoc (Backslashes/Backticks gingen dort kaputt).
 
-## HIER WEITERMACHEN – Stand 06.11.2026, nachmittags (Niklas: „heute Abend am Laptop weitermachen“)
+## HIER WEITERMACHEN – Stand 06.11.2026, abends (am Laptop)
 
 **So geht's am Laptop los:** Claude öffnen → Repository `result-ai` (Ordner klonen: `git clone
 https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browser **claude.ai/code** → GitHub verbinden →
 `result-ai`). Diese Datei wird automatisch gelesen – Claude weiß dann alles. Erster Satz an Claude reicht, z. B.
 „Lies CLAUDE.md und mach bei HIER WEITERMACHEN weiter“.
+- Auf dem Laptop liegt der Ordner unter `C:\Users\j.banholzer\result-ai` (NICHT in „Dokumente“ – das ist dort der
+  Firmen-OneDrive „fashionette AG“ und würde in die Firmen-Cloud hochladen). In einem sehr langen Ordnerpfad (z. B. dem
+  Sitzungsordner der Claude-App) scheitert `git clone` mit „'$GIT_DIR' too big“ – dann einen kurzen Pfad nehmen.
+- Node.js ist auf dem Laptop nicht installiert (Tests laufen auf GitHub); lokal ansehen: `.claude/launch.json` (Python-Server, Port 8098).
+
+**Neu am 06.11.2026 abends (Zweig `wett-tracker`, siehe Abschnitt „Wetten, Empfohlen, Cloudflare-Server“):** Wett-Tracker mit
+Guthaben (Bereich „Wetten“ unten), Speichern-Knopf bei Top-Tipps und Kombis, automatische Prüfung nach Abpfiff, Erfolgsquote im
+Verlauf, Kategorie „Empfohlen“, Wettbewerbs-Leiste in den Top-Tipps entfernt, Cloudflare-Server (`worker/worker.js`) für
+Wettschein-Scan und als Zeitgeber der Tipp-Suche.
+
+**Offen, in dieser Reihenfolge:**
+1. **Cloudflare fertig einrichten** (Niklas, Anleitung im Abschnitt unten): Server-Adresse in `API` (oben in `web/app.js`)
+   eintragen, Wettschein-Scan einmal mit einem echten Wettschein testen, in der KI-Zentrale prüfen, dass der Zeitgeber
+   „verbunden“ zeigt und die Tipp-Suche wieder stündlich läuft (Protokoll: „vom Zeitgeber“).
+2. **Zweig `wett-tracker` in `main` übernehmen** (erst dann ist alles online) und auf Niklas' iPhone prüfen lassen.
+3. **Morgen prüfen:** In der App unter „Auswählen“ z. B. „Viktoria Köln“, „Saarbrücken“, „Real Zaragoza“, „Bari“ suchen →
+   Wappen, Liga „3. Liga · Deutschland“ usw.
+4. **Cloudflare Worker ausbauen:** echter Spiel-Screenshot-Scan mit Gemini (Spielstand, Minute, Teams → Prognose).
+5. Kleinere Ideen: Quoten der Europapokal-Spiele archivieren (siehe „Vereine & Wappen“), danach Backtest.
+
+### Stand 06.11.2026, nachmittags (vor dem Wett-Tracker)
 
 **Fertig und online** (alles ohne KI-Schlüssel, alles automatisch auf GitHub Actions):
 - Startseite mit Begrüßung, Tipp des Tages, Top-Tipps-Karten, KI-Zentrale (oben rechts), „Spiel selbst auswählen“ (über 1.000
@@ -122,15 +145,60 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
 - **Automatik:** Tipp-Suche jetzt mit Terminen alle 10 Minuten (rechnet höchstens 1× pro Stunde), weil GitHub am 06.11. in
   15 Stunden nur 4 von ~30 geplanten Läufen gestartet hat. App-Stand `ra-shell-v16`.
 
-**Offen, in dieser Reihenfolge:**
-1. **Morgen prüfen:** In der App unter „Auswählen“ z. B. „Viktoria Köln“, „Saarbrücken“, „Real Zaragoza“, „Bari“ suchen →
-   Wappen, Liga „3. Liga · Deutschland“ usw. In der KI-Zentrale schauen, ob die Tipp-Suche jetzt wirklich jede Stunde läuft.
-2. **Falls GitHub weiter Läufe verschluckt:** externer Zeitgeber (Anleitung unter „Automatik abgesichert“). Konto und
-   GitHub-Schlüssel macht **Niklas selbst**, der Schlüssel kommt nie in den Chat.
-3. **Treffsicherheit überarbeiten** (Prinzip und Seite) – erst mit Niklas klären, was ihn stört (Ideen unten unter
-   „Ursprünglicher Plan Design-Runde 2“, Punkt 6).
-4. **Cloudflare Worker + echter Screenshot-Scan** mit Gemini (wartet auf Niklas' Cloudflare-Konto und seinen Gemini-Schlüssel).
-5. Kleinere Ideen: Quoten der Europapokal-Spiele archivieren (siehe „Vereine & Wappen“), danach Backtest.
+Damals offen (inzwischen erledigt bzw. oben übernommen): GitHub verschluckte die Termine weiter (06.11.: von 10:55 bis abends
+keine einzige Tipp-Suche) → Zeitgeber jetzt über den Cloudflare-Server; „Treffsicherheit überarbeiten“ → von Niklas als
+Erfolgsquote der gespeicherten Top-Tipp-Wetten festgelegt.
+
+### Wetten, Empfohlen, Cloudflare-Server (06.11.2026, abends – Niklas am Laptop)
+
+Niklas' Wünsche: „unten einen Knopf, wo man seine Tipps mit Gewinn/Verlust und Guthaben tracken kann – manuell mit Quote und
+Einsatz, möglicher Gewinn wird angezeigt, danach gewonnen/verloren → Guthaben ändert sich automatisch; oder Screenshot rein und
+die KI erstellt die Wette“ · „bei den Top-Tipps die Wettbewerbe unter Morgen komplett raus, nur die Tagesangaben“ · „aus den
+Top-Tipps eine Wette speichern und damit tracken“ · „im Verlauf prüft die KI sofort nach Abpfiff, ob sie geklappt hat, und
+speichert das in Verlauf und Erfolgsquote – das kann nur die KI“. Entscheidungen (06.11.2026):
+- **Verlauf und Erfolgsquote zählen nur Wetten aus den Top-Tipps** (inkl. „Empfohlen“ und Kombis). Die prüft die App selbst nach
+  dem Abpfiff; von Hand lässt sich dort nichts ändern, und nach dem Anpfiff lassen sie sich nicht mehr löschen (sonst könnte man
+  die Quote schönen). Selbst eingetragene und gescannte Wetten markiert man selbst – sie zählen nur fürs Guthaben.
+- **Neue Kategorie „Empfohlen“** in den Top-Tipps (Niklas: „Spiele, die die KI empfiehlt wegen guter Quoten und halbwegs guter
+  Erfolgsquote“): echte Buchmacher-Quote ab 1,50, Chance ab 55 %, Result AI höchstens 2 Punkte unter dem Buchmacher; gereiht
+  nach vorsichtigerer Chance × Quote (`REC`, `REC_GAP` in `scripts/tips.py`, Liste `rec` in `tips.json`, Bilanz `record.rec`).
+- **Cloudflare statt cron-job.org** für Wettschein-Scan UND Zeitgeber (ein Konto für beides). Konto und Schlüssel macht Niklas.
+
+Umsetzung:
+- **Leiste unten mit fünf Bereichen:** Start · Top-Tipps · **Wetten** · Auswählen · Verlauf (`TABS`). Bereich „Wetten“ (`#/bets`,
+  `vBets`): Guthaben-Karte (Guthaben, im Spiel, möglicher Gewinn, Gewinn/Verlust), „Wette eintragen“ (Blatt: worauf, Spiel,
+  Quote, Einsatz mit Schnellwahl 2–50 €, möglicher Gewinn live, Anbieter), „Wettschein scannen“, Listen Offen/Erledigt;
+  selbst eingetragene Wetten: Gewonnen / Verloren / Storniert / „Wieder auf offen“, Löschen mit zweitem Tippen.
+- **Speichern:** Knopf „Wette speichern“ auf jeder Tipp-Karte, „Kombi speichern“ auf jeder Kombi, runder Knopf bei „Top-Tipps zu
+  diesem Spiel“ auf der Spielseite. Blatt mit vorausgefüllter Quote (zum Anpassen an den eigenen Anbieter) und Einsatz.
+  Gespeichert → Knopf zeigt „Gespeichert · in Wetten“ (Schlüssel `g|m` bzw. `k|g:m,…`).
+- **Daten nur auf dem Handy:** `ra_bets` (Liste der Wetten: `src` tip|manual|scan, `auto`, `list`, `legs` mit ESPN-Spiel `g`,
+  Liga `slug`, Wett-Code `m`, `res`; `q`, `p`, `stake`, `win` = Auszahlung inkl. Einsatz, `status` open|won|lost|void, `done`)
+  und `ra_wallet` (`base` = „Guthaben jetzt“ wie beim Anbieter, `at`, `moves` = Ein-/Auszahlungen). Guthaben = `base` + alles nach
+  `at`: neue Einsätze ab, Auszahlungen (gewonnen: `win`, storniert: Einsatz) dazu.
+- **Automatische Prüfung** (`checkBets`/`settleAuto`): die App holt den Endstand direkt bei ESPN (`summary?event=…`, CORS
+  erlaubt) – beim Start, beim Zurückkommen in die App, auf Wetten/Verlauf/Erfolgsquote und jede Minute, solange ein Spiel läuft
+  (zeigt dann „läuft · 1:0 · 63'“). Gewertet wie beim Buchmacher nach 90 Minuten: bei Verlängerung/Elfmeterschießen zählen die
+  Tore der zwei Halbzeiten (`linescores`). Abgesagt/verschoben und 48 Std. später nicht gespielt → zählt nicht (Einsatz zurück;
+  in einer Kombi zählt das Spiel wie Quote 1,0). Getestet mit Liverpool–Arsenal 0:1: „Sieg Arsenal“ ✓, „Über 2,5“ ✗.
+- **Verlauf** (`vHist`): oben „Erfolgsquote“ (Ring + x von y gewonnen + Gewinn/Verlust), darunter „Deine Wetten“ aus den
+  Top-Tipps nach Anstoß-Tag mit ✓/✗, dann wie bisher „Deine Prognosen“. **Erfolgsquote** (`#/acc`, `vAccuracy`, ersetzt die
+  alte Beispiel-Seite „Treffsicherheit“): x von y gewonnen, erwartet laut Buchmacher-Chance, Einsatz/Ausgezahlt/Gewinn/Rendite,
+  nach Kategorie, zuletzt ausgewertet, „Ehrlichkeit“ ab 20 Wetten.
+- **Top-Tipps:** Wettbewerbs-Leiste entfernt (nur noch Tage), vier Listen Sicher · Empfohlen · Top-Quote · Kombis, Punkt beim
+  Alter der Suche ehrlich grün/orange/rot (`freshness`), ebenso der KI-Knopf auf dem Start.
+- **Cloudflare-Server** (`worker/worker.js`, Gratis-Tarif): `GET /` Status (nur Ja/Nein, welche Geheimnisse da sind), `GET /check`
+  Einladungscode, `POST /bet` Wettschein lesen (Gemini, Temperatur 0, festes JSON-Schema, nur ablesen – nichts erfinden),
+  `GET /kick` + **Cron Trigger alle 30 Min.**: startet `tips.yml` über die GitHub-API (`workflow_dispatch`, `via=zeitgeber`),
+  wenn die veröffentlichte Tipp-Suche älter als 50 Min. ist. Geheimnisse (nur in Cloudflare, nie im Code/Chat): `GEMINI_API_KEY`,
+  `GITHUB_TOKEN` (fine-grained, nur `result-ai`, Actions: Read and write), `INVITE_CODES` (Komma-getrennt).
+  Einfügen/Aktualisieren: Datei komplett kopieren → Cloudflare → Workers & Pages → result-ai → Edit code → alles ersetzen → Deploy.
+  Die App braucht die Server-Adresse in `API` (oben in `web/app.js`) und den Einladungscode (Einstellungen → „Einladungscode“).
+  Der Scan verkleinert den Screenshot vorher (Breite ≤ 1280, Höhe ≤ 3600, JPEG), danach prüft man die erkannte Wette im Blatt.
+- **KI-Zentrale:** neue Zeile „Zeitgeber“ (verbunden / GitHub-Schlüssel fehlt / nicht erreichbar / noch nicht eingerichtet),
+  Knopf „Tipp-Suche jetzt starten“, wenn die Suche verspätet ist; im Protokoll steht, wer gestartet hat (vom Zeitgeber / von
+  GitHub / von Hand – `RA_VIA` in `tips.yml`). GitHubs eigene Termine nur noch als Ersatz (2× pro Stunde, mit Alters-Prüfung).
+- Service Worker `ra-shell-v17`.
 
 ## Stand Ende 03.11.2026 (Anfang des Projekts – zur Geschichte)
 

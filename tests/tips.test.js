@@ -13,12 +13,14 @@ ok(!isNaN(new Date(d.updatedAt)), `Datum lesbar (${d.updatedAt})`);
 ok(d.games && typeof d.games === 'object', `Spiele vorhanden (${Object.keys(d.games || {}).length})`);
 ok(Array.isArray(d.top) && Array.isArray(d.safe) && Array.isArray(d.kombis), 'Listen Top, Sicher, Kombis vorhanden');
 
-const all = (d.top || []).concat(d.safe || []);
+const all = (d.top || []).concat(d.safe || [], d.rec || []);
 const bad = all.filter((t) => !d.games[t.g] || !CODES.includes(t.m) || !prob(t.p) || !(t.q >= 1.01 && t.q < 50) || (t.pm != null && !prob(t.pm)));
 ok(bad.length === 0, `jeder Tipp hat Spiel, Wett-Art, Chance und Quote${bad.length ? ' (' + bad.length + ' kaputt)' : ''}`);
 ok((d.safe || []).every((t) => t.p >= 0.7 && t.q >= 1.2), 'Sicher: Chance ab 70 %, Quote ab 1,20');
 ok((d.top || []).every((t) => t.p >= 0.5 && t.q >= 1.6), 'Top-Quote: Chance ab 50 %, Quote ab 1,60');
-const dupe = ['top', 'safe'].filter((k) => new Set((d[k] || []).map((t) => t.g)).size !== (d[k] || []).length);
+// Empfohlen (seit 06.11.2026): echte Quote ab 1,50, Chance ab 55 %, Result AI höchstens 2 Punkte unter dem Buchmacher
+if (d.rec) ok(d.rec.every((t) => t.real && t.p >= 0.55 && t.q >= 1.5 && t.pm != null && t.pm >= t.p - 0.02 - 1e-9), `Empfohlen: ${d.rec.length} Tipps nach den Regeln`);
+const dupe = ['top', 'safe', 'rec'].filter((k) => new Set((d[k] || []).map((t) => t.g)).size !== (d[k] || []).length);
 ok(dupe.length === 0, 'je Liste höchstens ein Tipp pro Spiel');
 
 const games = Object.values(d.games || {});
@@ -34,7 +36,7 @@ for (const k of d.kombis || []) {
 }
 
 const rec = d.record || {};
-ok(['top', 'safe'].every((l) => rec[l] && ['7', '30'].every((w) => rec[l][w] && rec[l][w].won <= rec[l][w].n)), 'Bilanz vollständig');
+ok(['top', 'safe'].concat(d.rec ? ['rec'] : []).every((l) => rec[l] && ['7', '30'].every((w) => rec[l][w] && rec[l][w].won <= rec[l][w].n)), 'Bilanz vollständig');
 
 // KI-Zentrale: Protokoll der Rechner (web/data/activity.json)
 const actPath = path.join(__dirname, '..', 'web', 'data', 'activity.json');
