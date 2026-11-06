@@ -1,7 +1,7 @@
 # Result AI – Projektwissen für Claude
 
-Diese Datei liest Claude in jeder neuen Sitzung automatisch. **Wer hier weitermacht: komplett lesen, dann bei „Stand“ unten
-weitermachen.** Ohne Installation (z. B. fremder Laptop): im Browser **claude.ai/code** → GitHub verbinden → Repository
+Diese Datei liest Claude in jeder neuen Sitzung automatisch. **Wer hier weitermacht: komplett lesen, dann bei
+„HIER WEITERMACHEN“ (unter „Arbeitsweise“) anfangen.** Ohne Installation (z. B. fremder Laptop): im Browser **claude.ai/code** → GitHub verbinden → Repository
 `result-ai` wählen. Alternativ Claude-App + Git installieren und das Repository klonen.
 
 ## Was das ist
@@ -98,8 +98,41 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
 - Commit-Nachrichten enden mit `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Keine Passwörter, Logins oder API-Schlüssel im Chat oder im Code. Konten (Cloudflare, KI-Anbieter) legt Niklas selbst an.
 - Auf einem fremden Laptop: nichts speichern lassen, am Ende bei Claude und GitHub abmelden.
+- Reihenfolge beim Hochladen: erst committen, dann `git pull --rebase -X theirs`, dann `git push` (der Bot committet mehrmals
+  pro Stunde Bilanz/Protokoll/Stärken nach `web/data/`).
+- Nach App-Änderungen `SHELL` in `web/sw.js` hochzählen und alle Seiten im Browser bei iPhone-Breite (390 px) durchklicken
+  (keine Fehler in der Konsole, kein seitliches Überlaufen).
+- **„Mach noch was“** (Niklas): erst die laufende Aufgabe ganz fertig machen, dann selbst die nächste sinnvolle Sache wählen und
+  am Ende kurz berichten.
+- Unter Windows: größere Änderungen per kleinem Python-Skript statt Bash-Heredoc (Backslashes/Backticks gingen dort kaputt).
 
-## Stand (Ende 03.11.2026) – morgen genau hier weitermachen
+## HIER WEITERMACHEN – Stand 06.11.2026, nachmittags (Niklas: „heute Abend am Laptop weitermachen“)
+
+**So geht's am Laptop los:** Claude öffnen → Repository `result-ai` (Ordner klonen: `git clone
+https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browser **claude.ai/code** → GitHub verbinden →
+`result-ai`). Diese Datei wird automatisch gelesen – Claude weiß dann alles. Erster Satz an Claude reicht, z. B.
+„Lies CLAUDE.md und mach bei HIER WEITERMACHEN weiter“.
+
+**Fertig und online** (alles ohne KI-Schlüssel, alles automatisch auf GitHub Actions):
+- Startseite mit Begrüßung, Tipp des Tages, Top-Tipps-Karten, KI-Zentrale (oben rechts), „Spiel selbst auswählen“ (über 1.000
+  Teams), Top-Tipps (Sicher, Top-Quote, Kombis inkl. CL- und Bundesliga-Kombi, Bilanz), Verlauf, Einstellungen (Name, Hell/Dunkel/Auto).
+- **Neu heute: 3. Ligen der Top-5-Länder** (3. Liga, Primera Federación, Serie C, Ligue 3) – siehe Abschnitt unten. Sie tauchen
+  **ab morgen früh** (erster Stärken-Lauf des Tages) in der App auf; heute nicht mehr, weil gilt: gleiches Spiel am selben Tag =
+  gleiche Zahlen (die Stärken von heute standen schon).
+- **Automatik:** Tipp-Suche jetzt mit Terminen alle 10 Minuten (rechnet höchstens 1× pro Stunde), weil GitHub am 06.11. in
+  15 Stunden nur 4 von ~30 geplanten Läufen gestartet hat. App-Stand `ra-shell-v16`.
+
+**Offen, in dieser Reihenfolge:**
+1. **Morgen prüfen:** In der App unter „Auswählen“ z. B. „Viktoria Köln“, „Saarbrücken“, „Real Zaragoza“, „Bari“ suchen →
+   Wappen, Liga „3. Liga · Deutschland“ usw. In der KI-Zentrale schauen, ob die Tipp-Suche jetzt wirklich jede Stunde läuft.
+2. **Falls GitHub weiter Läufe verschluckt:** externer Zeitgeber (Anleitung unter „Automatik abgesichert“). Konto und
+   GitHub-Schlüssel macht **Niklas selbst**, der Schlüssel kommt nie in den Chat.
+3. **Treffsicherheit überarbeiten** (Prinzip und Seite) – erst mit Niklas klären, was ihn stört (Ideen unten unter
+   „Ursprünglicher Plan Design-Runde 2“, Punkt 6).
+4. **Cloudflare Worker + echter Screenshot-Scan** mit Gemini (wartet auf Niklas' Cloudflare-Konto und seinen Gemini-Schlüssel).
+5. Kleinere Ideen: Quoten der Europapokal-Spiele archivieren (siehe „Vereine & Wappen“), danach Backtest.
+
+## Stand Ende 03.11.2026 (Anfang des Projekts – zur Geschichte)
 
 - Erledigt: Idee und alle Entscheidungen oben mit Niklas geklärt; Repository `result-ai` angelegt; Vorlagen aus der BVB-App
   kopiert (`vorlage-bvb/`).
@@ -111,7 +144,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
   Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
   Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (zuletzt `ra-shell-v14`).
+  hochzählen (aktueller Stand steht in `web/sw.js`).
 - Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
 - BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
   Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
@@ -333,8 +366,8 @@ Was automatisch läuft (alles ohne KI, alles auf GitHub Actions, Protokoll in de
 
 | Was | Wie oft | Workflow |
 |---|---|---|
-| Top-Tipps: Sicher, Top-Quote, alle Kombis (inkl. Champions-League- und Bundesliga-Kombi), Tipp des Tages, Bilanz-Auswertung, KI-Zentrale | jede Stunde (:17), Ersatz-Termin :47 | `tips.yml` |
-| Team-Stärken (57 Ligen + Europapokal, Wappen, Farben) | 1× pro Tag gültig, bis zu 5 Versuche (1:35, 5:35, 9:35, 14:35, 19:35 UTC) + Nachholen durch die Tipp-Suche | `ratings.yml` |
+| Top-Tipps: Sicher, Top-Quote, alle Kombis (inkl. Champions-League- und Bundesliga-Kombi), Tipp des Tages, Bilanz-Auswertung, KI-Zentrale | jede Stunde (Termine alle 10 Min., gerechnet nur, wenn die letzte Suche älter als 50 Min. ist) | `tips.yml` |
+| Team-Stärken (61 Ligen + Europapokal, Wappen, Farben) | 1× pro Tag gültig, bis zu 5 Versuche (1:35, 5:35, 9:35, 14:35, 19:35 UTC) + Nachholen durch die Tipp-Suche | `ratings.yml` |
 | App-Änderungen | bei jedem Push | `pages.yml` |
 
 - **GitHub verschluckt/verzögert geplante Läufe** (05.11.2026: Stärken-Lauf 3:30 kam um 11:21, die neue stündliche Tipp-Suche lief
@@ -347,8 +380,37 @@ Was automatisch läuft (alles ohne KI, alles auf GitHub Actions, Protokoll in de
   Veröffentlichen die aktuelle Tipp-Datei von der Seite (sonst würde ein App-Update ältere Tipps zurückspielen). Gespeichert werden
   Bilanz (`tips_log.json`, 31 Tage), Protokoll (`activity.json`, 8 Tage, Einzelheiten für die letzten 30 Läufe) und die Stärken.
 - Kontrolle: KI-Zentrale zeigt je Rechner „läuft / verspätet / hängt“; schlägt ein Lauf fehl, schickt GitHub Niklas eine E-Mail.
-- Ganz sicher wird es erst mit einem **externen Zeitgeber** (z. B. cron-job.org oder später ein Cloudflare-Cron), der den Workflow
-  über die GitHub-API anstößt – dafür bräuchte Niklas dort ein Konto und einen GitHub-Schlüssel (macht er selbst, nicht Claude).
+- **06.11.2026:** trotzdem nur 4 Tipp-Läufe in 15 Stunden (00:59, 01:50, 07:59, 09:55 UTC, dann 5 Stunden nichts). Darum jetzt
+  **Termine alle 10 Minuten** (`7,17,27,…,57`), alle mit Alters-Prüfung (eigener kleiner Prüf-Job ohne Veröffentlichung, der nach
+  Sekunden endet); von Hand/von außen gestartete Läufe rechnen immer. Die Warteschlange `pages` gilt jetzt nur für den Rechen-Job.
+- Ganz sicher wird es erst mit einem **externen Zeitgeber**, der den Workflow über die GitHub-API anstößt. Das macht **Niklas
+  selbst** (Konto + Schlüssel, nie in den Chat), Claude erklärt nur:
+  1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token:
+     Name „result-ai Zeitgeber“, Ablauf z. B. 1 Jahr, *Only select repositories* → `result-ai`, Permissions → Repository →
+     **Actions: Read and write** (sonst nichts). Token kopieren (wird nur einmal angezeigt).
+  2. Kostenloses Konto bei **cron-job.org** → Create cronjob: URL
+     `https://api.github.com/repos/sneaxx141108-gif/result-ai/actions/workflows/tips.yml/dispatches`, jede Stunde (z. B. Minute 20),
+     Advanced: Methode **POST**, Header `Accept: application/vnd.github+json`, `Authorization: Bearer <Token>`,
+     `X-GitHub-Api-Version: 2022-11-28`, Body `{"ref":"main"}`. Erfolg = Antwort **204**; in GitHub erscheint ein Lauf
+     „workflow_dispatch“. Später kann das auch der Cloudflare-Worker per Cron übernehmen.
+
+### 3. Ligen der Top-5-Länder (06.11.2026 – Niklas: „adde in den Top-5-Ländern die 3. Liga, also 1., 2. und 3. Liga“)
+
+- Von FotMob (wie die anderen FotMob-Ligen, `FM_LEAGUES` in `scripts/ratings.py`): **3. Liga** (FotMob 208, 20 Teams),
+  **Primera Federación** (8968, 2 Gruppen, 40 Teams), **Serie C** (147, 3 Gruppen, 60 Teams), **Ligue 3** (8970, 18 Teams).
+  England hatte schon die Ligen 1–5 (football-data). Jetzt **61 Ligen, ~1.056 Teams**.
+- **Auf-/Absteiger verbinden** (sonst wären die neuen Ligen Inseln ohne Vergleich): jedes FotMob-Team wird mit einem
+  football-data-Namen der Liga **eine Stufe höher** im selben Land verbunden, wenn der Name sehr ähnlich ist (≥ 0,85, oder gleich
+  einem der ESPN-Namen – so wird „Celta Fortuna“ = „Celta B“) **und beide nie gleichzeitig gespielt haben** (`apart`). Zweite
+  Mannschaften (`RESERVE`/`is_reserve`: II, B, U19/U21/U23, Next Gen, Futuro, Castilla, Atlètic …) nie mit Profis. Greift auch für
+  Liga Portugal 2 ↔ Primeira Liga (vorher Insel-Gefahr). 06.11.: 20 Verbindungen, u. a. Düsseldorf, Münster, Cottbus, Osnabrück,
+  Zaragoza, Huesca, Bari, Spezia, Bastia, Amiens, Tondela, AVS; der Rest (Arezzo, Eldense, Dijon …) hieß schon gleich.
+- Ergebnis: alle vier Ligen in Gruppe 0 (vergleichbar mit allen europäischen Ligen); Schnitt-Stärke je Land Liga 1 > 2 > 3
+  (z. B. Deutschland 1,07 / 0,33 / −0,15; England League One liegt mit 0,38 etwa auf Höhe der 2. Bundesliga). BVB II, Castilla,
+  Juventus Next Gen, Atalanta U23 usw. bleiben eigene Teams.
+- Test `tests/ratings.test.js` Abschnitt 6: 3. Ligen verbunden, Reihenfolge Liga 1 > 2 > 3, keine zweite Mannschaft bei Dortmund,
+  Bayern, Real, Barça, Juve. Fehlt eine Liga einmal (FotMob kurz nicht erreichbar), blockiert das nichts.
+- App: Zahl der Ligen steht nicht mehr fest im Text („38 Ligen“), sondern kommt aus `ratings.json`.
 
 ### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
 

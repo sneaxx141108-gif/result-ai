@@ -87,7 +87,21 @@ FM_LEAGUES = {
     267: ('bih.1', 'Premijer Liga', 'Bosnien'), 118: ('arm.1', 'Premier League', 'Armenien'), 439: ('geo.1', 'Erovnuli Liga', 'Georgien'),
     260: ('alb.1', 'Kategoria Superiore', 'Albanien'), 226: ('lva.1', 'Virslīga', 'Lettland'), 228: ('ltu.1', 'A Lyga', 'Litauen'),
     185: ('por.2', 'Liga Portugal 2', 'Portugal'),
+    # 3. Ligen der Top-5-Länder (Niklas, 06.11.2026: „1., 2. und 3. Liga in den Top-5-Ländern“; England hat schon bis Liga 5)
+    208: ('ger.3', '3. Liga', 'Deutschland'), 8968: ('esp.3', 'Primera Federación', 'Spanien'),
+    147: ('ita.3', 'Serie C', 'Italien'), 8970: ('fra.3', 'Ligue 3', 'Frankreich'),
 }
+# zweite Mannschaften (BVB II, Barça Atlètic, Juventus Next Gen, Atalanta U23 …) werden nie mit den Profis verbunden
+RESERVE = re.compile(r'(\bII\b|\b2\b|\bB\b|\bU ?1[79]\b|\bU ?2[13]\b|reserve|\bres\b|next gen|futuro|castilla|atl[eè]tic\b)', re.I)
+
+
+def is_reserve(n):
+    return bool(RESERVE.search(n or ''))
+
+
+def apart(a, b):
+    """Zwei Zeiträume (erstes, letztes Spiel) überschneiden sich nicht – derselbe Verein spielt nie in zwei Ligen gleichzeitig."""
+    return a[1] < b[0] or b[1] < a[0]
 # football-data-Ligen, für die ESPN keine Wappen hat: Wappen + Vereinsfarbe von FotMob (gleiche Vereine, nur Bild und Farbe)
 FM_CRESTS = {196: 'Polen', 51: 'Finnland', 126: 'Irland', 189: 'Rumänien'}
 QUICK = {'D1', 'E0', 'BRA'}
@@ -479,20 +493,54 @@ def load(quick=False):
             continue
         cm = cmap.setdefault(country, {})
         taken = {r['id'] for c2 in cmap.values() for r in c2.values()}
+        # Auf-/Absteiger: derselbe Verein stand in der football-data-Liga eine Stufe höher (3. Liga ↔ 2. Bundesliga, Liga Portugal 2
+        # ↔ Primeira Liga). Verbinden, sonst wäre die FotMob-Liga eine Insel ohne Vergleich. Nur bei sehr ähnlichem Namen, nur wenn
+        # beide nie gleichzeitig gespielt haben (Profis und zweite Mannschaft spielen gleichzeitig) und nie zweite Mannschaft mit Profis.
+        cc, lvl = lg.split('.')
+        up = '%s.%d' % (cc, int(lvl) - 1)
+        above = {n for (_c, l2, _n, c2, gs, _s) in loaded if l2 == up and c2 == country for g in gs for n in (g['home'], g['away'])}
+        span = seen.get(country, {})
+        fspan = {}
+        for g in games:
+            for n in (g['home'], g['away']):
+                f, l = fspan.get(n, (g['t'], g['t']))
+                fspan[n] = (min(f, g['t']), max(l, g['t']))
+        def link(fn, n):
+            known = [x for x in (cm.get(n) or {}).get('names') or [] if not (x.isupper() and len(x) <= 4)]
+            if any(slug(fn) == slug(x) for x in [n] + known):
+                return 1.0  # gleicher Name (auch einer der ESPN-Namen, z. B. „Celta Fortuna“ = „Celta B“)
+            if is_reserve(fn) != is_reserve(n):
+                return 0.0
+            return max(name_sim(fn, [n]), name_sim(n, [fn]))
+        pairs = sorted(((link(t['name'], n), tid, n) for tid, t in fteams.items() if t['name'] not in cm
+                        for n in above if n in span and apart(span[n], fspan.get(t['name'], (NOW, NOW)))), reverse=True)
+        twin = {}
+        for sc, tid, n in pairs:
+            if sc >= 0.85 and tid not in twin and n not in twin.values():
+                twin[tid] = n
         for tid, t in sorted(fteams.items()):
             if t['name'] in cm:
                 continue
-            best = max(((name_sim(t['name'], c['names'], c.get('abbr')), c) for c in cup_teams.values() if c['id'] not in taken),
-                       key=lambda bc: bc[0], default=(0, None))
             col = colors.get(tid)
+            n2 = twin.get(tid)
+            if n2:
+                log('  %s: „%s“ = „%s“ (Auf-/Absteiger)' % (lg, t['name'], n2))
+                if n2 in cm:
+                    cm[t['name']] = cm[n2]
+                    continue
+            both = [t['name']] + ([n2] if n2 else [])
+            best = max(((max(name_sim(x, c['names'], c.get('abbr')) for x in both), c) for c in cup_teams.values() if c['id'] not in taken),
+                       key=lambda bc: bc[0], default=(0, None))
             if best[0] >= 0.85:
                 c = best[1]
-                cm[t['name']] = {'id': c['id'], 'names': sorted(set(c['names']) | {t['name']}), 'display': c['display'], 'short': c['short'],
-                                 'abbr': c['abbr'], 'logo': c['logo'], 'color': c.get('color') or ((col[1:], None) if col else None)}
+                row = {'id': c['id'], 'names': sorted(set(c['names']) | set(both)), 'display': c['display'], 'short': c['short'],
+                       'abbr': c['abbr'], 'logo': c['logo'], 'color': c.get('color') or ((col[1:], None) if col else None)}
                 taken.add(c['id'])
             else:
-                cm[t['name']] = {'id': 'fm:%s' % tid, 'names': [n for n in (t['name'], t['short']) if n], 'display': t['name'], 'short': t['short'],
-                                 'abbr': None, 'logo': FM_LOGO % tid, 'color': (col[1:], None) if col else None}
+                row = {'id': 'fm:%s' % tid, 'names': [n for n in (t['name'], t['short'], n2) if n], 'display': t['name'], 'short': t['short'],
+                       'abbr': None, 'logo': FM_LOGO % tid, 'color': (col[1:], None) if col else None}
+            for n in both:
+                cm[n] = row
         cur_season = max((g['season'] for g in games), default='')
         stats = {}
         for g in games:

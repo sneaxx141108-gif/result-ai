@@ -46,5 +46,23 @@ for (const lg of ['ger.1', 'eng.1', 'esp.1', 'ita.1', 'fra.1']) {
 const l2 = d.teams.filter((t) => t.lg === 'ger.2');
 ok(l2.length >= 16 && byId['132'] && l2.every((t) => s(t) < s(byId['132'])), 'Bayern stärker als jeder Zweitligist');
 
+// 6) 3. Ligen der Top-5-Länder (06.11.2026, von FotMob): falls diesmal geladen, über Auf-/Absteiger mit dem Rest verbunden
+//    (keine Insel) und im Schnitt schwächer als Liga 2 – fehlt eine (FotMob kurz nicht erreichbar), blockiert das nichts
+const avg = (lg) => { const ts = d.teams.filter((t) => t.lg === lg); return ts.length ? ts.reduce((a, t) => a + s(t), 0) / ts.length : NaN; };
+for (const c of ['ger', 'esp', 'ita', 'fra']) {
+  const L3 = d.leagues.find((l) => l.id === c + '.3');
+  if (!L3) { console.log(`hinweis ${c}.3 diesmal nicht geladen`); continue; }
+  ok(L3.grp === 0, `${c}.3 (${L3.name}) mit den anderen Ligen verbunden`);
+  const a = [1, 2, 3].map((k) => avg(`${c}.${k}`));
+  ok(a[0] > a[1] && a[1] > a[2], `${c}: Liga 1 > Liga 2 > Liga 3 im Schnitt (${a.map((x) => x.toFixed(2)).join(' / ')})`);
+}
+// zweite Mannschaften (BVB II, Castilla, Juventus Next Gen …) nie mit den Profis zusammengelegt
+const RES = /\bII\b|\bB\b|U ?2[13]\b|U ?19\b|Castilla|Next Gen|Futuro|Atlètic/;
+const juve = d.teams.find((t) => t.name === 'Juventus');
+for (const t of [byId['124'], byId['132'], byId['86'], byId['83'], juve].filter(Boolean)) {
+  const bad = (t.alias || []).filter((n) => RES.test(n));
+  ok(bad.length === 0, `${t.name}: keine zweite Mannschaft untergemischt${bad.length ? ' (' + bad.join(', ') + ')' : ''}`);
+}
+
 console.log(fails ? `\n${fails} FEHLER` : '\nALLE TESTS OK');
 process.exit(fails ? 1 : 0);

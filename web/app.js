@@ -238,7 +238,7 @@
         <div class="acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="pick" aria-label="Screenshot aus Fotos wählen"></label>
           <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="pick" aria-label="Foto mit der Kamera machen"></label></div>
         <button class="demo-scan" data-act="demoscan">${I.scan}<span>Beispiel-Scan ansehen</span><span class="chev">›</span></button></section>
-      <a class="card pickrow" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Teams aus 38 Ligen · ohne Screenshot</div></span><span class="chev">›</span></a>
+      <a class="card pickrow" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Teams aus ${Object.keys(R.leagues).length || 'über 50'} Ligen · ohne Screenshot</div></span><span class="chev">›</span></a>
       <section class="sec"><div class="sec-h"><h2>Beispiele</h2><span class="note">ausgedacht · echte Rechnung</span></div>
         <div class="ex-row">${card(DEMO.live)}${card(DEMO.pre)}${card(DEMO.odds)}${mdCard}</div></section>
       <section class="sec"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="note link" data-act="tab" data-tab="/hist">Alle ›</button>' : ''}</div>
@@ -393,7 +393,7 @@
 
     // 8) Erklärung
     out += `<section class="card explain" data-sec="ex" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
-    out += `</div><p class="foot">${m.src === 'tips' ? 'Chancen aus den Buchmacher-Quoten (DraftKings über ESPN), Tore zusätzlich mit Result AI · jede Stunde neu gesucht.<br>' : ''}${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (38 Ligen + Europapokal).<br>` : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
+    out += `</div><p class="foot">${m.src === 'tips' ? 'Chancen aus den Buchmacher-Quoten (DraftKings über ESPN), Tore zusätzlich mit Result AI · jede Stunde neu gesucht.<br>' : ''}${m.fromMd || DEMO[m.id] ? 'Beispiel-Spiel (ausgedacht) – die Rechnung ist echt.<br>' : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (${Object.keys(R.leagues).length || 'viele'} Ligen + Europapokal).<br>` : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
     return out;
   }
   function heatmap(a, m, c) {
