@@ -26,6 +26,7 @@ import ratings as rt  # noqa: E402  (get, ESPN, pick_color – gleiche Regeln wi
 RATINGS = os.path.join(rt.ROOT, 'web', 'data', 'ratings.json')
 OUT = os.path.join(rt.ROOT, 'web', 'data', 'tips.json')
 LOG = os.path.join(rt.ROOT, 'web', 'data', 'tips_log.json')
+PUBLISHED = 'https://sneaxx141108-gif.github.io/result-ai/data/tips.json'  # die zuletzt veröffentlichte Suche
 NOW = datetime.now(timezone.utc)
 DAYS = 21         # 3 Wochen voraus: so ist der nächste Spieltag von Champions/Europa/Conference League immer dabei (Niklas)
 KEEP_DAYS = 31    # so lange bleibt die Bilanz (die App zeigt die letzten 30 Tage)
@@ -126,6 +127,18 @@ def months():
         x = NOW + timedelta(days=dd)
         ms.add((x.year, x.month))
     return sorted(ms)
+
+
+def last_search():
+    """Die zuletzt veröffentlichte Suche – der Vergleich für die KI-Zentrale. Die Datei im Repository taugt dafür nicht: sie wird
+    nicht mehr gespeichert und bleibt alt (06.–08.11.2026 galten dadurch stündlich rund 200 Tipps als „neu“). Nicht erreichbar
+    → None: dann meldet dieser Lauf lieber keine Zahlen als falsche."""
+    try:
+        d = json.loads(rt.get('%s?nc=%d' % (PUBLISHED, time.time()), timeout=30, retries=1))
+        return d if isinstance(d, dict) and d.get('updatedAt') else None
+    except (RuntimeError, ValueError) as e:
+        log('  Letzte Suche nicht lesbar (%s) – diesmal kein Vergleich für die KI-Zentrale.' % e)
+        return None
 
 
 def fetch(slug):
@@ -300,15 +313,12 @@ def main():
            'record': {lst: {'7': record(7, lst), '30': record(30, lst)} for lst in ('top', 'safe', 'rec')},
            'recent': recent}
     # KI-Zentrale: was ist seit der letzten Suche neu, weggefallen, verschoben, ausgewertet?
-    try:
-        prev = json.load(open(OUT, encoding='utf-8'))
-    except (OSError, ValueError):
-        prev = {}
-    pg = prev.get('games') or {}
-    prev_tips = {(t['g'], t['m'], lst): t for lst in ('top', 'safe', 'rec') for t in prev.get(lst, [])
+    prev = last_search()
+    pg = (prev or {}).get('games') or {}
+    prev_tips = {(t['g'], t['m'], lst): t for lst in ('top', 'safe', 'rec') for t in (prev or {}).get(lst, [])
                  if pg.get(t['g']) and when(pg[t['g']]['t']) and when(pg[t['g']]['t']) > NOW}
     cur_tips = {(c['g'], c['m'], lst): c for lst, items in (('top', top), ('safe', safe), ('rec', rec)) for c in items}
-    new = sorted((k for k in cur_tips if k not in prev_tips), key=lambda k: (k[2] != 'safe', -cur_tips[k]['p']))
+    new = sorted((k for k in cur_tips if k not in prev_tips), key=lambda k: (k[2] != 'safe', -cur_tips[k]['p'])) if prev else []
     gone = [k for k in prev_tips if k not in cur_tips]
     moved = [k for k in cur_tips if k in prev_tips and abs(cur_tips[k]['p'] - prev_tips[k]['p']) >= 0.02]
     seen_res, res_info = set(), []
@@ -323,9 +333,11 @@ def main():
         c, g = cur_tips[k], games[k[0]]
         added.append({'g': k[0], 'm': k[1], 'list': k[2], 'p': c['p'], 'q': c['q'], 'real': c['real'], 'comp': g['comp'], 'kick': g['t'],
                       'h': g['home']['name'], 'a': g['away']['name'], 'hid': g['home']['id'], 'aid': g['away']['id']})
-    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'rec': len(rec), 'kombis': len(kombis), 'new': len(new),
-               'gone': len(gone), 'moved': len(moved), 'checked': len(res_info), 'won': sum(1 for r in res_info if r['won']),
+    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'rec': len(rec), 'kombis': len(kombis),
+               'checked': len(res_info), 'won': sum(1 for r in res_info if r['won']),
                'via': os.environ.get('RA_VIA') or None}  # wer die Suche gestartet hat: zeitgeber (Cloudflare), github, hand
+    if prev:  # ohne Vergleich gibt es keine Zahlen (die App zeigt dann einfach keine)
+        summary.update(new=len(new), gone=len(gone), moved=len(moved))
     runs = activity.log_run('tips', NOW, time.time() - t0, summary, {'added': added, 'results': res_info[:30]})
     out['ki'] = activity.today_summary(runs, NOW)
 

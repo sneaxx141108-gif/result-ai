@@ -99,6 +99,8 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
 
 - Commit-Nachrichten enden mit `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Keine Passwörter, Logins oder API-Schlüssel im Chat oder im Code. Konten (Cloudflare, KI-Anbieter) legt Niklas selbst an.
+- **Das Repository ist öffentlich:** keine Nachnamen, Windows-Benutzernamen, Firmen oder E-Mail-Adressen in Dateien oder
+  Commit-Nachrichten.
 - Auf einem fremden Laptop: nichts speichern lassen, am Ende bei Claude und GitHub abmelden.
 - Reihenfolge beim Hochladen: erst committen, dann `git pull --rebase -X theirs`, dann `git push` (der Bot committet mehrmals
   pro Stunde Bilanz/Protokoll/Stärken nach `web/data/`).
@@ -140,9 +142,10 @@ Wettschein-Scan und als Zeitgeber der Tipp-Suche.
 1. **Auf Niklas' iPhone prüfen:** Bereich „Wetten“ (Guthaben eintragen, Wette eintragen, Top-Tipp speichern), „Empfohlen“,
    Verlauf + Erfolgsquote; in den Einstellungen den **Einladungscode** eintragen (✓ „Code passt“) und den **Wettschein-Scan**
    mit einem echten Wettschein testen (KI liest Teams, Tipps, Quoten, Einsatz).
-2. **KI-Zentrale:** Tipp-Suche läuft wieder stündlich? Im Protokoll muss „vom Zeitgeber“ stehen, Zeitgeber-Zeile „verbunden“.
-3. **3. Ligen prüfen:** In der App unter „Auswählen“ z. B. „Viktoria Köln“, „Saarbrücken“, „Real Zaragoza“, „Bari“ suchen →
-   Wappen, Liga „3. Liga · Deutschland“ usw.
+2. ~~KI-Zentrale prüfen~~ – geprüft am 08.11.2026: Tipp-Suche seit dem 06.11. abends lückenlos stündlich „vom Zeitgeber“,
+   Zeitgeber „verbunden“.
+3. ~~3. Ligen prüfen~~ – geprüft am 08.11.2026: 61 Ligen, 1.056 Teams; Viktoria Köln, Saarbrücken, Real Zaragoza, Bari mit Wappen
+   und richtiger Liga. Automatische Auswertung mit 11 echten Spielen getestet (auch Verlängerung/Elfmeterschießen): alles richtig.
 4. **Cloudflare Worker ausbauen:** echter Spiel-Screenshot-Scan mit Gemini (Spielstand, Minute, Teams → Prognose).
 5. Kleinere Ideen: Quoten der Europapokal-Spiele archivieren (siehe „Vereine & Wappen“), danach Backtest.
 
@@ -459,6 +462,9 @@ Was automatisch läuft (alles ohne KI, alles auf GitHub Actions, Protokoll in de
 - **Tipp-Datei wird nur veröffentlicht, nicht gespeichert** (hält das Repository klein); `pages.yml` und `ratings.yml` holen vor dem
   Veröffentlichen die aktuelle Tipp-Datei von der Seite (sonst würde ein App-Update ältere Tipps zurückspielen). Gespeichert werden
   Bilanz (`tips_log.json`, 31 Tage), Protokoll (`activity.json`, 8 Tage, Einzelheiten für die letzten 30 Läufe) und die Stärken.
+  `tips.py` vergleicht für die KI-Zentrale deshalb mit der **veröffentlichten** Suche (`last_search`), nicht mit der Datei im
+  Repository (die bleibt alt: bis 08.11.2026 galten so stündlich rund 200 Tipps als „neu“; diese falschen Zahlen sind aus dem
+  Protokoll gelöscht). Ist die Seite nicht erreichbar, meldet der Lauf keine Zahlen statt falscher.
 - Kontrolle: KI-Zentrale zeigt je Rechner „läuft / verspätet / hängt“; schlägt ein Lauf fehl, schickt GitHub Niklas eine E-Mail.
 - **06.11.2026:** trotzdem nur 4 Tipp-Läufe in 15 Stunden (00:59, 01:50, 07:59, 09:55 UTC, dann 5 Stunden nichts). Darum jetzt
   **Termine alle 10 Minuten** (`7,17,27,…,57`), alle mit Alters-Prüfung (eigener kleiner Prüf-Job ohne Veröffentlichung, der nach
