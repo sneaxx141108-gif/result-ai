@@ -144,6 +144,17 @@
     return `<span class="crest fb" style="--s:${s}px;background:${c};color:${onColor(c)}" aria-hidden="true">${esc(initials(name))}</span>`;
   }
   const plate = (name, p, extra = '') => `<span class="plate" style="--p:${p}px">${crest(name, Math.round(p * 0.66), true)}${extra}</span>`;
+  // Spiel-Karte: scharfer Schnitt zwischen den Vereinsfarben mit feiner heller Naht (wie eine TV-Grafik)
+  const teamBg = (m) => {
+    const h = teamColor(m.home);
+    const w = teamColor(m.away);
+    return `linear-gradient(102deg, ${h} 0%, ${h} 49.7%, rgba(255,255,255,.6) 49.7%, rgba(255,255,255,.6) 50.2%, ${w} 50.2%, ${w} 100%)`;
+  };
+  // großes Wappen als Wasserzeichen in der Spiel-Karte
+  const wm = (name, side) => { const src = logoSrc(name, false, 200); return src && !src.includes('/countries/') ? `<span class="wm ${side}" aria-hidden="true"><img src="${src}" alt="" decoding="async"${cors(src)}></span>` : ''; };
+  // farbiges Licht oben auf jeder Seite
+  const aura = (kind) => `<div class="aura aura-${kind}" aria-hidden="true"></div>`;
+  const decoRing = '<svg class="deco" viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" transform="rotate(-90 18 18)"><circle cx="18" cy="18" r="13" pathLength="100" stroke-dasharray="44 56"/><circle cx="18" cy="18" r="13" pathLength="100" stroke-dasharray="20 80" stroke-dashoffset="-52"/><circle cx="18" cy="18" r="13" pathLength="100" stroke-dasharray="16 84" stroke-dashoffset="-80"/></g></svg>';
   // rote Karten: Kärtchen am Wappen und „zu zehnt“ im Untertitel
   const redCards = (m, i) => { const n = (m.reds && m.reds[i]) || 0; return n ? `<span class="rcs" role="img" aria-label="${n} Rote Karte${n > 1 ? 'n' : ''}">${'<i></i>'.repeat(Math.min(n, 3))}</span>` : ''; };
   const shortHanded = (m) => [0, 1].map((i) => { const n = (m.reds && m.reds[i]) || 0; return n ? ` · ${esc(i ? m.away : m.home)} zu ${['', 'zehnt', 'neunt', 'acht'][Math.min(n, 3)]}` : ''; }).join('');
@@ -218,15 +229,18 @@
 
   // ------------------------------------------------------------------ Startseite
   const RG_TEXT = 'Keine Garantie. Wetten erst ab 18 · Glücksspiel kann süchtig machen – Hilfe bei check-dein-spiel.de oder kostenlos unter 0800 1 37 27 00 (BZgA).';
-  const scanBtns = () => `<div class="scan-acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein aus den Fotos wählen"></label>
+  const scanBtns = () => `<div class="acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein aus den Fotos wählen"></label>
     <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="scanbet" aria-label="Wettschein fotografieren"></label></div>`;
   function vHome() {
     const hist = store.get('history', []);
-    return `<section class="hello"><h1>${esc(greet())}</h1><p>${esc(todayLong())}</p></section>
+    return `${aura('home')}<section class="hello"><h1>${esc(greet())}</h1><p>${esc(todayLong())}</p></section>
       <div class="spot-slot">${spotlight()}</div>
       <section class="sec"><div class="sec-h"><h2>Top-Tipps</h2><button class="link" data-act="tab" data-tab="/tips">Alle</button></div><div class="tips-prev">${tipCarousel()}</div></section>
       <section class="sec"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="bil-slot">${bilanzCard()}</div></section>
-      <section class="sec"><div class="sec-h"><h2>Wettschein scannen</h2></div><div class="card scan-card"><p>Screenshot von deinem Wettschein: Result AI liest jede Wette und rechnet nach, wie gut sie wirklich ist.</p>${scanBtns()}</div></section>
+      <section class="scan-card">${decoRing}
+        <div class="sc-phone" aria-hidden="true"><div class="sc-screen"><span class="sc-lg">PREMIER LEAGUE</span><div class="sc-sb"><i style="background:#EF0107"></i><b>1 – 1</b><i style="background:#034694"></i></div><span class="sc-min">63'</span><span class="sc-box"></span><span class="sc-line"></span></div></div>
+        <div class="sc-text"><span class="sc-eb">${I.scan}Wettschein scannen</span><h2>Schein rein.<br><span>Prozente raus.</span></h2><p>Result AI liest jede Wette und rechnet nach, wie gut sie wirklich ist.</p></div>
+        ${scanBtns()}</section>
       <section class="sec"><div class="group"><a class="row" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Vereine und Länder aus ${Object.keys(R.leagues).length || 'über 50'} Ligen</div></span><span class="chev">›</span></a>${homeBets()}</div></section>
       ${hist.length ? `<section class="sec"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="link" data-act="tab" data-tab="/hist">Alle</button>' : ''}</div><div class="group">${hist.slice(0, 3).map(histRow).join('')}</div></section>` : ''}
       <p class="foot">${RG_TEXT}</p>`;
@@ -501,17 +515,21 @@
     const favHome = a.probs.home >= a.probs.away;
     const favP = Math.max(a.probs.home, a.probs.away);
     const favCol = favHome ? c.h : c.a;
-    const badge = k === 'draw' ? 'Offenes Spiel' : favP > 0.7 ? 'Klarer Favorit' : favP > 0.5 ? 'Favorit' : 'Leicht vorne';
-    let out = `<div class="res"><section class="match">
-      <div class="match-top">${live ? `<span class="chip live">LIVE ${m.minute}'</span>` : `<span class="chip">${m.kind === 'odds' ? 'Tipico-Quoten' : 'Vor dem Spiel'}</span>`}<span class="chip">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
-      <div class="versus"><div class="side">${plate(m.home, 72, redCards(m, 0))}<span class="nm">${esc(m.home)}</span></div>
+    const badge = k === 'draw' ? ['Offenes Spiel', 'var(--fill)', 'var(--text)']
+      : favP > 0.7 ? ['Klarer Favorit', favCol, onColor(favCol)] : favP > 0.5 ? ['Favorit', favCol, onColor(favCol)] : ['Leicht vorne', favCol, onColor(favCol)];
+    const hc = teamColor(m.home);
+    const ac = teamColor(m.away);
+    const fcol = favHome ? hc : ac;
+    let out = `<div class="res" style="--hgl:${rgba(hc, 0.3)};--agl:${rgba(ac, 0.3)};--hgd:${rgba(hc, 0.55)};--agd:${rgba(ac, 0.55)};--fvl:${rgba(fcol, 0.1)};--fvd:${rgba(fcol, 0.24)}"><div class="glow" aria-hidden="true"></div><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
+      <div class="match-top">${live ? `<span class="chip live">LIVE ${m.minute}'</span>` : `<span class="chip glass">${m.kind === 'odds' ? 'Tipico-Quoten' : 'Vor dem Spiel'}</span>`}<span class="chip glass">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
+      <div class="versus"><div class="side">${plate(m.home, 80, redCards(m, 0))}<span class="nm">${esc(m.home)}</span></div>
         <div class="mid">${live ? `<div class="sc">${m.score[0]}:${m.score[1]}</div><div class="sub">${m.minute}. Minute</div>` : '<div class="vs">VS</div>'}</div>
-        <div class="side">${plate(m.away, 72, redCards(m, 1))}<span class="nm">${esc(m.away)}</span></div></div></section>
+        <div class="side">${plate(m.away, 80, redCards(m, 1))}<span class="nm">${esc(m.away)}</span></div></div></section>
       ${secNav(m, a)}<div class="cards">`;
 
     // 1) Prognose mit der großen Zahl
     out += `<section class="card prob big" data-sec="ov" style="--i:0"><div class="top"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
-        <span class="badge">${badge}</span></div>
+        <span class="badge" style="background:${badge[1]};color:${badge[2]};--bgc:${badge[1]}">${badge[0]}</span></div>
       <div class="big-l">${esc(label)}</div><div class="big-s">${live ? `beim Stand von ${m.score[0]}:${m.score[1]} in der ${m.minute}. Minute${shortHanded(m)}` : 'vor dem Anpfiff'}</div>
       <div class="split" role="img" aria-label="Sieg ${esc(m.home)} ${r[0]} Prozent, Remis ${r[1]} Prozent, Sieg ${esc(m.away)} ${r[2]} Prozent">
         <i style="flex:${a.probs.home};background:${c.h};color:${c.h}"></i><i style="flex:${a.probs.draw};background:var(--draw);color:var(--draw)"></i><i style="flex:${a.probs.away};background:${c.a};color:${c.a}"></i></div>
@@ -727,10 +745,10 @@
     if (!d) return '<h1 class="ptitle">Spiel auswählen</h1><div class="empty" style="margin-top:18px">Die Team-Stärken werden geladen …</div>';
     const slot = (side, label) => {
       const t = P[side] && R.byId[P[side]];
-      return `<button class="slot ${t ? 'set' : ''}" data-act="slot" data-side="${side}">${t ? crest(reg(t), 46) : `<span class="slot-ph">${I.search}</span>`}
+      return `<button class="slot ${t ? 'set' : ''}" data-act="slot" data-side="${side}"${t ? ` style="--sg:${rgba(teamColor(reg(t)), 0.16)};--sgd:${rgba(teamColor(reg(t)), 0.32)}"` : ''}>${t ? crest(reg(t), 46) : `<span class="slot-ph">${I.search}</span>`}
         <span class="grow"><span class="slot-l">${label}</span><span class="slot-n">${t ? esc(tName(t)) : 'Team suchen'}</span>${t ? `<span class="slot-s">${esc(lgName(t.lg))}</span>` : ''}</span><span class="chev">›</span></button>`;
     };
-    return `<h1 class="ptitle">Spiel auswählen</h1><p class="psub">Zwei Vereine oder zwei Länder wählen.</p>
+    return `${aura('pick')}<h1 class="ptitle">Spiel auswählen</h1><p class="psub">Zwei Vereine oder zwei Länder wählen.</p>
       <div class="card pick" style="margin-top:18px">${slot('home', 'Heim')}<div class="pick-vs"><span>gegen</span>${P.home || P.away ? `<button class="swap" data-act="swap" aria-label="Heim und Gast tauschen">${I.swap}</button>` : ''}</div>${slot('away', 'Gast')}</div>
       ${matchPreview()}
       <div class="card opts" style="margin-top:14px">
@@ -908,14 +926,19 @@
     const g = T.data.games[t.g];
     const h = tipTeam(g.home);
     const a = tipTeam(g.away);
-    const on = B.keys.has(`${t.g}|${t.m}`);
-    const cmp = g.mo ? 'Nur Result AI · keine Marktdaten' : `Markt ${Math.round(t.p * 100)} %${t.pm != null ? ` · Result AI ${Math.round(t.pm * 100)} %` : ''}`;
-    return `<a class="tcard" href="#/r/t_${esc(g.id)}">
+    const hcl = teamColor(h);
+    const acl = teamColor(a);
+    const pc = Math.round(t.p * 100);
+    const bars = g.mo
+      ? `<div class="cmp2"><div class="ai"><span>Result AI</span><i><em style="width:${pc}%"></em></i><b>${pc} %</b></div></div>`
+      : `<div class="cmp2"><div><span>Markt</span><i><em style="width:${pc}%"></em></i><b>${pc} %</b></div>
+        <div class="ai"><span>Result AI</span><i><em style="width:${t.pm != null ? Math.round(t.pm * 100) : 0}%"></em></i><b>${t.pm != null ? Math.round(t.pm * 100) + ' %' : '–'}</b></div></div>`;
+    return `<a class="tcard ${list}" href="#/r/t_${esc(g.id)}" style="--i:${Math.min(i, 8)};--hg:${rgba(hcl, 0.1)};--ag:${rgba(acl, 0.1)};--hgd:${rgba(hcl, 0.22)};--agd:${rgba(acl, 0.22)}">
       <div class="tc-top"><span class="tc-comp">${esc(g.comp)}</span><span class="tc-time">${esc(kickoff(g.t))}</span></div>
       <div class="tc-main"><div class="tc-teams"><span class="tm">${crest(h, 24)}<span>${esc(h)}</span></span><span class="tm">${crest(a, 24)}<span>${esc(a)}</span></span></div>${ring(t.p)}</div>
-      <div class="tc-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="tc-q"><span class="k">Quote</span><b>${qTxt(t)}</b></div>
-        <button class="gsave${on ? ' on' : ''}" data-act="savetip" data-list="${list}" data-g="${esc(t.g)}" data-m="${esc(t.m)}" aria-label="${on ? 'Gespeichert – zu den Wetten' : 'Als Wette speichern'}">${on ? I.check : I.save}</button></div>
-      <div class="tc-foot"><span>${cmp}</span></div></a>`;
+      <div class="tc-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="tc-q"><span class="k">Quote</span><b>${qTxt(t)}</b></div></div>
+      ${bars}
+      ${saveBtn(B.keys.has(`${t.g}|${t.m}`), `data-act="savetip" data-list="${list}" data-g="${esc(t.g)}" data-m="${esc(t.m)}"`, 'Wette speichern')}</a>`;
   }
   // Speichern-Knopf auf Tipp- und Kombi-Karten: einmal gespeichert → „Gespeichert“ (Antippen öffnet die Wetten)
   const saveBtn = (on, attrs, label) => `<button class="tsave${on ? ' on' : ''}" ${attrs}>${on ? I.check : I.save}<span>${on ? 'Gespeichert · in Wetten' : label}</span></button>`;
@@ -977,7 +1000,7 @@
     return `<a class="card bil" href="#/bilanz"><div class="rec-hero">${ring(t.won / t.n)}<div class="grow"><b>${t.won} von ${t.n}</b><span>Tipps aufgegangen · erwartet ${pct0(t.exp / t.n)}</span></div><span class="chev">›</span></div><div class="bil-3">${cells}</div></a>`;
   }
   function vBilanz() {
-    const head = '<h1 class="ptitle">Bilanz</h1><p class="psub">Jeder angezeigte Tipp wird festgehalten und nach dem Abpfiff ausgewertet, auch die, die danebengehen.</p>';
+    const head = aura('hist') + '<h1 class="ptitle">Bilanz</h1><p class="psub">Jeder angezeigte Tipp wird festgehalten und nach dem Abpfiff ausgewertet, auch die, die danebengehen.</p>';
     const d = T.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${T.err ? 'Die Bilanz konnte gerade nicht geladen werden.' : 'Die Bilanz wird geladen …'}</div>`;
     const r = d.record || {};
@@ -992,7 +1015,7 @@
       <p class="foot">Gezählt werden die letzten 30 Tage. „Erwartet“ ist die Quote an Treffern, die Result AI vorher selbst genannt hat. Nah beieinander heißt: Die Prozente stimmen.</p>`;
   }
   function vTips() {
-    const head = '<h1 class="ptitle">Top-Tipps</h1>';
+    const head = aura('tips') + '<h1 class="ptitle">Top-Tipps</h1>';
     const d = T.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${T.err ? 'Die Tipps konnten gerade nicht geladen werden. Prüf die Verbindung.' : 'Die Tipps werden geladen …'}</div>`;
     const tabs = [['safe', 'Sicher'], ['rec', 'Empfohlen'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
@@ -1029,7 +1052,7 @@
     const auto = betsAll().filter((b) => b.auto);
     const s = betStats();
     const nOpen = auto.filter((b) => b.status === 'open').length;
-    return `<h1 class="ptitle">Verlauf</h1><p class="psub">Deine Wetten aus den Top-Tipps und deine Prognosen – nur auf diesem Handy gespeichert.</p>
+    return `${aura('hist')}<h1 class="ptitle">Verlauf</h1><p class="psub">Deine Wetten aus den Top-Tipps und deine Prognosen – nur auf diesem Handy gespeichert.</p>
       <a class="card accrow" href="#/acc">${s.n ? ring(s.won / s.n) : `<span class="round">${I.target}</span>`}<span class="grow"><b>Erfolgsquote</b><span>${s.n ? `${s.won} von ${s.n} Wetten gewonnen · ${signed(s.pl)}` : nOpen ? `${nOpen} ${nOpen === 1 ? 'Wette wartet' : 'Wetten warten'} auf den Abpfiff` : 'Noch keine Wette ausgewertet'}</span></span><span class="chev">›</span></a>
       <section class="sec"><div class="sec-h"><h2>Deine Wetten</h2><span class="note">aus den Top-Tipps</span></div>
         ${auto.length ? histBets(auto) : '<div class="empty">Noch keine gespeichert. Tipp in den Top-Tipps bei einer Wette auf „Wette speichern“ – Result AI prüft sie nach dem Abpfiff selbst.</div>'}</section>
@@ -1109,7 +1132,7 @@
     return h || '<p class="kd-p">Keine Einzelheiten (älterer Lauf oder nichts Neues).</p>';
   }
   function vKI() {
-    const head = '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was die automatischen Rechner hinzufügen – jeder Lauf wird hier protokolliert.</p>';
+    const head = aura('ki') + '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was die automatischen Rechner hinzufügen – jeder Lauf wird hier protokolliert.</p>';
     const d = A.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${A.err ? 'Das Protokoll konnte gerade nicht geladen werden.' : 'Das Protokoll wird geladen …'}</div>`;
     const runs = (d.runs || []).slice().reverse();
@@ -1222,10 +1245,12 @@
     const g = T.data.games[t.g];
     const h = tipTeam(g.home);
     const a = tipTeam(g.away);
-    return `<a class="spot" href="#/r/t_${esc(g.id)}">
-      <div class="sp-top"><span class="eyebrow">Tipp des Tages</span><span class="sp-when">${esc(kickoff(g.t))}</span></div>
-      <div class="tc-main"><div class="tc-teams"><span class="tm">${crest(h, 30)}<span>${esc(h)}</span></span><span class="tm">${crest(a, 30)}<span>${esc(a)}</span></span></div>${ring(t.p)}</div>
-      <div class="sp-bet"><div class="grow"><span class="k">${esc(tipKind(t.m))} · ${esc(g.comp)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="sp-p"><span>Quote</span><b>${qTxt(t)}</b></div></div></a>`;
+    const hc = teamColor(h);
+    const ac = teamColor(a);
+    return `<a class="spot teamcard" href="#/r/t_${esc(g.id)}" style="background:${teamBg({ home: h, away: a })};--gl:${rgba(hc, 0.65)};--gr:${rgba(ac, 0.65)}">${wm(h, 'l')}${wm(a, 'r')}
+      <div class="sp-top"><span class="chip glass">${I.flame}Tipp des Tages</span><span class="sp-when">${esc(kickoff(g.t))}</span></div>
+      <div class="sp-mid"><div class="sp-side">${plate(h, 66)}<b>${esc(h)}</b></div><div class="sp-c"><span class="sp-comp">${esc(g.comp)}</span><span class="sp-vs">VS</span></div><div class="sp-side">${plate(a, 66)}<b>${esc(a)}</b></div></div>
+      <div class="sp-bet"><div class="grow"><span class="k">${tipKind(t.m)}</span><b>${esc(tipLabel(t.m, h, a))}</b></div><div class="sp-p"><b>${Math.round(t.p * 100)}<small>%</small></b><span>Quote ${qTxt(t)}</span></div></div></a>`;
   }
   // Startseite: die besten Tipps als wischbare Karten
   function tipCarousel() {
@@ -1237,7 +1262,7 @@
       const g = T.data.games[t.g];
       const h = tipTeam(g.home);
       const a = tipTeam(g.away);
-      return `<a class="tmc" href="#/r/t_${esc(g.id)}">
+      return `<a class="tmc" href="#/r/t_${esc(g.id)}" style="--hg:${rgba(teamColor(h), 0.12)};--ag:${rgba(teamColor(a), 0.12)};--hgd:${rgba(teamColor(h), 0.26)};--agd:${rgba(teamColor(a), 0.26)}">
         <div class="tmc-top"><span>${esc(g.comp)}</span><span>${esc(kickoff(g.t))}</span></div>
         <div class="tmc-teams"><span>${crest(h, 22)}${esc(h)}</span><span>${crest(a, 22)}${esc(a)}</span></div>
         <div class="tmc-bet">${esc(tipLabel(t.m, h, a))}</div>
@@ -1251,7 +1276,7 @@
     if (!h || !a || h.id === a.id) return '';
     const hn = reg(h);
     const an = reg(a);
-    const head = `<div class="mp-top"><span class="chip">${P.live ? `LIVE ${P.minute}'` : 'Vorschau'}</span><span class="chip">${esc(h.nat && a.nat ? 'Länderspiel' : h.lg && h.lg === a.lg && R.leagues[h.lg] ? R.leagues[h.lg].name : 'Ligen-Duell')}</span>${P.neutral ? '<span class="mp-n">neutraler Platz</span>' : ''}</div>`;
+    const head = `<div class="mp-top"><span class="chip glass">${P.live ? `LIVE ${P.minute}'` : 'Vorschau'}</span><span class="chip glass">${esc(h.nat && a.nat ? 'Länderspiel' : h.lg && h.lg === a.lg && R.leagues[h.lg] ? R.leagues[h.lg].name : 'Ligen-Duell')}</span>${P.neutral ? '<span class="mp-n">neutraler Platz</span>' : ''}</div>`;
     let probs = '';
     if (h.grp === a.grp) {
       const m = lamOf(h, a, P.neutral);
@@ -1260,8 +1285,8 @@
       const r = round100([an2.probs.home, an2.probs.draw, an2.probs.away]);
       probs = `<div class="mp-pr"><div><b>${r[0]} %</b><span>${esc(hn)}</span></div><div><b>${r[1]} %</b><span>Remis</span></div><div><b>${r[2]} %</b><span>${esc(an)}</span></div></div>`;
     } else probs = `<div class="mp-pr mp-x">${!!h.nat !== !!a.nat ? 'Nationalteam gegen Verein rechnet Result AI nicht.' : 'Ligen ohne gemeinsame Gegner, hier rechnet Result AI nicht.'}</div>`;
-    return `<div class="mp">${head}
-      <div class="mp-mid"><div class="sp-side">${plate(hn, 56)}<b>${esc(hn)}</b></div><div class="mp-sc">${P.live ? `${P.score[0]}:${P.score[1]}` : 'VS'}</div><div class="sp-side">${plate(an, 56)}<b>${esc(an)}</b></div></div>${probs}</div>`;
+    return `<div class="mp teamcard" style="background:${teamBg({ home: hn, away: an })};--gl:${rgba(teamColor(hn), 0.6)};--gr:${rgba(teamColor(an), 0.6)}">${wm(hn, 'l')}${wm(an, 'r')}${head}
+      <div class="mp-mid"><div class="sp-side">${plate(hn, 62)}<b>${esc(hn)}</b></div><div class="mp-sc">${P.live ? `${P.score[0]}:${P.score[1]}` : 'VS'}</div><div class="sp-side">${plate(an, 62)}<b>${esc(an)}</b></div></div>${probs}</div>`;
   }
   // Verlauf: nach Tagen gruppiert, jede Zeile mit der Prognose (Favorit in Vereinsfarbe)
   function histGrouped(hist) {
@@ -1293,7 +1318,7 @@
   function vAccuracy() {
     const s = betStats();
     const nOpen = betsAll().filter((b) => b.auto && b.status === 'open').length;
-    const head = `<h1 class="ptitle">Erfolgsquote</h1><p class="psub">Nur Wetten, die du aus den Top-Tipps gespeichert hast. Result AI prüft sie nach dem Abpfiff selbst mit dem offiziellen Endstand – von Hand lässt sich hier nichts ändern.</p>`;
+    const head = `${aura('hist')}<h1 class="ptitle">Erfolgsquote</h1><p class="psub">Nur Wetten, die du aus den Top-Tipps gespeichert hast. Result AI prüft sie nach dem Abpfiff selbst mit dem offiziellen Endstand – von Hand lässt sich hier nichts ändern.</p>`;
     const wait = nOpen ? `<p class="tl-note" style="margin-top:14px">${nOpen} ${nOpen === 1 ? 'Wette wartet' : 'Wetten warten'} noch auf den Abpfiff.</p>` : '';
     if (!s.n) return head + `<div class="empty" style="margin-top:18px">Noch keine Wette ausgewertet. Speichere in den Top-Tipps eine Wette – nach dem Abpfiff steht hier, ob sie aufgegangen ist.</div>${wait}`;
     const roi = s.stake ? s.pl / s.stake : 0;
@@ -1499,10 +1524,9 @@
     const lastY = ys[ys.length - 1];
     const xl = [`<text x="${PL}" y="${H - 5}">${esc(fmtDate(t0))}</text>`, `<text x="${W - PR}" y="${H - 5}" text-anchor="end">Heute</text>`];
     if (days >= 3) xl.push(`<text x="${(PL + W - PR) / 2}" y="${H - 5}" text-anchor="middle">${esc(fmtDate((t0 + t1) / 2))}</text>`);
-    return `<div class="lc" style="--c:var(--${up ? 'pos' : 'neg'})" role="img" aria-label="Verlauf ${esc(def.label)} von ${esc(fmtDate(t0))} bis heute: zuletzt ${esc(def.big)}. Alle Werte stehen im Kontoauszug.">
+    return `<div class="lc${fresh ? ' in' : ''}" role="img" aria-label="Verlauf ${esc(def.label)} von ${esc(fmtDate(t0))} bis heute: zuletzt ${esc(def.big)}. Alle Werte stehen im Kontoauszug.">
       <svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${ticks.map((v) => `<line class="g" x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${PL - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${esc(tickFmt(v, step))}</text>`).join('')}
-      <path class="a" d="${area}"/><path class="l" d="${d}"/><line class="x" x1="${lastX.toFixed(1)}" x2="${lastX.toFixed(1)}" y1="${PT}" y2="${H - PB}"/><circle class="d" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5"/>${xl.join('')}</svg>
-      ${fresh ? `<span class="lc-cover" style="left:${(PL / W * 100).toFixed(1)}%"></span>` : ''}</div>`;
+      <path class="a" d="${area}"/><path class="l" d="${d}"/><line class="x" x1="${lastX.toFixed(1)}" x2="${lastX.toFixed(1)}" y1="${PT}" y2="${H - PB}"/><circle class="d" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5"/>${xl.join('')}</svg></div>`;
   }
   // Gewinn/Verlust je Tag, Woche oder Monat (je nach Zeitraum)
   function bucketize(list, from) {
@@ -1606,7 +1630,8 @@
     const hasW = ws.balance != null;
     const mode = hasW ? B.mode : 'pl';
     const from = periodFrom();
-    const inPeriod = settledBets().filter((b) => b.status !== 'void' && b.done >= from);
+    const sinceStart = mode === 'bal' && lg.st && lg.st.t > from; // Guthaben neu eingetragen: Gewinn zählt erst ab da
+    const inPeriod = settledBets().filter((b) => b.status !== 'void' && b.done >= (sinceStart ? lg.st.t : from));
     const pl = inPeriod.reduce((a, b) => a + betPL(b), 0);
     const stake = inPeriod.reduce((a, b) => a + b.stake, 0);
     const allPl = plPts();
@@ -1615,7 +1640,7 @@
     const big = mode === 'bal' ? eur(ws.balance) : signed(allPl.length ? allPl[allPl.length - 1].v : 0);
     const up = pl >= 0;
     const dir = pl > 0.004 ? '▲ ' : pl < -0.004 ? '▼ ' : '';
-    const sub = `<span class="${plusMinus(pl)}">${dir}${esc(eur(Math.abs(pl)))}${stake ? ` (${pctSigned(pl / stake)})` : ''}</span> · ${esc(PERIOD_TXT[B.period])}`;
+    const sub = `<span class="${plusMinus(pl)}">${dir}${esc(eur(Math.abs(pl)))}${stake ? ` (${pctSigned(pl / stake)})` : ''}</span> · ${esc(sinceStart ? 'seit dem Eintragen' : PERIOD_TXT[B.period])}`;
     const def = { big, sub, label };
     CH.line = null;
     const top = hasW
@@ -1684,7 +1709,7 @@
     const hero = moneyHero(ws, lg);
     const body = B.tab === 'over' ? moneyOverview(lg)
       : `<div class="blist">${list.length ? list.map(betCard).join('') : `<div class="empty">${B.tab === 'done' ? 'Noch keine erledigten Wetten.' : 'Keine offenen Wetten. Speichere einen Top-Tipp, trag eine Wette ein oder scanne deinen Wettschein.'}</div>`}</div>`;
-    return `<h1 class="ptitle">Wetten</h1>${hero}
+    return `${aura('bets')}<h1 class="ptitle">Wetten</h1>${hero}
       <div class="bet-acts"><button class="bact" data-act="newbet">${I.pen}<span>Wette eintragen</span></button><label class="bact">${I.scan}<span>Wettschein scannen</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein-Screenshot wählen"></label></div>
       <div class="seg s3" style="--k:${k};margin-top:18px"><span class="ind"></span>${TABS_B.map(([v, l]) => `<button class="${B.tab === v ? 'on' : ''}" data-act="btab" data-val="${v}">${l}</button>`).join('')}</div>
       <div class="bbody">${body}</div>
@@ -1837,8 +1862,23 @@
       <div class="lab" style="margin-top:24px">EINZAHLUNG ODER AUSZAHLUNG</div>
       <input class="search" type="text" inputmode="decimal" data-act="wmove" placeholder="Betrag, z. B. 20" autocomplete="off">
       <div class="bf-2"><button class="btn soft" data-act="wsave" data-mode="in">Einzahlen</button><button class="btn soft" data-act="wsave" data-mode="out">Auszahlen</button></div>
-      <p class="bf-note">Ab jetzt rechnet Result AI selbst weiter: Jede neue Wette zieht den Einsatz ab, jeder Gewinn kommt dazu, eine stornierte Wette gibt den Einsatz zurück.</p></div>`;
+      <p class="bf-note">Ab jetzt rechnet Result AI selbst weiter: Jede neue Wette zieht den Einsatz ab, jeder Gewinn kommt dazu, eine stornierte Wette gibt den Einsatz zurück.</p>${ws.balance != null ? '<button class="bf-reset" data-act="wreset">Guthaben zurücksetzen</button>' : ''}</div>`;
     document.body.appendChild(sh);
+  }
+  // Guthaben von vorne: Betrag, Ein-/Auszahlungen und Guthaben-Kurve weg. Wetten, Gewinn/Verlust und Erfolgsquote bleiben.
+  function walletResetAsk() {
+    const p = $('.sheet .panel');
+    if (!p) return;
+    p.innerHTML = `<div class="grip" data-grip></div><h2>Guthaben zurücksetzen?</h2>
+      <p class="bf-note" style="font-size:15px">Dein Guthaben, deine Ein- und Auszahlungen und die Guthaben-Kurve werden gelöscht. Deine Wetten und die Erfolgsquote bleiben. Das lässt sich nicht rückgängig machen.</p>
+      <button class="btn danger" data-act="wresetgo">Ja, zurücksetzen</button><button class="btn soft" data-act="close" style="margin-top:8px">Abbrechen</button>`;
+  }
+  function walletReset() {
+    store.set('wallet', {});
+    closeSheet();
+    haptic();
+    toast('Guthaben zurückgesetzt');
+    refreshBets();
   }
   function saveWallet(mode) {
     const sh = $('.sheet');
@@ -2009,6 +2049,10 @@
   }
 
   // ------------------------------------------------------------------ Seiten-Stapel: neue Seite schiebt sich von rechts herein
+  document.body.insertAdjacentHTML('beforeend', '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>'
+    + '<linearGradient id="rg-safe" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34C759"/><stop offset="1" stop-color="#00B39B"/></linearGradient>'
+    + '<linearGradient id="rg-top" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFB020"/><stop offset="1" stop-color="#FF375F"/></linearGradient>'
+    + '<linearGradient id="rg-rec" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A84FF"/><stop offset="1" stop-color="#AF52DE"/></linearGradient></defs></svg>');
   const stackEl = document.createElement('div');
   stackEl.className = 'stack';
   document.body.appendChild(stackEl);
@@ -2528,6 +2572,8 @@
       else deleteBet(a.dataset.id);
     }
     else if (act === 'wallet') openWalletSheet();
+    else if (act === 'wreset') walletResetAsk();
+    else if (act === 'wresetgo') walletReset();
     else if (act === 'wsave') saveWallet(a.dataset.mode);
     else if (act === 'kick') kickNow();
     else if (act === 'ki') location.hash = '#/ki';

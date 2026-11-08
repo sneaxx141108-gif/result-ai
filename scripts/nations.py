@@ -40,6 +40,7 @@ COMPS = {
 SETTINGS = {'half_life': 1095.0, 'w_friendly': 1.0, 'tau': 1.5, 'spread': 1.25}
 
 # deutsche Namen (Schlüssel = ESPN-Name); was hier fehlt, bleibt englisch
+COLOR_FIX = {'Deutschland': '#111111', 'Georgien': '#DA291C', 'Kanada': '#D52B1E'}  # ESPN-Farbe passt nicht zum Land (Deutschland wäre türkis)
 DE = {
     'Germany': 'Deutschland', 'France': 'Frankreich', 'Spain': 'Spanien', 'England': 'England', 'Italy': 'Italien', 'Netherlands': 'Niederlande',
     'Portugal': 'Portugal', 'Belgium': 'Belgien', 'Croatia': 'Kroatien', 'Denmark': 'Dänemark', 'Switzerland': 'Schweiz', 'Austria': 'Österreich',
@@ -155,7 +156,7 @@ def build(get, pick_color, log=print):
             continue
         name = DE.get(x['name'], x['name'])
         teams.append({'id': tid, 'name': name, 'short': None, 'abbr': x['abbr'] or None, 'alias': sorted({x['name'], name}), 'lg': 'nat', 'nat': True,
-                      'att': round(r['att'][tid], 4), 'def': round(r['def'][tid], 4), 'logo': x['logo'], 'color': x['color'], 'n': round(x['n'], 1)})
+                      'att': round(r['att'][tid], 4), 'def': round(r['def'][tid], 4), 'logo': x['logo'], 'color': COLOR_FIX.get(name, x['color']), 'n': round(x['n'], 1)})
     teams.sort(key=lambda t: -(t['att'] + t['def']))
     return teams, {'mu': round(r['mu'], 4), 'h': round(r['h'], 4), 'halfLife': SETTINGS['half_life'], 'spread': SETTINGS['spread']}, len(games)
 
