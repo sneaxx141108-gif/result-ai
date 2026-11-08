@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import activity  # noqa: E402  (Protokoll für die KI-Zentrale)
 import forecast as fc  # noqa: E402
+import nations as nt  # noqa: E402  (Nationalteams: eigene Gruppe mit eigenem Tor-Niveau)
 
 # Einstellungen per Backtest bestimmt (04.11.2026, 38 Ligen, je 1.406 bzw. 2.246 Spiele aus den letzten 28/56 Tagen
 # vorhergesagt; scripts/backtest.py): Quoten zählen achtfach, wenig Zug zur Mitte, jüngere Spiele wichtiger,
@@ -105,6 +106,7 @@ def apart(a, b):
 # football-data-Ligen, für die ESPN keine Wappen hat: Wappen + Vereinsfarbe von FotMob (gleiche Vereine, nur Bild und Farbe)
 FM_CRESTS = {196: 'Polen', 51: 'Finnland', 126: 'Irland', 189: 'Rumänien'}
 QUICK = {'D1', 'E0', 'BRA'}
+NAT_GRP = 1000  # Gruppe der Nationalteams (Vereine: 0, 1, 2 …)
 
 # football-data-Kurznamen, die sich nicht von selbst den ESPN-Namen zuordnen lassen (aus der BVB-App)
 FD_ALIAS = {'Paris SG': 'Paris Saint-Germain', "Nott'm Forest": 'Nottingham Forest', 'Man United': 'Manchester United',
@@ -744,6 +746,18 @@ def main(quick=False):
         prev = json.load(open(OUT, encoding='utf-8'))
     except (OSError, ValueError):
         prev = {}
+    # Nationalteams: eigene Insel (Gruppe NAT_GRP), nie mit Vereinen vergleichbar. Klappt der Abruf nicht, bleiben die vom Vortag.
+    nat_model = prev.get('natModel')
+    club_ids = {t['id'] for t in teams}
+    try:
+        nat_teams, nat_model, n_nat = nt.build(get, pick_color, log)
+        log('Nationalteams: %d Länder aus %d Spielen' % (len(nat_teams), n_nat))
+    except Exception as e:  # noqa: BLE001
+        nat_teams = [t for t in prev.get('teams', []) if t.get('nat')]
+        log('Nationalteams nicht neu gerechnet (%s) – %d vom Vortag bleiben.' % (e, len(nat_teams)))
+    teams += [dict(t, grp=NAT_GRP) for t in nat_teams if t['id'] not in club_ids]
+    if nat_teams:
+        leagues.append({'id': 'nat', 'name': 'Nationalteams', 'country': 'Welt', 'src': 'nat', 'grp': NAT_GRP})
     pv = {t['id']: t for t in prev.get('teams', [])}
     since = datetime.fromisoformat(prev['updatedAt'].replace('Z', '+00:00')) if prev.get('updatedAt') else NOW - timedelta(days=1)
     new_games = sum(1 for _c, _l, _n, _co, gs, _s in data['loaded'] for g in gs if g['hg'] is not None and since < g['t'] <= NOW)
@@ -760,7 +774,7 @@ def main(quick=False):
 
     out = {'updatedAt': NOW.strftime('%Y-%m-%dT%H:%M:%SZ'), 'season': START,
            'model': {'mu': round(fit['mu'], 4), 'h': round(fit['h'], 4), 'rho': fc.DC_RHO, 'halfLife': fc.HALF_LIFE, 'spread': SPREAD},
-           'leagues': leagues, 'cups': cups, 'groups': len(order), 'teams': teams}
+           'natModel': nat_model, 'leagues': leagues, 'cups': cups, 'groups': len(order), 'teams': teams}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, separators=(',', ':'))

@@ -66,6 +66,7 @@ jobs:
       - name: Tipps rechnen (Sicher, Empfohlen, Top-Quote, Kombis, Bilanz)
         env:
           RA_VIA: ${{ github.event_name == 'schedule' && 'github' || inputs.via || 'hand' }}  # für die KI-Zentrale
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}  # Tipico-Quoten über The Odds API – legt Niklas selbst an (ohne Schlüssel: „k. A.“)
         run: python3 scripts/tips.py
       - name: Prüfen (bei Fehlern bleibt die alte Version online)
         run: |

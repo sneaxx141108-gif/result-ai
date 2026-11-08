@@ -14,12 +14,17 @@ ok(d.games && typeof d.games === 'object', `Spiele vorhanden (${Object.keys(d.ga
 ok(Array.isArray(d.top) && Array.isArray(d.safe) && Array.isArray(d.kombis), 'Listen Top, Sicher, Kombis vorhanden');
 
 const all = (d.top || []).concat(d.safe || [], d.rec || []);
-const bad = all.filter((t) => !d.games[t.g] || !CODES.includes(t.m) || !prob(t.p) || !(t.q >= 1.01 && t.q < 50) || (t.pm != null && !prob(t.pm)));
+// Quote = nur Tipico: null = „k. A.“ (noch kein Schlüssel oder Tipico bietet diese Wette nicht über die Schnittstelle an)
+const bad = all.filter((t) => !d.games[t.g] || !CODES.includes(t.m) || !prob(t.p) || !(t.q == null || (t.q >= 1.01 && t.q < 50)) || (t.q != null) !== !!t.real || (t.pm != null && !prob(t.pm)));
 ok(bad.length === 0, `jeder Tipp hat Spiel, Wett-Art, Chance und Quote${bad.length ? ' (' + bad.length + ' kaputt)' : ''}`);
-ok((d.safe || []).every((t) => t.p >= 0.7 && t.q >= 1.2), 'Sicher: Chance ab 70 %, Quote ab 1,20');
-ok((d.top || []).every((t) => t.p >= 0.5 && t.q >= 1.6), 'Top-Quote: Chance ab 50 %, Quote ab 1,60');
-// Empfohlen (seit 06.11.2026): echte Quote ab 1,50, Chance ab 55 %, Result AI höchstens 2 Punkte unter dem Buchmacher
-if (d.rec) ok(d.rec.every((t) => t.real && t.p >= 0.55 && t.q >= 1.5 && t.pm != null && t.pm >= t.p - 0.02 - 1e-9), `Empfohlen: ${d.rec.length} Tipps nach den Regeln`);
+ok((d.safe || []).every((t) => t.p >= 0.7 && (t.q == null || t.q >= 1.2)), 'Sicher: Chance ab 70 %, Quote ab 1,20');
+ok((d.top || []).every((t) => t.p >= 0.5 && (t.q == null || t.q >= 1.6)), 'Top-Quote: Chance ab 50 %, Quote ab 1,60');
+// Empfohlen (seit 06.11.2026): Quote ab 1,50, Chance ab 55 %, Result AI höchstens 2 Punkte unter dem Markt
+if (d.rec) ok(d.rec.every((t) => t.p >= 0.55 && (t.q == null || t.q >= 1.5) && t.pm != null && t.pm >= t.p - 0.02 - 1e-9), `Empfohlen: ${d.rec.length} Tipps nach den Regeln`);
+// Tipico: ohne Schlüssel keine einzige Quote; nirgends darf eine andere Quote als Tipico stehen
+ok(d.tipico && typeof d.tipico.connected === 'boolean', `Tipico-Status vorhanden (${d.tipico && d.tipico.connected ? 'verbunden' : 'nicht verbunden'})`);
+if (d.tipico && !d.tipico.connected) ok(all.every((t) => t.q == null) && Object.values(d.games || {}).every((g) => !Object.keys(g.odds || {}).length), 'ohne Tipico nirgends eine Quote');
+ok(Array.isArray(d.all) && d.all.every((x) => x.length === 11 && x[8] > 0 && x[9] > 0), `Liste aller Spiele für den Scan (${(d.all || []).length})`);
 const dupe = ['top', 'safe', 'rec'].filter((k) => new Set((d[k] || []).map((t) => t.g)).size !== (d[k] || []).length);
 ok(dupe.length === 0, 'je Liste höchstens ein Tipp pro Spiel');
 
@@ -30,9 +35,9 @@ ok(badG.length === 0, `Spiele vollständig (Teams, Anpfiff, Tor-Erwartung)${badG
 for (const k of d.kombis || []) {
   const legs = (k.legs || []).map((l) => all.find((t) => t.g === l.g && t.m === l.m));
   const p = legs.reduce((x, t) => x * (t ? t.p : NaN), 1);
-  const q = legs.reduce((x, t) => x * (t ? t.q : NaN), 1);
+  const q = legs.every((t) => t && t.q) ? legs.reduce((x, t) => x * t.q, 1) : null;
   ok(legs.length >= 2 && legs.every(Boolean) && new Set(legs.map((t) => t.g)).size === legs.length, `${k.name}: ${legs.length} Tipps aus verschiedenen Spielen`);
-  ok(Math.abs(p - k.p) < 0.002 && Math.abs(q - k.q) < 0.05, `${k.name}: Gesamtchance ${(100 * k.p).toFixed(1)} % und Quote ${k.q} stimmen`);
+  ok(Math.abs(p - k.p) < 0.002 && (q == null ? k.q == null : Math.abs(q - k.q) < 0.05), `${k.name}: Gesamtchance ${(100 * k.p).toFixed(1)} % und Quote ${k.q == null ? 'k. A.' : k.q} stimmen`);
 }
 
 const rec = d.record || {};

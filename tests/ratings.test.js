@@ -24,6 +24,15 @@ ok(dup.length === 0, `jede Team-ID nur einmal${dup.length ? ': ' + dup.slice(0, 
 const badCol = d.teams.filter((t) => t.color != null && !/^#[0-9A-F]{6}$/i.test(t.color));
 ok(badCol.length === 0, 'Vereinsfarben im Format #RRGGBB');
 
+// 2b) Nationalteams (seit 08.11.2026): eigene Gruppe, eigenes Tor-Niveau – fehlen sie (ESPN kurz weg), blockiert das nichts
+const nats = d.teams.filter((t) => t.nat);
+if (!nats.length) console.log('hinweis Nationalteams diesmal nicht geladen');
+else {
+  ok(nats.length >= 120 && d.natModel && fin(d.natModel.mu) && fin(d.natModel.h), `${nats.length} Länder mit eigenem Modell`);
+  ok(nats.every((t) => t.grp === 1000 && t.lg === 'nat') && !d.teams.some((t) => !t.nat && t.grp === 1000), 'Länder bilden eine eigene Gruppe');
+  for (const n of ['Deutschland', 'Spanien', 'Brasilien', 'Argentinien']) ok(nats.some((t) => t.name === n), `${n} vorhanden`);
+}
+
 // 3) Stichproben: bekannte Teams mit der richtigen ESPN-ID
 const byId = Object.fromEntries(d.teams.map((t) => [t.id, t]));
 for (const [id, name] of [['124', 'Dortmund'], ['132', 'Bayern'], ['359', 'Arsenal'], ['86', 'Real Madrid'], ['83', 'Barcelona'], ['371', 'West Ham']]) {

@@ -1,13 +1,13 @@
 {
   "name": "Result AI",
   "short_name": "Result AI",
-  "description": "Screenshot eines Fußballspiels rein – Gewinn-Wahrscheinlichkeiten und wahrscheinlichste Ergebnisse raus.",
+  "description": "Fußball-Prognosen, Top-Tipps, Wettschein-Scan und dein Wett-Tracker.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#FFFFFF",
+  "background_color": "#F2F2F7",
+  "theme_color": "#F2F2F7",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

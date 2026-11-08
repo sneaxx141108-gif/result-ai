@@ -110,7 +110,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   am Ende kurz berichten.
 - Unter Windows: größere Änderungen per kleinem Python-Skript statt Bash-Heredoc (Backslashes/Backticks gingen dort kaputt).
 
-## HIER WEITERMACHEN – Stand 06.11.2026, abends (am Laptop)
+## HIER WEITERMACHEN – Stand 08.11.2026, abends
 
 **So geht's am Laptop los:** Claude öffnen → Repository `result-ai` (Ordner klonen: `git clone
 https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browser **claude.ai/code** → GitHub verbinden →
@@ -120,6 +120,30 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
   hochgeladen). In einem sehr langen Ordnerpfad (z. B. dem Sitzungsordner der Claude-App) scheitert `git clone` mit
   „'$GIT_DIR' too big“ – dann einen kurzen Pfad nehmen.
 - Node.js ist auf dem Laptop nicht installiert (Tests laufen auf GitHub); lokal ansehen: `.claude/launch.json` (Python-Server, Port 8098).
+
+**Niklas' Checkliste vom 08.11.2026 – alle 9 Punkte eingebaut (App-Stand `ra-shell-v18`):**
+1. **Quoten nur von Tipico.** `scripts/tipico.py` holt sie über The Odds API (`tipico_de`, Region `eu`); GitHub-Secret `ODDS_API_KEY`
+   (Konto und Schlüssel macht Niklas selbst; Gratis-Plan 500 Credits im Monat, ob Tipico darin enthalten ist, ist **nicht bestätigt**).
+   Tipico selbst auslesen ist abgelehnt (Bot-Schutz, nicht umgehen). Quoten anderer Anbieter werden **nie angezeigt**, Unbekanntes
+   ist „k. A.“ (Doppelchance und Beide treffen liefert diese Schnittstelle nicht). Für die **Prozente** darf der Markt intern weiter
+   einfließen, das ist genauer. Bisher nur gegen das dokumentierte Format getestet (`tests/tipico.test.py`), noch nie live.
+2. **Ladebildschirm:** `#splash` steht direkt in `web/index.html` (Ring + Name, nur transform/opacity), Startbilder hell und dunkel in `web/icons/`.
+3. **Länder:** `scripts/nations.py` (ESPN, rund 4.500 Länderspiele, 218 Teams) mit eigenem `natModel` (Tor-Niveau, Heimvorteil, Halbwertszeit 3 Jahre),
+   in den Stärken `lg:'nat'`, `nat:true`, `grp:1000`. Backtest 1.200 Spiele (Sep. 2025 bis Okt. 2026, inkl. WM 2026): Log-Loss 0,8532, Favorit in 60 % richtig.
+4. **Geld-Tracker** (`#/bets`, ganz in `web/app.js`): Kurve Guthaben/Gewinn mit Zeitraum (Finger drauf zeigt Wert und Datum), Kennzahlen, Gewinn je Tag/Woche/Monat,
+   Aufschlüsselung nach Art/Wette/Quote, Höhepunkte, Kontoauszug. Alles nur auf dem Handy, `ra_wallet` hat jetzt `start` und `fixes`. Nie Beispieldaten ausliefern.
+5. **3. Liga Deutschland in den Tipps:** ohne Marktquoten (`MODEL_ONLY`), Spiele und Ergebnisse von FotMob (`fmg:…`, Ergebnisse in `tips.json` → `res`).
+6. **Bilanz:** eigene Abteilung auf dem Start plus Seite `#/bilanz`; Beispiel-Wetten sind raus.
+7. **Design-Runde 5:** Block am Ende von `web/app.css`. Weiße Karten mit Haarlinie, einfarbig, Farbe nur für Wappen, Daten und Gewinn/Verlust (immer mit Vorzeichen/Pfeil/Häkchen).
+8. **Genauigkeit** (112.610 Spiele, Test ab 01.07.2025): Marge per Power-Methode raus (`devig`), Tor-Erwartung aus der Remis-Quote, wenn keine Über/Unter-Quote da ist,
+   Korrektur nur für Beide treffen und „Team trifft“ (`CAL`). Sicher-Tipps vorher 73,3 % erwartet gegen 75,8 % echt, jetzt 74,5 gegen 75,3. Schlussquoten sind kaum zu schlagen,
+   der Gewinn ist klein und liegt bei den Favoriten. Änderungen nur nach neuem Backtest.
+9. **Wettschein-Scan** (`#/scan` → `#/slip`, Server `POST /bet`): `resolveTeam` ist absichtlich streng (lieber „k. A.“ als das falsche Team). Ohne Marktpreise wird nur innerhalb einer Liga gerechnet,
+   „Wert“ gibt es nur gegen Marktpreise. Sind alle Spiele erkannt, prüft die App die Wette selbst (`track:true`); Scans zählen nur fürs Guthaben, nicht für die Erfolgsquote.
+
+**Wichtig fürs Hochladen:** `pages.yml` testet die `web/data/tips.json` aus dem Repository, die der Bot nicht mehr committet. Ändert sich ihr Format, muss eine frische Datei mit (`python scripts/tips.py`, danach `tips_log.json` und `activity.json` wieder zurücksetzen).
+
+**Noch zu prüfen:** alles auf Niklas' iPhone, ein echter Wettschein (bisher nur mit nachgestellter Server-Antwort getestet), Tipico sobald der Schlüssel eingetragen ist.
 
 **Neu am 06.11.2026 abends (gebaut im Zweig `wett-tracker`, seit spätabends in `main` und online; siehe Abschnitt „Wetten,
 Empfohlen, Cloudflare-Server“):** Wett-Tracker mit

@@ -1,4 +1,5 @@
-"""Top-Tipps: kommende Spiele mit Buchmacher-Quoten (ESPN, Quoten von DraftKings) → Chance jeder Wette → beste Tipps + Kombis.
+"""Top-Tipps: kommende Spiele → Chance jeder Wette → beste Tipps + Kombis. Quoten-Anzeige nur von Tipico (scripts/tipico.py, ohne
+Schlüssel „k. A.“); die Marktdaten von ESPN fließen nur in die Chance ein und werden nie als Quote angezeigt.
 Ohne KI, nur Mathe (Tormodell aus forecast.py). Läuft mehrmals täglich (.github/workflows/tips.yml) → web/data/tips.json.
 
 Woher die Chance kommt (Backtest 05.11.2026, 1.398 + 2.229 echte Spiele mit Schlussquoten):
@@ -14,6 +15,7 @@ Bilanz: jeder angezeigte Tipp (Listen „Top“ und „Sicher“) wird mit Chanc
 import json
 import math
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -21,7 +23,9 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import activity  # noqa: E402  (Protokoll für die KI-Zentrale)
 import forecast as fc  # noqa: E402
+import nations as nt  # noqa: E402  (Wettbewerbe der Nationalteams)
 import ratings as rt  # noqa: E402  (get, ESPN, pick_color – gleiche Regeln wie der Stärken-Rechner)
+import tipico  # noqa: E402  (Quoten von Tipico über The Odds API)
 
 RATINGS = os.path.join(rt.ROOT, 'web', 'data', 'ratings.json')
 OUT = os.path.join(rt.ROOT, 'web', 'data', 'tips.json')
@@ -30,7 +34,11 @@ PUBLISHED = 'https://sneaxx141108-gif.github.io/result-ai/data/tips.json'  # die
 NOW = datetime.now(timezone.utc)
 DAYS = 21         # 3 Wochen voraus: so ist der nächste Spieltag von Champions/Europa/Conference League immer dabei (Niklas)
 KEEP_DAYS = 31    # so lange bleibt die Bilanz (die App zeigt die letzten 30 Tage)
-MARGIN = 0.06     # typische Buchmacher-Marge → geschätzte Quote, wo ESPN keine liefert (Doppelchance, Beide treffen …)
+MARGIN = 0.06     # typische Buchmacher-Marge → nur zum Einordnen, wo keine Quote bekannt ist (Doppelchance, Beide treffen …), wird nie angezeigt
+FM_LIGA3 = 208    # FotMob-Liga-ID der 3. Liga
+MODEL_ONLY = {'ger.3'}  # Ligen ohne Marktdaten: Chance aus den Team-Stärken von Result AI
+# Feinabgleich der aus Quoten gerechneten Tor-Wetten (Backtest 08.11.2026, 48.603 Spiele; in drei Test-Saisons immer besser), wie in engine.js
+CAL = {'BY': (0.0615, 0.923), 'HS': (-0.0119, 1.0616), 'AS': (0.0599, 1.0035)}
 MIN_Q = 1.12      # kleinere Quoten lohnen nicht (z. B. „Über 0,5 Tore“)
 SAFE = (0.70, 1.20)  # Liste „Sicher“: Chance ab 70 %, Quote ab 1,20
 TOP = (0.50, 1.60)   # Liste „Top-Quote“: Chance über 50 %, Quote ab 1,60
@@ -95,8 +103,14 @@ def real_odds(comp):
     return q
 
 
-def probs(m):
-    """Chance jeder Wette aus der Ergebnis-Matrix (Tormodell)."""
+def calibrate(code, p):
+    a, b = CAL[code]
+    x = a + b * math.log(p / (1 - p))
+    return 1 / (1 + math.exp(-x))
+
+
+def probs(m, market=False):
+    """Chance jeder Wette aus der Ergebnis-Matrix (Tormodell); market = aus Quoten gerechnet → Feinabgleich der Tor-Wetten."""
     n = len(m)
     w, d, l = fc.outcome_probs(m)
     p = {'H': w, 'D': d, 'A': l, 'HD': w + d, 'DA': d + l, 'HA': w + l}
@@ -107,6 +121,9 @@ def probs(m):
     p['HS'] = 1 - sum(m[0])                 # Heim trifft mindestens einmal
     p['AS'] = 1 - sum(row[0] for row in m)  # Gast trifft mindestens einmal
     p['BY'] = sum(m[x][y] for x in range(1, n) for y in range(1, n))
+    if market:
+        for c in ('BY', 'HS', 'AS'):
+            p[c] = calibrate(c, p[c])
     p['BN'] = 1 - p['BY']
     return p
 
@@ -164,18 +181,77 @@ def team_of(c):
 
 def kombi(pool, min_p, max_legs):
     """Kombi aus verschiedenen Spielen: der Reihe nach dazunehmen, solange die Gesamtchance über min_p bleibt."""
-    legs, p, q = [], 1.0, 1.0
+    legs, p = [], 1.0
     for c in pool:
         if p * c['p'] < min_p:
             continue
         legs.append(c)
         p *= c['p']
-        q *= c['q']
         if len(legs) == max_legs:
             break
     if len(legs) < 2:
         return None
-    return {'legs': [{'g': c['g'], 'm': c['m']} for c in legs], 'p': round(p, 4), 'q': round(q, 2)}
+    q = None  # Gesamtquote nur, wenn jede Einzelquote von Tipico bekannt ist
+    if all(c['q'] for c in legs):
+        q = 1.0
+        for c in legs:
+            q *= c['q']
+        q = round(q, 2)
+    return {'legs': [{'g': c['g'], 'm': c['m']} for c in legs], 'p': round(p, 4), 'q': q}
+
+
+def odds_from(q):
+    """Tipico-Quoten -> Chancen ohne Marge fürs Tormodell (für Spiele, die ESPN nicht mit Quoten führt)."""
+    if not all(k in q for k in ('H', 'D', 'A')):
+        return None
+    ph, pd, pa = fc.devig([1 / q['H'], 1 / q['D'], 1 / q['A']])
+    od = {'ph': ph, 'pd': pd, 'pa': pa}
+    for line in (2.5, 1.5, 3.5):
+        k = '%d' % round(line * 10)
+        if 'O' + k in q and 'U' + k in q:
+            od.update(line=line, pover=fc.devig([1 / q['O' + k], 1 / q['U' + k]])[0])
+            break
+    return od
+
+
+def fotmob_games(rd, results):
+    """3. Liga (ESPN führt sie nicht): kommende Spiele und Ergebnisse von der normalen FotMob-Seite (erlaubt, wie in ratings.py).
+    Gerechnet wird mit den Team-Stärken von Result AI, sobald Tipico-Quoten da sind mit denen."""
+    by_id = {t['id']: t for t in rd['teams']}
+    by_name = {}
+    for t in rd['teams']:
+        if t.get('lg') in ('ger.1', 'ger.2', 'ger.3'):
+            for n in (t.get('alias') or []) + [t['name']]:
+                by_name.setdefault(rt.slug(n), t)
+    try:
+        pp = rt.fm_page(FM_LIGA3)
+    except Exception as e:  # noqa: BLE001  (FotMob kurz weg: die anderen Ligen laufen weiter)
+        log('  3. Liga (FotMob): %s' % e)
+        return []
+    out = []
+
+    def team(x):
+        r = by_id.get('fm:%s' % x.get('id')) or by_name.get(rt.slug(x['name']))
+        return {'id': r['id'] if r else 'fm:%s' % x.get('id'), 'name': (r or {}).get('name') or x['name'],
+                'short': x.get('shortName') if x.get('shortName') != x['name'] else None,
+                'logo': rt.FM_LOGO % x.get('id'), 'color': (r or {}).get('color')}
+    for m in ((pp.get('fixtures') or {}).get('allMatches') or []):
+        st = m.get('status') or {}
+        h, a = m.get('home') or {}, m.get('away') or {}
+        if not st.get('utcTime') or st.get('cancelled') or st.get('awarded') or not h.get('name') or not a.get('name'):
+            continue
+        gid = 'fmg:%s' % m.get('id')
+        if st.get('finished'):
+            sc = re.match(r'\s*(\d+)\s*-\s*(\d+)', st.get('scoreStr') or '')
+            if sc:
+                results[gid] = (int(sc.group(1)), int(sc.group(2)))
+            continue
+        t = when(st['utcTime'])
+        if st.get('started') or not t or not (NOW < t < NOW + timedelta(days=DAYS)):
+            continue
+        out.append({'id': gid, 'slug': 'ger.3', 'comp': '3. Liga', 't': t, 'date': t.strftime('%Y-%m-%dT%H:%MZ'), 'neutral': False,
+                    'home': team(h), 'away': team(a), 'od': None, 'sig': {}})
+    return out
 
 
 def main():
@@ -183,10 +259,13 @@ def main():
     rd = json.load(open(RATINGS, encoding='utf-8'))
     teams = {t['id']: t for t in rd['teams']}
     md = rd['model']
-    names = {L['id']: L['name'] for L in rd['leagues'] if L.get('src') != 'fotmob'}  # FotMob-Ligen hat ESPN nicht
+    nat_md = rd.get('natModel')  # Nationalteams haben ihr eigenes Tor-Niveau und ihren eigenen Heimvorteil
+    names = {L['id']: L['name'] for L in rd['leagues'] if L.get('src') not in ('fotmob', 'nat')}  # FotMob-Ligen hat ESPN nicht
     names.update(CUPS)
+    names.update({slug: v[0] for slug, v in nt.COMPS.items()})  # WM, EM, Nations League, Qualifikationen, Länderspiele
+    prev = last_search()  # für die KI-Zentrale und die zuletzt bekannten Tipico-Quoten
 
-    games, cands, results = {}, [], {}
+    raw, results = [], {}
     seen = set()
     for slug in list(names):
         for e in fetch(slug):
@@ -198,46 +277,63 @@ def main():
                 results[ev['id']] = (ev['hs'], ev['as'])
                 continue
             t = when(ev['date'])
-            if ev['state'] != 'pre' or not t or not (NOW < t < NOW + timedelta(days=DAYS)) or not ev['odds']:
+            if ev['state'] != 'pre' or not t or not (NOW < t < NOW + timedelta(days=DAYS)):
                 continue
             comp = (e.get('competitions') or [{}])[0]
             side = {c.get('homeAway'): c for c in comp.get('competitors') or []}
-            home, away = team_of(side['home']), team_of(side['away'])
-            # zweite Meinung: Result AI allein (nur wenn beide Teams bekannt und vergleichbar sind)
-            th, ta = teams.get(home['id']), teams.get(away['id'])
-            lm = None
-            # nur mit genug Liga-Spielen: Teams, die Result AI bloß aus ein paar Europapokal-Spielen kennt (n = 0, z. B.
-            # Ararat-Armenia), bekämen sonst absurde Werte (Torreense–Ararat: 5,8 erwartete Tore)
-            if th and ta and th['grp'] == ta['grp'] and th.get('n', 0) >= 5 and ta.get('n', 0) >= 5:
-                hv = 0.0 if ev['neutral'] else md['h']
-                lm = (math.exp(md['mu'] + hv + th['att'] - ta['def']), math.exp(md['mu'] + ta['att'] - th['def']))
-            od = ev['odds']
-            if not od.get('line'):
-                od = dict(od, total=(lm[0] + lm[1]) if lm else 2.7)  # ohne Über/Unter-Quote: Tore laut Result AI
+            raw.append({'id': ev['id'], 'slug': slug, 'comp': names[slug], 't': t, 'date': ev['date'], 'neutral': ev['neutral'],
+                        'home': team_of(side['home']), 'away': team_of(side['away']), 'od': ev['odds'], 'sig': real_odds(comp) if ev['odds'] else {}})
+    raw += fotmob_games(rd, results)
+    tq, tip_st = tipico.refresh(raw, prev, NOW, when, log)
+
+    games, compact, cands = {}, [], []
+    for r in raw:
+        gid = r['id']
+        # zweite Meinung: Result AI allein (nur wenn beide Teams bekannt und vergleichbar sind)
+        th, ta = teams.get(r['home']['id']), teams.get(r['away']['id'])
+        lm = None
+        # nur mit genug Liga-Spielen: Teams, die Result AI bloß aus ein paar Europapokal-Spielen kennt (n = 0, z. B.
+        # Ararat-Armenia), bekämen sonst absurde Werte (Torreense–Ararat: 5,8 erwartete Tore)
+        if th and ta and th['grp'] == ta['grp'] and th.get('n', 0) >= 5 and ta.get('n', 0) >= 5 and (not th.get('nat') or nat_md):
+            mx = nat_md if th.get('nat') else md
+            hv = 0.0 if r['neutral'] else mx['h']
+            lm = (math.exp(mx['mu'] + hv + th['att'] - ta['def']), math.exp(mx['mu'] + ta['att'] - th['def']))
+        tipq = (tq.get(gid) or {}).get('q') or {}
+        od = r['od'] or odds_from(tipq)
+        if od:  # Chance aus den Quoten des Marktes (genauer als jedes Modell) – angezeigt werden davon nur die Chancen
             lh, la = fc.market_lambdas(od, quick=True)
-            p = probs(fc.score_matrix(lh, la))
+            p = probs(fc.score_matrix(lh, la), market=True)
             pm = probs(fc.score_matrix(*lm)) if lm else None
-            q_real = real_odds(comp)
-            gid = ev['id']
-            games[gid] = {'id': gid, 'slug': slug, 'comp': names[slug], 't': ev['date'], 'neutral': ev['neutral'],
-                          'home': home, 'away': away, 'lh': round(lh, 3), 'la': round(la, 3),
-                          'mlh': round(lm[0], 3) if lm else None, 'mla': round(lm[1], 3) if lm else None,
-                          'odds': {k: round(v, 2) for k, v in q_real.items()}, 'line': od.get('line')}
-            for code in CODES:
-                pc = p[code]
-                real = code in q_real
-                q = q_real[code] if real else max(1.01, 1 / (pc * (1 + MARGIN)))
-                if pc < 0.40 or q < MIN_Q:
-                    continue
-                # Reihenfolge der Listen (angezeigt wird immer die Buchmacher-Chance p): „Sicher“ nimmt Result AI zu einem Viertel
-                # dazu – bei gleicher Buchmacher-Chance steht oben, wo Result AI noch sicherer ist. „Top-Quote“ rechnet mit der
-                # vorsichtigeren der beiden Chancen.
-                pmc = pm[code] if pm else None
-                cands.append({'g': gid, 'm': code, 'p': round(pc, 4), 'q': round(q, 2), 'real': real,
-                              'pm': round(pmc, 4) if pmc is not None else None,
-                              'sure': pc + max(-0.08, min(0.08, 0.25 * (pmc - pc))) if pmc is not None else pc - 0.03,
-                              'conf': min(pc, pmc) if pmc is not None else pc - 0.05})
-    log('%d kommende Spiele mit Quoten, %d mögliche Tipps, %d Ergebnisse (%.0f s)' % (len(games), len(cands), len(results), time.time() - t0))
+        elif r['slug'] in MODEL_ONLY and lm:  # z. B. 3. Liga: keine Quoten bekannt → Team-Stärken von Result AI
+            lh, la = lm
+            p = probs(fc.score_matrix(lh, la))
+            pm = None
+        else:
+            continue
+        line = next((x for x in (2.5, 1.5, 3.5) if 'O%d' % round(x * 10) in tipq and 'U%d' % round(x * 10) in tipq), None)
+        games[gid] = {'id': gid, 'slug': r['slug'], 'comp': r['comp'], 't': r['date'], 'neutral': r['neutral'],
+                      'home': r['home'], 'away': r['away'], 'lh': round(lh, 3), 'la': round(la, 3),
+                      'mlh': round(lm[0], 3) if lm else None, 'mla': round(lm[1], 3) if lm else None,
+                      'odds': tipq, 'line': line, 'at': (tq.get(gid) or {}).get('at')}
+        if not od:
+            games[gid]['mo'] = True  # nur Result AI, kein Markt
+        compact.append([gid, r['slug'], r['date'], r['comp'], r['home']['id'], r['away']['id'], r['home']['name'], r['away']['name'], round(lh, 3), round(la, 3), 0 if od else 1])
+        for code in CODES:
+            pc = p[code]
+            price = tipq.get(code)        # Tipico – das Einzige, was als Quote angezeigt wird
+            sig = r['sig'].get(code)      # andere Buchmacher: nur fürs Einordnen, wird nie angezeigt
+            rank = price or sig or max(1.01, 1 / (pc * (1 + MARGIN)))
+            if pc < 0.40 or rank < MIN_Q:
+                continue
+            # Reihenfolge der Listen (angezeigt wird immer die Markt-Chance p): „Sicher“ nimmt Result AI zu einem Viertel
+            # dazu – bei gleicher Chance steht oben, wo Result AI noch sicherer ist. „Top-Quote“ rechnet mit der vorsichtigeren
+            # der beiden Chancen.
+            pmc = pm[code] if pm else None
+            cands.append({'g': gid, 'm': code, 'p': round(pc, 4), 'q': round(price, 2) if price else None, 'qr': round(rank, 2), 'real': bool(price), 'known': bool(price or sig),
+                          'pm': round(pmc, 4) if pmc is not None else None,
+                          'sure': pc + max(-0.08, min(0.08, 0.25 * (pmc - pc))) if pmc is not None else pc - 0.03,
+                          'conf': min(pc, pmc) if pmc is not None else pc - 0.05})
+    log('%d kommende Spiele, %d mit Tipico-Quoten, %d mögliche Tipps, %d Ergebnisse (%.0f s)' % (len(games), len(tq), len(cands), len(results), time.time() - t0))
 
     # je Spiel höchstens ein Tipp pro Liste. „Sicher“: Chance ab 70 % bei Quote ab 1,20, gereiht nach der vorsichtigeren
     # Chance (echte Quote minimal bevorzugt). „Top-Quote“: Quote ab 1,60 bei über 50 % Chance, gereiht nach vorsichtiger
@@ -246,15 +342,15 @@ def main():
     def best(lo_p, lo_q, key, pool=None, n=90):
         out = {}
         for c in cands if pool is None else pool:
-            if c['p'] >= lo_p and c['q'] >= lo_q:
+            if c['p'] >= lo_p and c['qr'] >= lo_q:
                 k = key(c)
                 if c['g'] not in out or k > out[c['g']][0]:
                     out[c['g']] = (k, c)
         return [c for k, c in sorted(out.values(), key=lambda kc: (kc[0], kc[1]['p']), reverse=True)][:n]
-    safe = best(*SAFE, key=lambda c: (round(c['sure'], 3), c['real']))
-    top = best(*TOP, key=lambda c: (round(c['conf'] * c['q'], 3), c['real']))
-    rec = best(*REC, key=lambda c: round(c['conf'] * c['q'], 3), n=60,
-               pool=[c for c in cands if c['real'] and c['pm'] is not None and c['pm'] >= c['p'] - REC_GAP])
+    safe = best(*SAFE, key=lambda c: (round(c['sure'], 3), c['known']))
+    top = best(*TOP, key=lambda c: (round(c['conf'] * c['qr'], 3), c['known']))
+    rec = best(*REC, key=lambda c: round(c['conf'] * c['qr'], 3), n=60,
+               pool=[c for c in cands if c['known'] and c['pm'] is not None and c['pm'] >= c['p'] - REC_GAP])
     # Kombis bevorzugt aus Spielen der nächsten 36 Stunden (heute/morgen spielbar)
     soon = lambda lst: [c for c in lst if when(games[c['g']]['t']) < NOW + timedelta(hours=36)]  # noqa: E731
     kombis = [k for k in (dict(kombi(soon(safe), 0.45, 3) or kombi(safe, 0.45, 3) or {}, name='Sichere Kombi', kind='safe'),
@@ -304,7 +400,9 @@ def main():
             break
 
     used = {c['g'] for c in top + safe + rec}
-    out = {'updatedAt': NOW.strftime('%Y-%m-%dT%H:%M:%SZ'), 'source': 'ESPN · Quoten von DraftKings', 'days': DAYS,
+    out = {'updatedAt': NOW.strftime('%Y-%m-%dT%H:%M:%SZ'), 'source': 'ESPN und FotMob', 'days': DAYS,
+           'tipico': tip_st, 'tq': tq, 'all': compact,
+           'res': {g: list(v) for g, v in results.items() if g.startswith('fmg:')},  # Ergebnisse, die die App nicht selbst abfragen kann
            'games': {g: games[g] for g in sorted(used)},
            'top': [{k: c[k] for k in ('g', 'm', 'p', 'q', 'real', 'pm')} for c in top],
            'safe': [{k: c[k] for k in ('g', 'm', 'p', 'q', 'real', 'pm')} for c in safe],
@@ -313,7 +411,6 @@ def main():
            'record': {lst: {'7': record(7, lst), '30': record(30, lst)} for lst in ('top', 'safe', 'rec')},
            'recent': recent}
     # KI-Zentrale: was ist seit der letzten Suche neu, weggefallen, verschoben, ausgewertet?
-    prev = last_search()
     pg = (prev or {}).get('games') or {}
     prev_tips = {(t['g'], t['m'], lst): t for lst in ('top', 'safe', 'rec') for t in (prev or {}).get(lst, [])
                  if pg.get(t['g']) and when(pg[t['g']]['t']) and when(pg[t['g']]['t']) > NOW}
@@ -333,7 +430,7 @@ def main():
         c, g = cur_tips[k], games[k[0]]
         added.append({'g': k[0], 'm': k[1], 'list': k[2], 'p': c['p'], 'q': c['q'], 'real': c['real'], 'comp': g['comp'], 'kick': g['t'],
                       'h': g['home']['name'], 'a': g['away']['name'], 'hid': g['home']['id'], 'aid': g['away']['id']})
-    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'rec': len(rec), 'kombis': len(kombis),
+    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'rec': len(rec), 'kombis': len(kombis), 'tipico': len(tq) if tip_st.get('connected') else None,
                'checked': len(res_info), 'won': sum(1 for r in res_info if r['won']),
                'via': os.environ.get('RA_VIA') or None}  # wer die Suche gestartet hat: zeitgeber (Cloudflare), github, hand
     if prev:  # ohne Vergleich gibt es keine Zahlen (die App zeigt dann einfach keine)

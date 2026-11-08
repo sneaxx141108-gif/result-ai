@@ -156,7 +156,9 @@
       top: topScores(fin, 6),
       matrix: fin.slice(0, 7).map((row) => row.slice(0, 7)),
       over: lines.map((l) => ({ line: l, over: pOver(fin, l), under: 1 - pOver(fin, l) })),
-      btts: btts(fin),
+      btts: input.market && !live ? calibrate('BY', btts(fin)) : btts(fin),
+      hs: 1 - fin[0].reduce((s, v) => s + v, 0),
+      as: 1 - fin.reduce((s, row) => s + row[0], 0),
       next: {
         home: restRate > 0 ? (rh / restRate) * (1 - pNone) : 0,
         away: restRate > 0 ? (ra / restRate) * (1 - pNone) : 0,
@@ -173,6 +175,68 @@
     };
   }
 
+  /* Buchmacher-Marge rausrechnen (Potenz-Methode, wie devig in forecast.py): rs = 1/Quote je Ausgang -> Chancen mit Summe 1.
+     Backtest 08.11.2026 (112.610 Spiele): vor allem bei Favoriten genauer als gleichmäßiges Runterteilen. */
+  function devig(rs) {
+    let lo = 0.5;
+    let hi = 4;
+    for (let i = 0; i < 60; i++) {
+      const k = (lo + hi) / 2;
+      if (rs.reduce((a, r) => a + Math.pow(r, k), 0) > 1) lo = k; else hi = k;
+    }
+    const k = (lo + hi) / 2;
+    const out = rs.map((r) => Math.pow(r, k));
+    const s = out.reduce((a, b) => a + b, 0);
+    return out.map((x) => x / s);
+  }
+  // Erwartete Tore aus Sieg-minus-Niederlage-Chance und Remis-Chance (Newton-Verfahren, wie lambdas_from_draw in forecast.py)
+  function fromDraw(diff, pdraw) {
+    let lh = 1.5;
+    let la = 1.2;
+    const res = (a, b) => { const o = outcome(scoreMatrix(a, b)); return [o.home - o.away - diff, o.draw - pdraw]; };
+    for (let i = 0; i < 14; i++) {
+      const r = res(lh, la);
+      if (Math.abs(r[0]) + Math.abs(r[1]) < 2e-6) break;
+      const e = 1e-4;
+      const a = res(lh + e, la);
+      const b = res(lh, la + e);
+      const j00 = (a[0] - r[0]) / e;
+      const j01 = (b[0] - r[0]) / e;
+      const j10 = (a[1] - r[1]) / e;
+      const j11 = (b[1] - r[1]) / e;
+      const det = j00 * j11 - j01 * j10;
+      if (Math.abs(det) < 1e-9) break;
+      let dl = (j11 * r[0] - j01 * r[1]) / det;
+      let dm = (-j10 * r[0] + j00 * r[1]) / det;
+      const big = Math.max(Math.abs(dl), Math.abs(dm));
+      if (big > 0.6) { dl *= 0.6 / big; dm *= 0.6 / big; }
+      lh = Math.min(7, Math.max(0.05, lh - dl));
+      la = Math.min(7, Math.max(0.05, la - dm));
+    }
+    return [lh, la];
+  }
+  /* Feinabgleich der Tor-Wetten (Backtest 08.11.2026, 48.603 Spiele, in drei Test-Saisons immer besser): aus Quoten gerechnete Chancen
+     für „beide treffen“, „Heim trifft“ und „Gast trifft“ leicht nachjustieren. a/b gelernt an allen Jahren. */
+  const CAL = { BY: [0.0615, 0.923], HS: [-0.0119, 1.0616], AS: [0.0599, 1.0035] };
+  function calibrate(code, p) {
+    const c = CAL[code === 'BN' ? 'BY' : code];
+    if (!c || !(p > 0 && p < 1)) return p;
+    const q = code === 'BN' ? 1 - p : p;
+    const x = 1 / (1 + Math.exp(-(c[0] + c[1] * Math.log(q / (1 - q)))));
+    return code === 'BN' ? 1 - x : x;
+  }
+  // Chance einer Wette (Wett-Codes wie in tips.py) aus einer Analyse; market = aus Quoten gerechnet → Feinabgleich (btts ist dann schon abgeglichen)
+  function codeProb(a, code, market) {
+    const po = (l) => { const o = a.over.find((x) => x.line === l); return o ? o.over : null; };
+    const m = /^([OU])(\d)(\d)$/.exec(code);
+    if (m) { const v = po(+m[2] + +m[3] / 10); return v == null ? null : m[1] === 'O' ? v : 1 - v; }
+    if (code === 'BY') return a.btts;
+    if (code === 'BN') return 1 - a.btts;
+    const raw = { H: a.probs.home, D: a.probs.draw, A: a.probs.away, HD: a.double['1X'], DA: a.double.X2, HA: a.double['12'], HS: a.hs, AS: a.as }[code];
+    if (raw == null) return null;
+    return market ? calibrate(code, raw) : raw;
+  }
+
   /* Quoten -> Tor-Erwartung (wie market_lambdas der BVB-App).
      odds: { home, draw, away } (Dezimalquoten), optional line + over (z. B. 2.5 und Quote auf "über") */
   function fromOdds(odds) {
@@ -180,7 +244,8 @@
     const id = 1 / odds.draw;
     const ia = 1 / odds.away;
     const book = ih + id + ia;
-    const market = { home: ih / book, draw: id / book, away: ia / book, margin: book - 1 };
+    const fair = devig([ih, id, ia]);
+    const market = { home: fair[0], draw: fair[1], away: fair[2], margin: book - 1 };
     const target = market.home - market.away;
     const supFor = (total) => {
       let lo = -total + 0.02;
@@ -192,9 +257,14 @@
       }
       return (lo + hi) / 2;
     };
+    if (!(odds.line && odds.over && odds.under)) {
+      // keine Über/Unter-Quote: die Remis-Quote verrät, wie torreich das Spiel wird (genauer als pauschal 2,75 Tore)
+      const l = fromDraw(target, market.draw);
+      return { lh: l[0], la: l[1], market };
+    }
     let total = 2.75;
     if (odds.line && odds.over && odds.under) {
-      const po = (1 / odds.over) / (1 / odds.over + 1 / odds.under);
+      const po = devig([1 / odds.over, 1 / odds.under])[0];
       let lo = 0.6;
       let hi = 6.5;
       for (let i = 0; i < 30; i++) {
@@ -208,7 +278,7 @@
     return { lh: Math.max(0.05, (total + s) / 2), la: Math.max(0.05, (total - s) / 2), market };
   }
 
-  const api = { MAXG, analyze, fromOdds, scoreMatrix, outcome, poisVec, goalShareUntil };
+  const api = { MAXG, analyze, fromOdds, scoreMatrix, outcome, poisVec, goalShareUntil, devig, calibrate, codeProb };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.RE = api;
 })(typeof self !== 'undefined' ? self : this);
