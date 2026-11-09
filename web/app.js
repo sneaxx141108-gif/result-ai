@@ -61,6 +61,7 @@
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>',
     flame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c.6 3.2 5.5 5.6 5.5 10.6A5.5 5.5 0 0 1 12 19.1a5.5 5.5 0 0 1-5.5-5.5c0-2.6 1.4-4.3 2.6-5.4.2 1.9 1 3 2.1 3.4C11 8.6 10.6 5.6 12 3z"/></svg>',
     spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 2.5l1.7 5.1 5.1 1.7-5.1 1.7L10 16.1l-1.7-5.1-5.1-1.7 5.1-1.7z"/><path d="M18 13.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
     chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>',
     homeF: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.3 3.6a1 1 0 0 1 1.4 0l7.7 6.4c.4.3.6.8.6 1.3V19a1.5 1.5 0 0 1-1.5 1.5h-4v-5.2a1 1 0 0 0-1-1h-5a1 1 0 0 0-1 1v5.2h-4A1.5 1.5 0 0 1 3 19v-7.7c0-.5.2-1 .6-1.3z"/></svg>',
     flameF: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6c.7 3.4 5.9 5.9 5.9 11.1A5.9 5.9 0 0 1 12 19.6a5.9 5.9 0 0 1-5.9-5.9c0-2.8 1.5-4.6 2.8-5.8.2 2 1.1 3.2 2.2 3.6C10.9 8.4 10.5 5.2 12 2.6z"/></svg>',
@@ -1231,7 +1232,7 @@
       + fact('Pro Tag übrig', t.share != null ? `etwa ${Math.round(t.share)} Credits` : 'k. A.');
     const next = (t.next || []).length ? `<div class="tp-h">Als Nächstes dran</div>${t.next.map((x) => `<div class="tp-row"><b>${esc(x.comp)}</b><span>${esc(when(x.at))}</span></div>`).join('')}` : '';
     const log = (t.log || []).slice(-6).reverse();
-    const last = log.length ? `<div class="tp-h">Letzte Abrufe</div>${log.map((x) => `<div class="tp-row"><b>${esc(x.comp)}</b><span>${x.matched} ${x.matched === 1 ? 'Spiel' : 'Spiele'} · ${esc(when(x.t))}</span></div>`).join('')}` : '';
+    const last = log.length ? `<div class="tp-h">Letzte Abrufe</div>${log.map((x) => `<div class="tp-row"><b>${esc(x.comp)}</b><span>${x.offers === 0 ? 'noch keine Quoten bei Tipico' : `${x.matched} ${x.matched === 1 ? 'Spiel' : 'Spiele'}`} · ${esc(when(x.t))}</span></div>`).join('')}` : '';
     return `<section class="sec"><div class="sec-h"><h2>Tipico</h2><span class="note">Quoten über The Odds API</span></div><div class="card tp">
       <div class="tp-top"><div><b class="tp-n">${left != null ? left : 'k. A.'}</b><span class="tp-l">${limit ? `von ${limit} ` : ''}Credits übrig</span></div><span class="ks-st ${st}"><i></i>${txt}</span></div>${bar}
       ${t.err ? `<p class="tp-err">${esc(t.err)}</p>` : ''}<div class="tp-facts">${facts}</div>${rules}${next}${last}</div></section>`;
@@ -1376,12 +1377,13 @@
   // Wette: { id, at, src: tip|manual|scan, auto (nur Top-Tipps: zählt für die Erfolgsquote), track (Scan: Spiel erkannt, Result AI prüft mit), list, key, title, legs, q, p, stake,
   //          win (Auszahlung inkl. Einsatz), status: open|won|lost|void, done, bookie, teams }
   // Tipp der Wette (leg): { g (ESPN-Spiel), slug (ESPN-Liga), m (Wett-Code), home, away, comp, t (Anpfiff), pick, q, p, res }
-  const B = { tab: 'over', period: '30', mode: 'bal', split: 'cat', more: false, keys: new Set(), draft: null };
+  const B = { tab: 'over', period: '30', mode: 'bal', split: 'cat', more: false, keys: new Set(), draft: null, cal: null, calDay: null, anim: null, doneAll: false };
   const betsAll = () => { const x = store.get('bets', []); return Array.isArray(x) ? x : []; };
   const betsSave = (list) => store.set('bets', list.slice(0, 500));
   const savedKeys = () => new Set(betsAll().map((b) => b.key).filter(Boolean));
   const kombiKey = (k) => 'k|' + k.legs.map((l) => l.g + ':' + l.m).join(',');
   const payout = (b) => (b.status === 'won' ? b.win : b.status === 'void' ? b.stake : 0);
+  const cents = (v) => Math.round((v || 0) * 100); // Geld wird in ganzen Cent gerechnet, damit sich keine Rundungsfehler aufschaukeln
   const legTeams = (l) => (l.home && l.away ? `${l.home} – ${l.away}` : l.event || '');
   const betTitle = (b) => (b.legs.length > 1 ? `${b.title || 'Kombi'} · ${b.legs.length} Tipps` : (b.legs[0] && b.legs[0].pick) || b.title || 'Wette');
   const betSub = (b) => (b.legs.length > 1 ? b.legs.map((l) => l.pick).join(' · ')
@@ -1397,19 +1399,19 @@
     const w = store.get('wallet', {}) || {};
     const bets = betsAll();
     const at = w.at || 0;
-    let bal = typeof w.base === 'number' ? w.base : null;
+    let bal = typeof w.base === 'number' ? cents(w.base) : null;
     let open = 0;
     let openWin = 0;
     let pl = 0;
     bets.forEach((b) => {
-      if (b.status === 'open') { open += b.stake; openWin += b.win; } else pl += payout(b) - b.stake;
+      if (b.status === 'open') { open += cents(b.stake); openWin += cents(b.win); } else pl += cents(payout(b)) - cents(b.stake);
       if (bal != null) {
-        if (b.at > at) bal -= b.stake;
-        if (b.done && b.done > at) bal += payout(b);
+        if (b.at > at) bal -= cents(b.stake);
+        if (b.done && b.done > at) bal += cents(payout(b));
       }
     });
-    if (bal != null) (w.moves || []).forEach((m) => { if (m.t > at) bal += m.v; });
-    return { balance: bal, open, openWin, pl, n: bets.length, nOpen: bets.filter((b) => b.status === 'open').length };
+    if (bal != null) (w.moves || []).forEach((m) => { if (m.t > at) bal += cents(m.v); });
+    return { balance: bal == null ? null : bal / 100, open: open / 100, openWin: openWin / 100, pl: pl / 100, n: bets.length, nOpen: bets.filter((b) => b.status === 'open').length };
   }
   // Erfolgsquote: nur automatisch geprüfte Wetten (aus den Top-Tipps), nur gewonnen/verloren
   function betStats() {
@@ -1468,17 +1470,27 @@
       <div class="bc-money"><div><span>Einsatz</span><b>${eur(b.stake)}</b></div><div><span>Quote</span><b>${nf2.format(b.q)}</b></div><div><span>${third[0]}</span><b class="${third[2]}">${third[1]}</b></div></div>
       ${acts}<div class="bc-foot"><span>Gespeichert ${esc(agoText(b.at))}${b.bookie ? ' · ' + esc(b.bookie) : ''}</span>${canDelete(b) ? `<button class="bc-del" data-act="delbet" data-id="${b.id}">Löschen</button>` : ''}</div></article>`;
   }
-  // ------------------------------------------------------------------ Geld-Tracker (Niklas, 08.11.2026: „deutlich upgraden, mit Graphen, Design und allem Drum und Dran“)
-  // Alles wird aus den gespeicherten Wetten und Buchungen gerechnet. Der Zeitraum oben gilt für alles darunter.
-  const PERIOD_DAYS = { 7: 7, 30: 30, 90: 90 };
-  const PERIOD_TXT = { 7: 'letzte 7 Tage', 30: 'letzte 30 Tage', 90: 'letzte 3 Monate', all: 'seit Beginn' };
-  const PERIODS_M = [['7', '7 T'], ['30', '30 T'], ['90', '3 M'], ['all', 'Alles']];
+  // ------------------------------------------------------------------ Geld-Tracker (Niklas, 09.11.2026: „fettes Upgrade, kein Grün beim Geld, Graphen animiert, Kalender“)
+  // Alles wird aus den gespeicherten Wetten und Buchungen gerechnet. Geld wird in ganzen Cent addiert, damit sich keine Rundungsfehler aufschaukeln.
+  // Eine Wette zählt am Tag ihres letzten Anpfiffs: ausgewertet wird sie erst, wenn die App offen ist, und das kann Tage später sein.
+  const PERIOD_DAYS = { 7: 7, 30: 30, 90: 90, 365: 365 };
+  const PERIOD_TXT = { 7: 'letzte 7 Tage', 30: 'letzte 30 Tage', 90: 'letzte 3 Monate', 365: 'letzte 12 Monate', all: 'seit Beginn' };
+  const PERIODS_M = [['7', '7 T'], ['30', '30 T'], ['90', '3 M'], ['365', '1 J'], ['all', 'Alles']];
   const periodFrom = () => (B.period === 'all' ? -Infinity : Date.now() - PERIOD_DAYS[B.period] * 864e5);
   const fmtDate = (t) => new Date(t).toLocaleDateString('de-DE', { day: 'numeric', month: 'short' });
+  const dayShort = (t) => new Date(t).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
   const fmtWhen = (t) => `${fmtDate(t)}, ${hm(t)}`;
-  const betPL = (b) => payout(b) - b.stake;
-  const settledBets = () => betsAll().filter((b) => b.status !== 'open' && b.done).sort((x, y) => x.done - y.done);
+  const dayLong = (t) => { const dd = dayDiff(new Date(t).toISOString()); return dd === 0 ? 'Heute' : dd === -1 ? 'Gestern' : new Date(t).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }); };
+  const betCents = (b) => cents(payout(b)) - cents(b.stake);
+  const betPL = (b) => betCents(b) / 100;
+  const settleT = (b) => { const k = lastKick(b); return k && k < b.done ? k : b.done; };
+  const sumPL = (list) => list.reduce((a, b) => a + betCents(b), 0) / 100;
+  const sumStake = (list) => list.reduce((a, b) => a + cents(b.stake), 0) / 100;
+  const settledBets = () => betsAll().filter((b) => b.status !== 'open' && b.done).sort((x, y) => settleT(x) - settleT(y));
+  const betsFrom = (from) => settledBets().filter((b) => b.status !== 'void' && settleT(b) >= from);
   const plusMinus = (v) => (v > 0.004 ? 'up' : v < -0.004 ? 'down' : '');
+  const replay = (el, cls) => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+  const curPage = () => S.stack[S.stack.length - 1];
 
   // Kontoauszug: jede Bewegung mit dem Guthaben danach (Guthaben zählt ab dem Moment, in dem es eingetragen wurde)
   function ledger() {
@@ -1487,22 +1499,22 @@
     const ev = [];
     betsAll().forEach((b) => {
       const txt = betTitle(b);
-      ev.push({ t: b.at, v: -b.stake, k: 'stake', txt });
-      if (b.done && b.status !== 'open') ev.push({ t: b.done, v: payout(b), k: b.status, txt });
+      ev.push({ t: b.at, real: b.at, v: -b.stake, k: 'stake', txt });
+      if (b.done && b.status !== 'open') ev.push({ t: Math.max(b.at, settleT(b)), real: b.done, v: payout(b), k: b.status, txt });
     });
-    (w.moves || []).forEach((m) => ev.push({ t: m.t, v: m.v, k: m.v > 0 ? 'in' : 'out', txt: '' }));
-    (w.fixes || []).forEach((f) => ev.push({ t: f.t, v: f.v, k: 'fix', txt: '' }));
+    (w.moves || []).forEach((m) => ev.push({ t: m.t, real: m.t, v: m.v, k: m.v > 0 ? 'in' : 'out', txt: '' }));
+    (w.fixes || []).forEach((f) => ev.push({ t: f.t, real: f.t, v: f.v, k: 'fix', txt: '' }));
     ev.sort((x, y) => x.t - y.t);
-    let bal = st ? st.v : null;
-    ev.forEach((e) => { if (st && e.t > st.t) { bal += e.v; e.bal = bal; } });
+    let c = st ? cents(st.v) : null;
+    ev.forEach((e) => { if (st && e.real > st.t) { if (e.t <= st.t) e.t = st.t + 1; c += cents(e.v); e.bal = c / 100; } });
     return { ev, st };
   }
   const walletPts = (lg) => (lg.st ? [{ t: lg.st.t, v: lg.st.v }].concat(lg.ev.filter((e) => e.bal != null && e.v !== 0).map((e) => ({ t: e.t, v: e.bal }))) : []);
   function plPts() {
     const list = settledBets();
     if (!list.length) return [];
-    let v = 0;
-    return [{ t: list[0].done - 1, v: 0 }].concat(list.map((b) => { v += betPL(b); return { t: b.done, v }; }));
+    let c = 0;
+    return [{ t: settleT(list[0]) - 1, v: 0 }].concat(list.map((b) => { c += betCents(b); return { t: settleT(b), v: c / 100 }; }));
   }
   // Reihe auf den Zeitraum zuschneiden: Wert am Anfang, Bewegungen, Stand heute
   function slicePts(pts, from) {
@@ -1524,47 +1536,166 @@
     for (let v = Math.floor(lo / step + 1e-9) * step; v <= Math.ceil(hi / step - 1e-9) * step + step * 1e-6; v += step) out.push(+v.toFixed(6));
     return { ticks: out, step };
   }
-  const tickFmt = (v, step) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: step < 1 ? 2 : 0 }).format(v) + ' €';
+  const tickFmt = (v, step) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: step < 1 ? 2 : 0 }).format(v).replace('-', '−');
 
-  // Linie: Antippen und Ziehen zeigt oben in der großen Zahl den Wert an dieser Stelle
+  // Kurve: weiche Linie ohne Überschwingen, sie läuft exakt durch jeden echten Wert. Beim Umschalten zeichnet sie sich um, statt neu aufzutauchen.
   const CH = { line: null, bars: null };
-  function lineChart(pts, up, fmtV, def) {
-    const W = 358;
-    const H = 176;
-    const PL = 46;
-    const PR = 8;
-    const PT = 10;
-    const PB = 22;
+  const LC = { W: 358, H: 190, R: 52, PT: 12, PB: 26, N: 110 };
+  const lcRight = LC.W - LC.R;
+  const LCX = Array.from({ length: LC.N }, (_, i) => ((i / (LC.N - 1)) * lcRight).toFixed(1));
+  const f1 = (v) => v.toFixed(1);
+  function monoSlopes(xs, ys) {
+    const n = xs.length;
+    const h = [];
+    const d = [];
+    for (let i = 0; i < n - 1; i++) { h[i] = xs[i + 1] - xs[i]; d[i] = (ys[i + 1] - ys[i]) / h[i]; }
+    const m = new Array(n).fill(0);
+    m[0] = d[0];
+    m[n - 1] = d[n - 2];
+    for (let i = 1; i < n - 1; i++) {
+      if (d[i - 1] * d[i] <= 0) continue;
+      const w1 = 2 * h[i] + h[i - 1];
+      const w2 = h[i] + 2 * h[i - 1];
+      m[i] = (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]);
+    }
+    return m;
+  }
+  function sampleCurve(xs, ys, ms) {
+    const out = new Array(LC.N);
+    let j = 0;
+    for (let i = 0; i < LC.N; i++) {
+      const x = (i / (LC.N - 1)) * lcRight;
+      while (j < xs.length - 2 && x > xs[j + 1]) j++;
+      const h = xs[j + 1] - xs[j];
+      const t = Math.max(0, Math.min(1, (x - xs[j]) / h));
+      const t2 = t * t;
+      const t3 = t2 * t;
+      out[i] = (2 * t3 - 3 * t2 + 1) * ys[j] + (t3 - 2 * t2 + t) * h * ms[j] + (-2 * t3 + 3 * t2) * ys[j + 1] + (t3 - t2) * h * ms[j + 1];
+    }
+    return out;
+  }
+  const samplePath = (y) => { let s = ''; for (let i = 0; i < LC.N; i++) s += `${i ? 'L' : 'M'}${LCX[i]} ${y[i].toFixed(1)}`; return s; };
+  const sampleArea = (y, b) => `${samplePath(y)}L${lcRight} ${b.toFixed(1)}L0 ${b.toFixed(1)}Z`;
+  function lineModel(pts) {
+    const { W, H, R, PT, PB } = LC;
     const vs = pts.map((p) => p.v);
     const { ticks, step } = niceTicks(Math.min(...vs), Math.max(...vs));
     const lo = ticks[0];
     const hi = ticks[ticks.length - 1];
     const t0 = pts[0].t;
     const t1 = pts[pts.length - 1].t;
-    const X = (t) => PL + ((t - t0) / Math.max(1, t1 - t0)) * (W - PL - PR);
+    const X = (t) => ((t - t0) / Math.max(1, t1 - t0)) * lcRight;
     const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
-    const xs = pts.map((p) => X(p.t));
-    const ys = pts.map((p) => Y(p.v));
-    const d = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(' ');
-    const base = Y(Math.max(lo, Math.min(hi, 0))).toFixed(1);
-    const area = `${d} L${xs[xs.length - 1].toFixed(1)} ${base} L${xs[0].toFixed(1)} ${base} Z`;
-    CH.line = { W, xs, ys, pts, fmtV, def };
-    const sig = `${B.period}|${B.mode}|${pts.length}|${pts[pts.length - 1].v}`;
-    const fresh = sig !== CH.sig;
-    CH.sig = sig;
-    const days = (t1 - t0) / 864e5;
+    const xs = [];
+    pts.forEach((p, i) => xs.push(i ? Math.max(X(p.t), xs[i - 1] + 0.02) : X(p.t)));
+    const ys = vs.map(Y);
+    const ms = monoSlopes(xs, ys);
+    let d = `M${f1(xs[0])} ${f1(ys[0])}`;
+    for (let i = 0; i < xs.length - 1; i++) {
+      const h = (xs[i + 1] - xs[i]) / 3;
+      d += `C${f1(xs[i] + h)} ${f1(ys[i] + ms[i] * h)} ${f1(xs[i + 1] - h)} ${f1(ys[i + 1] - ms[i + 1] * h)} ${f1(xs[i + 1])} ${f1(ys[i + 1])}`;
+    }
+    const base = Y(Math.max(lo, Math.min(hi, 0)));
     const lastX = xs[xs.length - 1];
     const lastY = ys[ys.length - 1];
-    const xl = [`<text x="${PL}" y="${H - 5}">${esc(fmtDate(t0))}</text>`, `<text x="${W - PR}" y="${H - 5}" text-anchor="end">Heute</text>`];
-    if (days >= 3) xl.push(`<text x="${(PL + W - PR) / 2}" y="${H - 5}" text-anchor="middle">${esc(fmtDate((t0 + t1) / 2))}</text>`);
-    return `<div class="lc${fresh ? ' in' : ''}" role="img" aria-label="Verlauf ${esc(def.label)} von ${esc(fmtDate(t0))} bis heute: zuletzt ${esc(def.big)}. Alle Werte stehen im Kontoauszug.">
-      <svg viewBox="0 0 ${W} ${H}" aria-hidden="true">${ticks.map((v) => `<line class="g" x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${PL - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${esc(tickFmt(v, step))}</text>`).join('')}
-      <path class="a" d="${area}"/><path class="l" d="${d}"/><line class="x" x1="${lastX.toFixed(1)}" x2="${lastX.toFixed(1)}" y1="${PT}" y2="${H - PB}"/><circle class="d" cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="5"/>${xl.join('')}</svg></div>`;
+    const area = `${d}L${f1(lastX)} ${f1(base)}L${f1(xs[0])} ${f1(base)}Z`;
+    const grid = ticks.map((v) => `<line class="${v === 0 ? 'z' : 'g'}" x1="0" x2="${lcRight}" y1="${f1(Y(v))}" y2="${f1(Y(v))}"/><text x="${W - 16}" y="${f1(Y(v) + 4)}" text-anchor="end">${esc(tickFmt(v, step))}</text>`).join('');
+    const days = (t1 - t0) / 864e5;
+    let xl = `<text x="16" y="${H - 7}">${esc(fmtDate(t0))}</text><text x="${lcRight}" y="${H - 7}" text-anchor="end">Heute</text>`;
+    if (days >= 3) xl += `<text x="${lcRight / 2}" y="${H - 7}" text-anchor="middle">${esc(fmtDate((t0 + t1) / 2))}</text>`;
+    return { W, H, R, right: lcRight, xs, ys, pts, d, area, base, lastX, lastY, grid, xl, sy: sampleCurve(xs, ys, ms), t0 };
+  }
+  const lcAria = (h, m) => `Verlauf ${h.label} von ${fmtDate(m.t0)} bis heute: zuletzt ${h.big}. Alle Werte stehen im Kontoauszug.`;
+  let lcRaf = 0;
+  let lcEnd = null;
+  function lcStop() {
+    if (lcRaf) { cancelAnimationFrame(lcRaf); lcRaf = 0; }
+    if (lcEnd) { const f = lcEnd; lcEnd = null; f(); }
+  }
+  function lcPlace(root, x, y) {
+    $('.x', root).setAttribute('x1', f1(x));
+    $('.x', root).setAttribute('x2', f1(x));
+    [$('.d', root), $('.h', root)].forEach((c) => { c.setAttribute('cx', f1(x)); c.setAttribute('cy', f1(y)); });
+  }
+  // Von den alten y-Werten zu den neuen: wave = von links nach rechts aufbauen (erster Auftritt), sonst alle Punkte gleichzeitig
+  function lcMorph(root, from, base0, wave, frame, done) {
+    lcStop();
+    const c = CH.line;
+    if (!c || !root.isConnected) return;
+    const to = c.sy;
+    const N = LC.N;
+    const line = $('.l', root);
+    const area = $('.a', root);
+    const dur = wave ? 760 : 480;
+    let wd = 0;
+    const apply = () => {
+      clearTimeout(wd);
+      line.setAttribute('d', c.d);
+      $('.l2', root).setAttribute('d', c.d);
+      area.setAttribute('d', c.area);
+      lcPlace(root, c.lastX, c.lastY);
+      c.cur = c.sy;
+      c.curBase = c.base;
+      if (done) done();
+    };
+    if (reduce) { apply(); return; }
+    lcEnd = apply;
+    wd = setTimeout(lcStop, dur + 500); // Sicherung, falls das Handy gerade keine Bilder zeichnet
+    let t0 = 0;
+    const step = (now) => {
+      if (!t0) t0 = now;
+      const k = Math.min(1, (now - t0) / dur);
+      const y = new Array(N);
+      for (let i = 0; i < N; i++) {
+        const p = wave ? Math.max(0, Math.min(1, (k - (i / (N - 1)) * 0.42) / 0.58)) : k;
+        const e = 1 - Math.pow(1 - p, 4);
+        y[i] = from[i] + (to[i] - from[i]) * e;
+      }
+      const eb = 1 - Math.pow(1 - k, 4);
+      const b = base0 + (c.base - base0) * eb;
+      line.setAttribute('d', samplePath(y));
+      area.setAttribute('d', sampleArea(y, b));
+      lcPlace(root, c.lastX, y[N - 1]);
+      c.cur = y;
+      c.curBase = b;
+      if (frame) frame(eb);
+      if (k < 1) lcRaf = requestAnimationFrame(step);
+      else { lcRaf = 0; lcEnd = null; apply(); }
+    };
+    lcRaf = requestAnimationFrame(step);
+  }
+  function swapFade(g, html) {
+    const n = g.cloneNode(false);
+    n.innerHTML = html;
+    n.classList.add('fin');
+    g.classList.remove('fin');
+    g.classList.add('out');
+    g.parentNode.insertBefore(n, g.nextSibling);
+    setTimeout(() => g.remove(), 260);
+  }
+  function lineChart(h) {
+    lcStop();
+    const prev = CH.line;
+    const m = lineModel(h.pts);
+    const sig = `${B.period}|${h.mode}|${h.pts.length}|${h.pts[h.pts.length - 1].v}`;
+    let from = null;
+    let base0 = m.base;
+    let wave = false;
+    if (!reduce && B.anim === 'enter') { from = new Array(LC.N).fill(m.base); wave = true; }
+    else if (!reduce && prev && prev.sig !== sig && prev.cur) { from = prev.cur; base0 = prev.curBase; }
+    CH.line = Object.assign(m, { fmtV: h.fmtV, def: h, sig, cur: from || m.sy, curBase: base0 });
+    if (from) requestAnimationFrame(() => { const lc = $$('.lc').pop(); if (lc) lcMorph(lc, from, base0, wave); });
+    const y0 = from ? from[LC.N - 1] : m.lastY;
+    const dL = from ? samplePath(from) : m.d;
+    const dA = from ? sampleArea(from, base0) : m.area;
+    return `<div class="lc" role="img" aria-label="${esc(lcAria(h, m))}">
+      <svg viewBox="0 0 ${m.W} ${m.H}" aria-hidden="true"><defs><linearGradient id="lc-wash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><clipPath id="lc-cp"><rect x="0" y="0" width="${m.W}" height="${m.H}"/></clipPath></defs>
+      <g class="lc-g">${m.grid}</g><path class="a" fill="url(#lc-wash)" d="${dA}"/><path class="l2" d="${m.d}"/><path class="l" d="${dL}" clip-path="url(#lc-cp)"/><line class="x" x1="${f1(m.lastX)}" x2="${f1(m.lastX)}" y1="${LC.PT}" y2="${m.H - LC.PB}"/><circle class="h" cx="${f1(m.lastX)}" cy="${f1(y0)}" r="10"/><circle class="d" cx="${f1(m.lastX)}" cy="${f1(y0)}" r="4.5"/><g class="lc-xl">${m.xl}</g></svg></div>`;
   }
   // Gewinn/Verlust je Tag, Woche oder Monat (je nach Zeitraum)
   function bucketize(list, from) {
     const now = Date.now();
-    const start = Number.isFinite(from) ? from : (list.length ? list[0].done : now);
+    const start = Number.isFinite(from) ? from : (list.length ? settleT(list[0]) : now);
     const span = (now - start) / 864e5;
     const unit = span <= 14 ? 'day' : span <= 125 ? 'week' : 'month';
     const floor = (t) => {
@@ -1576,19 +1707,19 @@
     };
     const next = (d) => (unit === 'month' ? new Date(d.getFullYear(), d.getMonth() + 1, 1) : new Date(d.getFullYear(), d.getMonth(), d.getDate() + (unit === 'week' ? 7 : 1)));
     const out = [];
-    for (let d = floor(start); d.getTime() <= now; d = next(d)) out.push({ t0: d.getTime(), t1: next(d).getTime(), v: 0, n: 0 });
-    list.forEach((b) => { const x = out.find((k) => b.done >= k.t0 && b.done < k.t1); if (x) { x.v += betPL(b); x.n++; } });
-    return { unit, bk: out.slice(unit === 'month' ? -12 : unit === 'week' ? -14 : -14) };
+    for (let d = floor(start); d.getTime() <= now; d = next(d)) out.push({ t0: d.getTime(), t1: next(d).getTime(), c: 0, v: 0, n: 0 });
+    list.forEach((b) => { const t = settleT(b); const x = out.find((k) => t >= k.t0 && t < k.t1); if (x) { x.c += betCents(b); x.v = x.c / 100; x.n++; } });
+    return { unit, bk: out.slice(unit === 'month' ? -12 : -14) };
   }
   const bucketLong = (k, unit) => (unit === 'day' ? new Date(k.t0).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })
     : unit === 'week' ? `Woche ab ${fmtDate(k.t0)}` : new Date(k.t0).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }));
   const bucketShort = (k, unit) => { const d = new Date(k.t0); return unit === 'month' ? d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '') : `${d.getDate()}.${d.getMonth() + 1}.`; };
   const bucketRead = (k, unit) => `${bucketLong(k, unit)} · ${k.n ? `${signed(k.v)} · ${k.n} ${k.n === 1 ? 'Wette' : 'Wetten'}` : 'keine Wette ausgewertet'}`;
   function barChart(bk, unit) {
-    const W = 358;
+    const W = 322;
     const H = 150;
-    const PL = 46;
-    const PR = 8;
+    const PL = 40;
+    const PR = 2;
     const PT = 18;
     const PB = 22;
     const vs = bk.map((b) => b.v);
@@ -1613,13 +1744,13 @@
         const r = Math.min(4, h, bw / 2);
         const s1 = up ? 1 : 0;
         const dy = up ? r : -r;
-        path = `<path class="${up ? 'pos' : 'neg'}" d="M${x.toFixed(1)} ${y0.toFixed(1)} L${x.toFixed(1)} ${(yv + dy).toFixed(1)} A${r} ${r} 0 0 ${s1} ${(x + r).toFixed(1)} ${yv.toFixed(1)} L${(x + bw - r).toFixed(1)} ${yv.toFixed(1)} A${r} ${r} 0 0 ${s1} ${(x + bw).toFixed(1)} ${(yv + dy).toFixed(1)} L${(x + bw).toFixed(1)} ${y0.toFixed(1)} Z"/>`;
+        path = `<path class="${up ? 'pos' : 'neg'}" style="--i:${i}" d="M${f1(x)} ${f1(y0)} L${f1(x)} ${f1(yv + dy)} A${r} ${r} 0 0 ${s1} ${f1(x + r)} ${f1(yv)} L${f1(x + bw - r)} ${f1(yv)} A${r} ${r} 0 0 ${s1} ${f1(x + bw)} ${f1(yv + dy)} L${f1(x + bw)} ${f1(y0)} Z"/>`;
       }
-      const lab = k.n && (k.v === mx || k.v === mn) && h >= 0.5 ? `<text class="v" x="${(x + bw / 2).toFixed(1)}" y="${(up ? yv - 5 : yv + 13).toFixed(1)}" text-anchor="middle">${esc((k.v > 0 ? '+' : '−') + Math.round(Math.abs(k.v)))}</text>` : '';
-      const xl = (bk.length - 1 - i) % every === 0 ? `<text x="${(x + bw / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle">${esc(bucketShort(k, unit))}</text>` : '';
-      return `<g class="bm">${path}${lab}${xl}<rect class="hit" data-act="barpick" data-i="${i}" x="${(PL + slot * i).toFixed(1)}" y="0" width="${slot.toFixed(1)}" height="${H}"/></g>`;
+      const lab = k.n && (k.v === mx || k.v === mn) && h >= 0.5 ? `<text class="v" x="${f1(x + bw / 2)}" y="${f1(up ? yv - 5 : yv + 13)}" text-anchor="middle">${esc((k.v > 0 ? '+' : '−') + Math.round(Math.abs(k.v)))}</text>` : '';
+      const xl = (bk.length - 1 - i) % every === 0 ? `<text x="${f1(x + bw / 2)}" y="${H - 5}" text-anchor="middle">${esc(bucketShort(k, unit))}</text>` : '';
+      return `<g class="bm">${path}${lab}${xl}<rect class="hit" data-act="barpick" data-i="${i}" x="${f1(PL + slot * i)}" y="0" width="${f1(slot)}" height="${H}"/></g>`;
     }).join('');
-    return `<svg class="bc" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gewinn und Verlust je Zeitabschnitt">${ticks.map((v) => `<line class="${v === 0 ? 'z' : 'g'}" x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${PL - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${esc(tickFmt(v, step))}</text>`).join('')}${marks}</svg>`;
+    return `<svg class="bc${B.anim ? ' in' : ''}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gewinn und Verlust je Zeitabschnitt">${ticks.map((v) => `<line class="${v === 0 ? 'z' : 'g'}" x1="${PL}" x2="${W - PR}" y1="${f1(Y(v))}" y2="${f1(Y(v))}"/><text x="${PL - 6}" y="${f1(Y(v) + 4)}" text-anchor="end">${esc(tickFmt(v, step))}</text>`).join('')}${marks}</svg>`;
   }
   const CAT_NAMES = { safe: 'Sicher', rec: 'Empfohlen', top: 'Top-Quote', kombi: 'Kombi', manual: 'Selbst eingetragen', scan: 'Gescannt' };
   const catOf = (b) => CAT_NAMES[b.auto ? b.list || 'safe' : b.src === 'scan' ? 'scan' : 'manual'];
@@ -1630,25 +1761,39 @@
     return c ? tipKind(c) : 'Sonstige';
   }
   const bandOf = (b) => (b.q < 1.5 ? 'unter 1,50' : b.q < 2 ? '1,50 bis 1,99' : b.q < 3 ? '2,00 bis 2,99' : 'ab 3,00');
-  function splitRows(list) {
-    const key = { cat: catOf, mkt: marketOf, odds: bandOf }[B.split];
+  function leagueOf(b) {
+    const set = new Set(b.legs.map((l) => l.comp).filter(Boolean));
+    return set.size === 1 ? [...set][0] : set.size ? 'Mehrere Ligen' : 'Ohne Liga';
+  }
+  const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  const weekdayOf = (b) => WEEKDAYS[new Date(settleT(b)).getDay()];
+  const SPLITS = [['cat', 'Art', catOf], ['mkt', 'Wette', marketOf], ['odds', 'Quote', bandOf], ['lg', 'Liga', leagueOf], ['wd', 'Tag', weekdayOf]];
+  function groupBets(list, key) {
     const m = new Map();
     list.forEach((b) => {
       const k = key(b);
-      const x = m.get(k) || { k, n: 0, won: 0, pl: 0 };
+      const x = m.get(k) || { k, n: 0, won: 0, c: 0, st: 0 };
       x.n++;
       x.won += b.status === 'won' ? 1 : 0;
-      x.pl += betPL(b);
+      x.c += betCents(b);
+      x.st += cents(b.stake);
       m.set(k, x);
     });
-    const rows = [...m.values()].sort((a, b) => b.pl - a.pl);
-    const mx = Math.max(1e-9, ...rows.map((r) => Math.abs(r.pl)));
-    return rows.map((r) => `<div class="sr-row"><div class="sr-t"><b>${esc(r.k)}</b><span>${r.won} von ${r.n} gewonnen</span></div><b class="sr-v ${plusMinus(r.pl)}">${signed(r.pl)}</b><div class="sr-bar"><i class="${r.pl < 0 ? 'neg' : 'pos'}" style="transform:scaleX(${(Math.abs(r.pl) / mx).toFixed(3)})"></i></div></div>`).join('');
+    return [...m.values()];
   }
-  function betLine(b, label) {
+  function splitRows(list) {
+    const rows = groupBets(list, SPLITS.find((s) => s[0] === B.split)[2]).sort((a, b) => b.c - a.c);
+    const mx = Math.max(1, ...rows.map((r) => Math.abs(r.c)));
+    return rows.slice(0, 12).map((r, i) => `<div class="sr-row"><div class="sr-t"><b>${esc(r.k)}</b><span>${r.won} von ${r.n} gewonnen${r.st ? ` · ${pctSigned(r.c / r.st)}` : ''}</span></div><b class="sr-v ${plusMinus(r.c / 100)}">${signed(r.c / 100)}</b><div class="sr-bar"><i class="${r.c < 0 ? 'neg' : 'pos'}" style="--i:${i};transform:scaleX(${(Math.abs(r.c) / mx).toFixed(3)})"></i></div></div>`).join('');
+  }
+  function betLine(b, label, noDate) {
     regTeams(b);
     const pl = betPL(b);
-    return `<div class="rec-it ${b.status}"><span class="mk">${b.status === 'won' ? '✓' : '✗'}</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc(label)} · ${esc(fmtDate(b.done))} · Quote ${nf2.format(b.q)}</span></span><span class="rp2 ${plusMinus(pl)}">${signed(pl)}</span></div>`;
+    return `<div class="rec-it ${b.status}"><span class="mk">${{ won: '✓', lost: '✗', void: '–' }[b.status]}</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc([label, noDate ? '' : fmtDate(settleT(b)), `Quote ${nf2.format(b.q)}`].filter(Boolean).join(' · '))}</span></span><span class="rp2 ${plusMinus(pl)}">${b.status === 'void' ? 'zurück' : signed(pl)}</span></div>`;
+  }
+  function openLine(b) {
+    regTeams(b);
+    return `<div class="rec-it open"><span class="mk">…</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc(`Offen · ${liveText(b)}`)}</span></span><span class="rp2">${eur(b.stake)}</span></div>`;
   }
   function ledgerHtml(lg) {
     const from = periodFrom();
@@ -1656,45 +1801,115 @@
     if (!rows.length) return '';
     const NAMES = { stake: 'Einsatz', won: 'Gewinn ausgezahlt', void: 'Einsatz zurück', in: 'Einzahlung', out: 'Auszahlung', fix: 'Korrektur' };
     const shown = B.more ? rows.slice(0, 200) : rows.slice(0, 6);
-    return `<section class="sec"><div class="sec-h"><h2>Kontoauszug</h2><span class="note">${esc(PERIOD_TXT[B.period])}</span></div><div class="group">${shown.map((e) => `<div class="row lgr"><span class="grow"><div class="t">${NAMES[e.k]}</div><div class="s">${esc([fmtWhen(e.t), e.txt].filter(Boolean).join(' · '))}</div></span><span class="lgv"><b class="${e.v > 0 ? 'up' : ''}">${signed(e.v)}</b>${e.bal != null ? `<span>${eur(e.bal)}</span>` : ''}</span></div>`).join('')}</div>${rows.length > 6 ? `<button class="more" data-act="lgmore">${B.more ? 'Weniger anzeigen' : `Alle ${rows.length} anzeigen`}</button>` : ''}</section>`;
+    return `<section class="sec"><div class="sec-h"><h2>Kontoauszug</h2><span class="note">${esc(PERIOD_TXT[B.period])}</span></div><div class="group">${shown.map((e) => `<div class="row lgr"><span class="grow"><div class="t">${NAMES[e.k]}</div><div class="s">${esc([e.k === 'won' || e.k === 'void' ? fmtDate(e.t) : fmtWhen(e.t), e.txt].filter(Boolean).join(' · '))}</div></span><span class="lgv"><b class="${e.v > 0 ? 'up' : ''}">${signed(e.v)}</b>${e.bal != null ? `<span>${eur(e.bal)}</span>` : ''}</span></div>`).join('')}</div>${rows.length > 6 ? `<button class="more" data-act="lgmore">${B.more ? 'Weniger anzeigen' : `Alle ${rows.length} anzeigen`}</button>` : ''}</section>`;
   }
-  // Große Karte oben: Guthaben oder Gewinn, Kurve, Zeitraum
-  function moneyHero(ws, lg) {
+  // Farbe der großen Karte (Niklas sucht sie im Blatt „Guthaben“ aus)
+  const LOOKS = [['uv', 'Ultraviolett'], ['fire', 'Inferno'], ['gold', 'Gold'], ['ice', 'Ozean']];
+  const looksHtml = () => { const cur = store.get('mlook', 'uv'); return `<div class="lab" style="margin-top:24px">FARBE DER KARTE</div><div class="looks">${LOOKS.map(([v, l]) => `<button class="lk${cur === v ? ' on' : ''}" data-act="mlook" data-val="${v}"><i class="lk-${v}"></i><span>${l}</span></button>`).join('')}</div>`; };
+  // Große Karte: Guthaben oder Gewinn im gewählten Zeitraum
+  function heroData(ws, lg) {
     const hasW = ws.balance != null;
     const mode = hasW ? B.mode : 'pl';
     const from = periodFrom();
     const sinceStart = mode === 'bal' && lg.st && lg.st.t > from; // Guthaben neu eingetragen: Gewinn zählt erst ab da
-    const inPeriod = settledBets().filter((b) => b.status !== 'void' && b.done >= (sinceStart ? lg.st.t : from));
-    const pl = inPeriod.reduce((a, b) => a + betPL(b), 0);
-    const stake = inPeriod.reduce((a, b) => a + b.stake, 0);
-    const allPl = plPts();
-    const pts = slicePts(mode === 'bal' ? walletPts(lg) : allPl, from);
-    const label = mode === 'bal' ? 'Guthaben' : 'Gewinn/Verlust';
-    const big = mode === 'bal' ? eur(ws.balance) : signed(allPl.length ? allPl[allPl.length - 1].v : 0);
-    const up = pl >= 0;
-    const dir = pl > 0.004 ? '▲ ' : pl < -0.004 ? '▼ ' : '';
-    const sub = `<span class="${plusMinus(pl)}">${dir}${esc(eur(Math.abs(pl)))}${stake ? ` (${pctSigned(pl / stake)})` : ''}</span> · ${esc(sinceStart ? 'seit dem Eintragen' : PERIOD_TXT[B.period])}`;
-    const def = { big, sub, label };
-    CH.line = null;
-    const top = hasW
-      ? `<div class="mseg"><button class="${mode === 'bal' ? 'on' : ''}" data-act="mmode" data-val="bal">Guthaben</button><button class="${mode === 'pl' ? 'on' : ''}" data-act="mmode" data-val="pl">Gewinn</button></div><button class="link" data-act="wallet">Ändern</button>`
-      : '<span class="eyebrow">Gewinn/Verlust</span><button class="link" data-act="wallet">Guthaben eintragen</button>';
-    if (!hasW && !ws.n) {
-      return `<section class="mh"><div class="mh-top"><span class="eyebrow">Dein Geld</span></div><p class="mh-empty">Trag dein Guthaben ein, dann siehst du hier deine Kurve, deinen Gewinn und wie gut deine Wetten laufen.</p><button class="btn" data-act="wallet">Guthaben eintragen</button></section>`;
+    const list = betsFrom(sinceStart ? lg.st.t : from);
+    const pl = sumPL(list);
+    const stake = sumStake(list);
+    const won = list.filter((b) => b.status === 'won').length;
+    let pts;
+    let val;
+    if (mode === 'bal') { pts = slicePts(walletPts(lg), from); val = ws.balance; } else {
+      // Gewinn: Die Kurve startet im Zeitraum bei null, die große Zahl ist der Gewinn in genau diesem Zeitraum
+      const raw = slicePts(plPts(), from);
+      const base = raw.length ? cents(raw[0].v) : 0;
+      pts = raw.map((p) => ({ t: p.t, v: (cents(p.v) - base) / 100 }));
+      val = pts.length ? pts[pts.length - 1].v : 0;
     }
-    const chart = pts.length >= 2 ? lineChart(pts, up, mode === 'bal' ? eur : signed, def) : `<p class="mh-empty">Noch nichts in diesem Zeitraum. Sobald die erste Wette ausgewertet ist, erscheint hier deine Kurve.</p>`;
-    return `<section class="mh"><div class="mh-top">${top}</div><div class="mh-n">${esc(big)}</div><div class="mh-d">${sub}</div>${chart}
-      <div class="pseg">${PERIODS_M.map(([v, l]) => `<button class="${B.period === v ? 'on' : ''}" data-act="mperiod" data-val="${v}">${l}</button>`).join('')}</div>
+    const fmtV = mode === 'bal' ? eur : signed;
+    const dir = pl > 0.004 ? '▲ ' : pl < -0.004 ? '▼ ' : '';
+    const when = esc(sinceStart ? 'seit dem Eintragen' : PERIOD_TXT[B.period]);
+    const rend = stake ? pctSigned(pl / stake) : '';
+    const sub = mode === 'bal' ? `<span class="mh-chg">${dir}${esc(eur(Math.abs(pl)))}${rend ? ` · ${rend}` : ''}</span><span class="mh-w">${when}</span>`
+      : `${rend ? `<span class="mh-chg">${rend}</span>` : ''}<span class="mh-w">${list.length ? `${won} von ${list.length} gewonnen` : 'keine Wette in diesem Zeitraum'}</span>`;
+    return { mode, hasW, pts, val, fmtV, big: fmtV(val), sub, label: mode === 'bal' ? 'Guthaben' : 'Gewinn und Verlust' };
+  }
+  function moneyHero(ws, lg) {
+    const look = store.get('mlook', 'uv');
+    if (ws.balance == null && !ws.n) {
+      lcStop();
+      CH.line = null;
+      return `<section class="mh" data-look="${esc(look)}"><div class="mh-top"><span class="eyebrow">Dein Geld</span></div><p class="mh-empty">Trag dein Guthaben ein, dann siehst du hier deine Kurve, deinen Gewinn und wie gut deine Wetten laufen.</p><button class="btn" data-act="wallet">Guthaben eintragen</button></section>`;
+    }
+    const h = heroData(ws, lg);
+    const top = h.hasW
+      ? `<div class="mseg" style="--k:${h.mode === 'pl' ? 1 : 0}"><span class="ind"></span><button class="${h.mode === 'bal' ? 'on' : ''}" data-act="mmode" data-val="bal">Guthaben</button><button class="${h.mode === 'pl' ? 'on' : ''}" data-act="mmode" data-val="pl">Gewinn</button></div><button class="link" data-act="wallet">Ändern</button>`
+      : '<span class="eyebrow">Gewinn und Verlust</span><button class="link" data-act="wallet">Guthaben eintragen</button>';
+    let chart;
+    if (h.pts.length >= 2) chart = lineChart(h);
+    else { lcStop(); CH.line = null; chart = '<p class="mh-empty">Noch nichts in diesem Zeitraum. Sobald die erste Wette ausgewertet ist, erscheint hier deine Kurve.</p>'; }
+    const k = Math.max(0, PERIODS_M.findIndex(([v]) => v === B.period));
+    return `<section class="mh" data-look="${esc(look)}"><div class="mh-top">${top}</div><div class="mh-n">${esc(h.big)}</div><div class="mh-d">${h.sub}</div>${chart}
+      <div class="pseg" style="--k:${k};--n:${PERIODS_M.length}"><span class="ind"></span>${PERIODS_M.map(([v, l]) => `<button class="${B.period === v ? 'on' : ''}" data-act="mperiod" data-val="${v}">${l}</button>`).join('')}</div>
       <div class="mh-open"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Möglicher Gewinn</span><b>${eur(ws.openWin)}</b></div><div><span>Offen</span><b>${ws.nOpen}</b></div></div></section>`;
+  }
+  // Zeitraum oder Ansicht gewechselt: Knöpfe gleiten, Kurve zeichnet sich um, Zahl läuft mit – die Seite wird dafür nicht neu aufgebaut
+  function moneySwitch() {
+    const pg = curPage();
+    const mh = pg && $('.mh', pg.el);
+    const lc = mh && $('.lc', mh);
+    const c0 = CH.line;
+    const ws = walletState();
+    const lg = ledger();
+    const h = heroData(ws, lg);
+    if (!lc || !c0 || h.pts.length < 2) { B.anim = 'enter'; redrawTop(); B.anim = null; return; }
+    lcStop();
+    const seg = $('.mseg', mh);
+    if (seg) { seg.style.setProperty('--k', h.mode === 'pl' ? 1 : 0); $$('button', seg).forEach((x) => x.classList.toggle('on', x.dataset.val === h.mode)); }
+    const ps = $('.pseg', mh);
+    ps.style.setProperty('--k', Math.max(0, PERIODS_M.findIndex(([v]) => v === B.period)));
+    $$('button', ps).forEach((x) => x.classList.toggle('on', x.dataset.val === B.period));
+    const m = lineModel(h.pts);
+    const from = CH.line.cur;
+    const base0 = CH.line.curBase;
+    const a = c0.def.val;
+    const num = $('.mh-n', mh);
+    const sig = `${B.period}|${h.mode}|${h.pts.length}|${h.pts[h.pts.length - 1].v}`;
+    CH.line = Object.assign(m, { fmtV: h.fmtV, def: h, sig, cur: from, curBase: base0 });
+    swapFade($('.lc-g:not(.out)', lc), m.grid);
+    swapFade($('.lc-xl:not(.out)', lc), m.xl);
+    lc.setAttribute('aria-label', lcAria(h, m));
+    const sub = $('.mh-d', mh);
+    sub.innerHTML = h.sub;
+    replay(sub, 'fadein');
+    lcMorph(lc, from, base0, false, (e) => { num.textContent = h.fmtV(a + (h.val - a) * e); }, () => { num.textContent = h.big; });
+    const ovw = $('.ovw', pg.el);
+    if (ovw) { B.anim = 'switch'; ovw.innerHTML = moneyOverview(lg); B.anim = null; replay(ovw, 'fadein'); }
+    pg.el._geo = null;
+  }
+  // „Das fällt auf“: nur was die eigenen Zahlen wirklich hergeben (je Gruppe mindestens 3 Wetten)
+  function insightsHtml(list) {
+    const out = [];
+    const usable = (key, min) => groupBets(list, key).filter((r) => r.n >= (min || 3) && !/^(Sonstige|Ohne Liga|Mehrere Ligen)$/.test(r.k));
+    const mkt = usable(marketOf).sort((a, b) => b.c - a.c);
+    if (mkt.length && mkt[0].c >= 100) out.push(`Am besten läuft bei dir <b>${esc(mkt[0].k)}</b>: ${signed(mkt[0].c / 100)} aus ${mkt[0].n} Wetten.`);
+    if (mkt.length && mkt[mkt.length - 1].c <= -100) out.push(`Am meisten kostet dich <b>${esc(mkt[mkt.length - 1].k)}</b>: ${signed(mkt[mkt.length - 1].c / 100)} aus ${mkt[mkt.length - 1].n} Wetten.`);
+    const odds = usable(bandOf, 4).sort((a, b) => b.c / b.st - a.c / a.st);
+    if (odds.length >= 2 && odds[0].c > 0) out.push(`Die beste Rendite holst du bei Quoten <b>${esc(odds[0].k)}</b>: ${pctSigned(odds[0].c / odds[0].st)}.`);
+    const wd = usable(weekdayOf).sort((a, b) => b.c - a.c);
+    if (wd.length >= 2 && wd[0].c >= 100) out.push(`Dein stärkster Tag ist der <b>${esc(wd[0].k)}</b>: ${signed(wd[0].c / 100)}.`);
+    if (!out.length) return '';
+    const note = list.length < 30 ? `<p class="ins-n">Bei ${list.length} Wetten spielt der Zufall noch eine große Rolle.</p>` : '';
+    return `<section class="sec"><div class="sec-h"><h2>Das fällt auf</h2></div><div class="card ins">${out.slice(0, 3).map((t) => `<p>${t}</p>`).join('')}${note}</div></section>`;
   }
   function moneyOverview(lg) {
     const from = periodFrom();
-    const list = settledBets().filter((b) => b.status !== 'void' && b.done >= from);
+    const list = betsFrom(from);
     if (!list.length) return `<div class="empty">In diesem Zeitraum ist noch keine Wette ausgewertet. Danach stehen hier Rendite, Trefferquote und mehr.</div>${ledgerHtml(lg)}`;
-    const pl = list.reduce((a, b) => a + betPL(b), 0);
-    const stake = list.reduce((a, b) => a + b.stake, 0);
+    const pl = sumPL(list);
+    const stake = sumStake(list);
     const won = list.filter((b) => b.status === 'won').length;
     const avgQ = list.reduce((a, b) => a + b.q, 0) / list.length;
+    const fair = list.reduce((a, b) => a + 1 / b.q, 0) / list.length;
     let cur = 0;
     let curW = null;
     let best = 0;
@@ -1707,46 +1922,263 @@
       run = w ? run + 1 : 0;
       best = Math.max(best, run);
       if (curW === w) cur++; else { curW = w; cur = 1; }
-      cum += betPL(b);
+      cum += betCents(b);
       peak = Math.max(peak, cum);
       dd = Math.max(dd, peak - cum);
     });
+    const withP = list.filter((b) => b.p > 0 && b.p <= 1);
+    const expC = withP.reduce((a, b) => a + cents(b.p * b.win) - cents(b.stake), 0);
+    const actC = withP.reduce((a, b) => a + betCents(b), 0);
     const tile = (l, v, sub, c) => `<div class="kpi"><span>${l}</span><b class="${c || ''}">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
     const kpis = tile('Gewinn/Verlust', signed(pl), `bei ${eur(stake)} Einsatz`, plusMinus(pl))
       + tile('Rendite', pctSigned(pl / stake), 'Gewinn je Euro Einsatz', plusMinus(pl))
       + tile('Trefferquote', pctR(won / list.length), `${won} von ${list.length} gewonnen`)
-      + tile('Ø Quote', nf2.format(avgQ), `fair wären ${pctR(1 / avgQ)} Treffer`)
+      + tile('Ø Quote', nf2.format(avgQ), `ab ${pctR(fair)} Treffern im Plus`)
       + tile('Aktuelle Serie', `${cur} ${curW ? (cur === 1 ? 'Sieg' : 'Siege') : (cur === 1 ? 'Niederlage' : 'Niederlagen')}`, `längste Siegesserie: ${best}`)
-      + tile('Größter Rückgang', dd > 0.004 ? `−${eur(dd)}` : eur(0), 'vom Höchststand aus');
+      + tile('Größter Rückgang', dd ? `−${eur(dd / 100)}` : eur(0), 'vom Höchststand aus')
+      + tile('Ø Einsatz', eur(stake / list.length), `${list.length} ${list.length === 1 ? 'Wette' : 'Wetten'}`)
+      + (withP.length >= 5 ? tile('Erwartet laut Chancen', signed(expC / 100), `echt: ${signed(actC / 100)} · ${withP.length} Wetten`) : tile('Größter Gewinn', signed(Math.max(...list.map(betPL))), 'bei einer einzelnen Wette'));
+    const last10 = list.slice(-10);
+    const form = `<div class="card fcard"><div class="f-h"><b>Form</b><span>letzte ${last10.length}, die neueste rechts</span></div><div class="fstrip">${last10.map((b) => `<i class="${b.status === 'won' ? 'w' : 'l'}" title="${esc(betTitle(b))}">${b.status === 'won' ? '✓' : '✗'}</i>`).join('')}</div></div>`;
     const { unit, bk } = bucketize(list, from);
     const lastK = bk.slice().reverse().find((k) => k.n) || bk[bk.length - 1];
     const sorted = list.slice().sort((a, b) => betPL(b) - betPL(a));
     const bestB = sorted[0];
     const worstB = sorted[sorted.length - 1];
-    const splitTabs = [['cat', 'Art'], ['mkt', 'Wette'], ['odds', 'Quote']];
-    return `<div class="kpis">${kpis}</div>
+    const days = [...dayBook().values()].filter((x) => x.n && x.t >= from).sort((a, b) => b.c - a.c);
+    const dayRow = (x, name) => `<div class="rec-it ${x.c < 0 ? 'lost' : 'won'}"><span class="mk">${I.cal}</span><span class="grow"><b>${name}</b><span>${esc(dayShort(x.t))} · ${x.n} ${x.n === 1 ? 'Wette' : 'Wetten'}</span></span><span class="rp2 ${plusMinus(x.c / 100)}">${signed(x.c / 100)}</span></div>`;
+    const dayRows = days.length >= 2 ? (days[0].c > 0 ? dayRow(days[0], 'Bester Tag') : '') + (days[days.length - 1].c < 0 ? dayRow(days[days.length - 1], 'Schlechtester Tag') : '') : '';
+    const kSplit = Math.max(0, SPLITS.findIndex((s) => s[0] === B.split));
+    return `<div class="kpis">${kpis}</div>${form}
       <section class="sec"><div class="sec-h"><h2>Gewinn je ${{ day: 'Tag', week: 'Woche', month: 'Monat' }[unit]}</h2></div><div class="card"><p class="bc-read">${esc(bucketRead(lastK, unit))}</p>${barChart(bk, unit)}</div></section>
-      <section class="sec"><div class="sec-h"><h2>Wo du gewinnst</h2></div><div class="card"><div class="pseg in">${splitTabs.map(([v, l]) => `<button class="${B.split === v ? 'on' : ''}" data-act="bsplit" data-val="${v}">${l}</button>`).join('')}</div><div class="srs">${splitRows(list)}</div></div></section>
-      <section class="sec"><div class="sec-h"><h2>Höhepunkte</h2></div><div class="card rec"><div class="rec-list" style="border-top:0">${betLine(bestB, 'Beste')}${worstB !== bestB ? betLine(worstB, 'Schlechteste') : ''}</div></div></section>
+      ${insightsHtml(list)}
+      <section class="sec"><div class="sec-h"><h2>Wo du gewinnst</h2></div><div class="card"><div class="pseg in" style="--k:${kSplit};--n:${SPLITS.length}"><span class="ind"></span>${SPLITS.map(([v, l]) => `<button class="${B.split === v ? 'on' : ''}" data-act="bsplit" data-val="${v}">${l}</button>`).join('')}</div><div class="srs${B.anim ? ' in' : ''}">${splitRows(list)}</div></div></section>
+      <section class="sec"><div class="sec-h"><h2>Höhepunkte</h2></div><div class="card rec"><div class="rec-list" style="border-top:0">${betLine(bestB, 'Beste Wette')}${worstB !== bestB ? betLine(worstB, 'Schlechteste Wette') : ''}${dayRows}</div></div></section>
       ${ledgerHtml(lg)}`;
   }
-  function vBets() {
-    const ws = walletState();
+
+  // ------------------------------------------------------------------ Kalender: Plus und Minus je Tag, Monat wischen, Tag antippen
+  const ymOf = (t) => { const d = new Date(t); return d.getFullYear() * 12 + d.getMonth(); };
+  const calKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  function dayBook() {
+    const m = new Map();
+    settledBets().forEach((b) => {
+      const t = settleT(b);
+      const k = calKey(new Date(t));
+      const x = m.get(k) || { k, t, c: 0, n: 0, won: 0, stake: 0, list: [] };
+      x.c += betCents(b);
+      x.list.push(b);
+      if (b.status !== 'void') { x.n++; x.stake += cents(b.stake); x.won += b.status === 'won' ? 1 : 0; }
+      m.set(k, x);
+    });
+    return m;
+  }
+  function openBook() {
+    const m = new Map();
+    betsAll().filter((b) => b.status === 'open').forEach((b) => {
+      const t = firstKick(b);
+      if (!Number.isFinite(t)) return;
+      const k = calKey(new Date(t));
+      m.set(k, (m.get(k) || []).concat(b));
+    });
+    return m;
+  }
+  // kurz genug für eine Kalender-Zelle: +12,50 · +123 · +1,2k
+  function compactC(c) {
+    const v = Math.abs(c) / 100;
+    const s = c > 0 ? '+' : c < 0 ? '−' : '';
+    if (v >= 9999.5) return `${s}${Math.round(v / 1000)}k`;
+    if (v >= 999.5) return `${s}${(v / 1000).toFixed(1).replace('.', ',')}k`;
+    if (v >= 99.5) return `${s}${Math.round(v)}`;
+    return s + (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ','));
+  }
+  function calFirst() {
+    const list = settledBets();
+    const nowYm = ymOf(Date.now());
+    return list.length ? Math.min(nowYm, ymOf(settleT(list[0]))) : nowYm;
+  }
+  function calHtml() {
+    const book = dayBook();
+    const opens = openBook();
+    const nowYm = ymOf(Date.now());
+    if (B.cal == null || B.cal > nowYm) B.cal = nowYm;
+    const ym = B.cal;
+    const y = Math.floor(ym / 12);
+    const mo = ym - y * 12;
+    const nDays = new Date(y, mo + 1, 0).getDate();
+    const lead = (new Date(y, mo, 1).getDay() + 6) % 7;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const rows = [];
+    for (let d = 1; d <= nDays; d++) { const x = book.get(`${y}-${mo}-${d}`); if (x) rows.push(Object.assign({ d }, x)); }
+    const total = rows.reduce((a, r) => a + r.c, 0);
+    const n = rows.reduce((a, r) => a + r.n, 0);
+    const won = rows.reduce((a, r) => a + r.won, 0);
+    const stake = rows.reduce((a, r) => a + r.stake, 0);
+    const max = Math.max(1, ...rows.map((r) => Math.abs(r.c)));
+    const plus = rows.filter((r) => r.c > 0);
+    const minus = rows.filter((r) => r.c < 0);
+    const bestD = plus.length ? plus.reduce((a, r) => (r.c > a.c ? r : a)) : null;
+    const worstD = minus.length ? minus.reduce((a, r) => (r.c < a.c ? r : a)) : null;
+    const cell = (d) => {
+      const date = new Date(y, mo, d);
+      const key = `${y}-${mo}-${d}`;
+      const x = book.get(key);
+      const op = opens.get(key);
+      const lv = x && x.c ? Math.max(1, Math.ceil(Math.sqrt(Math.abs(x.c) / max) * 4)) : 0;
+      const cls = ['cd', x ? (x.c > 0 ? `p${lv}` : x.c < 0 ? `n${lv}` : 'z') : '', date > today ? 'fu' : '', +date === +today ? 'now' : '', B.calDay === d ? 'sel' : ''].filter(Boolean).join(' ');
+      const inner = `<span class="cd-d">${d}</span>${op ? '<i class="cd-o"></i>' : ''}${x ? `<span class="cd-v">${x.c ? esc(compactC(x.c)) : '±0'}</span>` : ''}`;
+      const label = `${date.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })}: ${x ? `${signed(x.c / 100)}, ${x.list.length} ${x.list.length === 1 ? 'Wette' : 'Wetten'}` : ''}${op ? `${x ? ', ' : ''}${op.length} offen` : ''}`;
+      return x || op ? `<button class="${cls}" data-act="calday" data-val="${d}" aria-label="${esc(label)}">${inner}</button>` : `<div class="${cls}">${inner}</div>`;
+    };
+    let cells = '';
+    for (let i = 0; i < lead; i++) cells += '<div class="cd blank"></div>';
+    for (let d = 1; d <= nDays; d++) cells += cell(d);
+    const tile = (l, v, s, c) => `<div class="kpi"><span>${l}</span><b class="${c || ''}">${v}</b><small>${s}</small></div>`;
+    const tiles = rows.length ? `<div class="kpis cal-kpis">${tile('Tage im Plus', plus.length, `von ${rows.length} mit Wetten`)}${tile('Tage im Minus', minus.length, `von ${rows.length} mit Wetten`)}${bestD ? tile('Bester Tag', signed(bestD.c / 100), esc(dayShort(bestD.t)), 'up') : ''}${worstD ? tile('Schlechtester Tag', signed(worstD.c / 100), esc(dayShort(worstD.t)), 'down') : ''}</div>` : '';
+    return `<section class="card cal-c">
+        <div class="cal-h"><button class="cal-nav" data-act="calgo" data-val="-1" aria-label="Voriger Monat"${ym <= calFirst() ? ' disabled' : ''}>‹</button><b class="cal-m">${esc(new Date(y, mo, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }))}</b><button class="cal-nav" data-act="calgo" data-val="1" aria-label="Nächster Monat"${ym >= nowYm ? ' disabled' : ''}>›</button></div>
+        <div class="cal-big ${plusMinus(total / 100)}">${signed(total / 100)}</div>
+        <div class="cal-sub">${n ? `${n} ${n === 1 ? 'Wette' : 'Wetten'} · ${won} gewonnen${stake ? ` · Rendite ${pctSigned(total / stake)}` : ''}` : 'Keine Wette in diesem Monat ausgewertet'}</div>
+        <div class="cal-wd">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<span>${w}</span>`).join('')}</div>
+        <div class="cal-swipe"><div class="cal-grid">${cells}</div></div>
+        <p class="cal-leg"><i class="cd p3"></i>Plus<i class="cd n3"></i>Minus<em>Je kräftiger, desto mehr Geld</em></p>
+      </section>${tiles}<div class="cal-det">${calDetail(y, mo, rows, book, opens)}</div>${yearStrip(book, ym, nowYm)}`;
+  }
+  function calDetail(y, mo, rows, book, opens) {
+    if (B.calDay) {
+      const key = `${y}-${mo}-${B.calDay}`;
+      const x = book.get(key);
+      const op = opens.get(key) || [];
+      const t = new Date(y, mo, B.calDay).getTime();
+      const items = (x ? x.list.slice().reverse().map((b) => betLine(b, catOf(b), true)) : []).concat(op.map(openLine)).join('');
+      return `<section class="sec"><div class="sec-h"><h2>${esc(dayLong(t))}</h2>${x ? `<span class="sv ${plusMinus(x.c / 100)}">${signed(x.c / 100)}</span>` : ''}</div><div class="card rec"><div class="rec-list" style="border-top:0">${items}</div></div><button class="more" data-act="calday" data-val="0">Ganzen Monat anzeigen</button></section>`;
+    }
+    if (!rows.length) return '';
+    return `<section class="sec"><div class="sec-h"><h2>Alle Tage</h2></div><div class="group">${rows.slice().reverse().map((r) => `<button class="row cal-r" data-act="calday" data-val="${r.d}"><span class="grow"><div class="t">${esc(dayLong(r.t))}</div><div class="s">${r.list.length} ${r.list.length === 1 ? 'Wette' : 'Wetten'}${r.n ? ` · ${r.won} gewonnen` : ''}</div></span><b class="sv ${plusMinus(r.c / 100)}">${signed(r.c / 100)}</b><span class="chev">›</span></button>`).join('')}</div></section>`;
+  }
+  function yearStrip(book, ym, nowYm) {
+    const months = [];
+    for (let k = nowYm - 11; k <= nowYm; k++) months.push({ k, c: 0, n: 0 });
+    book.forEach((x) => { const m = months.find((mm) => mm.k === ymOf(x.t)); if (m) { m.c += x.c; m.n += x.n; } });
+    if (!months.some((m) => m.n)) return '';
+    const max = Math.max(1, ...months.map((m) => Math.abs(m.c)));
+    const total = months.reduce((a, m) => a + m.c, 0);
+    const first = calFirst();
+    return `<section class="sec"><div class="sec-h"><h2>Letzte 12 Monate</h2><span class="sv ${plusMinus(total / 100)}">${signed(total / 100)}</span></div><div class="card cal-yr">${months.map((m, i) => {
+      const y = Math.floor(m.k / 12);
+      const d = new Date(y, m.k - y * 12, 1);
+      const h = m.c ? Math.max(6, Math.round((Math.abs(m.c) / max) * 100)) : 0;
+      const on = m.k === ym ? ' on' : '';
+      const lab = d.toLocaleDateString('de-DE', { month: 'narrow' });
+      const bar = h ? `<i class="${m.c > 0 ? 'p' : 'n'}" style="--h:${h / 100};--i:${i}"></i>` : '';
+      return m.k < first ? `<span class="cy off"><span class="cy-p"></span><span class="cy-l">${lab}</span></span>`
+        : `<button class="cy${on}" data-act="calmonth" data-val="${m.k}" aria-label="${esc(d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }))}: ${esc(signed(m.c / 100))}"><span class="cy-p">${bar}</span><span class="cy-l">${lab}</span></button>`;
+    }).join('')}</div></section>`;
+  }
+  // Monat wechseln: dir = 1 nach vorn, −1 zurück; ym = direkt zu einem Monat
+  function calShift(dir, ym) {
+    const pg = curPage();
+    const el = pg && $('.cal', pg.el);
+    const nowYm = ymOf(Date.now());
+    const cur = B.cal == null ? nowYm : B.cal;
+    const next = ym != null ? ym : cur + dir;
+    if (!el || next > nowYm || next < calFirst() || next === cur) return false;
+    B.cal = next;
+    B.calDay = null;
+    el.innerHTML = calHtml();
+    pg.el._geo = null;
+    if (reduce) return true;
+    const d = (dir || (next > cur ? 1 : -1)) * 46;
+    const grid = $('.cal-grid', el);
+    if (grid) grid.animate([{ transform: `translateX(${d}px)`, opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }], { duration: 300, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    const sum = [$('.cal-m', el), $('.cal-big', el), $('.cal-sub', el)];
+    sum.forEach((x) => x && replay(x, 'fadein'));
+    return true;
+  }
+  // Tag antippen: Zelle markieren, darunter die Wetten dieses Tages
+  function calPick(d) {
+    const pg = curPage();
+    const el = pg && $('.cal', pg.el);
+    if (!el) return;
+    B.calDay = d === B.calDay ? null : d || null;
+    $$('.cal-grid .cd', el).forEach((c) => { const v = +((c.dataset && c.dataset.val) || 0); c.classList.toggle('sel', !!B.calDay && v === B.calDay); });
+    const ym = B.cal;
+    const y = Math.floor(ym / 12);
+    const mo = ym - y * 12;
+    const book = dayBook();
+    const rows = [];
+    for (let k = 1; k <= 31; k++) { const x = book.get(`${y}-${mo}-${k}`); if (x) rows.push(Object.assign({ d: k }, x)); }
+    const det = $('.cal-det', el);
+    det.innerHTML = calDetail(y, mo, rows, book, openBook());
+    replay(det, 'fadein');
+    pg.el._geo = null;
+  }
+  // Inhalt je Reiter
+  const betActs = () => `<div class="bet-acts"><button class="bact" data-act="newbet">${I.pen}<span>Wette eintragen</span></button><label class="bact">${I.scan}<span>Wettschein scannen</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein-Screenshot wählen"></label></div>`;
+  const openSort = (x, y) => (firstKick(x) - firstKick(y)) || (y.at - x.at);
+  function doneList(done) {
+    const book = dayBook();
+    let out = '';
+    let day = '';
+    done.forEach((b) => {
+      const k = calKey(new Date(settleT(b)));
+      if (k !== day) {
+        day = k;
+        const x = book.get(k);
+        out += `<div class="dgrp"><span>${esc(dayLong(settleT(b)))}</span><b class="${plusMinus(x.c / 100)}">${signed(x.c / 100)}</b></div>`;
+      }
+      out += betCard(b);
+    });
+    return out;
+  }
+  function betsBody() {
     const bets = betsAll();
-    const lg = ledger();
-    const open = bets.filter((b) => b.status === 'open').sort((x, y) => (firstKick(x) - firstKick(y)) || (y.at - x.at));
-    const done = bets.filter((b) => b.status !== 'open').sort((x, y) => (y.done || 0) - (x.done || 0));
-    const TABS_B = [['over', 'Übersicht'], ['open', `Offen · ${open.length}`], ['done', `Erledigt · ${done.length}`]];
-    const k = Math.max(0, TABS_B.findIndex((x) => x[0] === B.tab));
-    const list = B.tab === 'done' ? done : open;
-    const hero = moneyHero(ws, lg);
-    const body = B.tab === 'over' ? moneyOverview(lg)
-      : `<div class="blist">${list.length ? list.map(betCard).join('') : `<div class="empty">${B.tab === 'done' ? 'Noch keine erledigten Wetten.' : 'Keine offenen Wetten. Speichere einen Top-Tipp, trag eine Wette ein oder scanne deinen Wettschein.'}</div>`}</div>`;
-    return `${aura('bets')}<h1 class="ptitle">Wetten</h1>${hero}
-      <div class="bet-acts"><button class="bact" data-act="newbet">${I.pen}<span>Wette eintragen</span></button><label class="bact">${I.scan}<span>Wettschein scannen</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein-Screenshot wählen"></label></div>
-      <div class="seg s3" style="--k:${k};margin-top:18px"><span class="ind"></span>${TABS_B.map(([v, l]) => `<button class="${B.tab === v ? 'on' : ''}" data-act="btab" data-val="${v}">${l}</button>`).join('')}</div>
-      <div class="bbody">${body}</div>
+    if (B.tab === 'cal') return `<div class="cal">${calHtml()}</div>`;
+    if (B.tab === 'over') {
+      const ws = walletState();
+      const lg = ledger();
+      return `${moneyHero(ws, lg)}${betActs()}<div class="ovw">${moneyOverview(lg)}</div>`;
+    }
+    if (B.tab === 'open') {
+      const open = bets.filter((b) => b.status === 'open').sort(openSort);
+      const ws = walletState();
+      return `${betActs()}${open.length ? `<div class="bsum"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Möglicher Gewinn</span><b>${eur(ws.openWin)}</b></div></div>` : ''}<div class="blist">${open.length ? open.map(betCard).join('') : '<div class="empty">Keine offenen Wetten. Speichere einen Top-Tipp, trag eine Wette ein oder scanne deinen Wettschein.</div>'}</div>`;
+    }
+    const done = bets.filter((b) => b.status !== 'open' && b.done).sort((x, y) => settleT(y) - settleT(x));
+    if (!done.length) return '<div class="blist"><div class="empty">Noch keine erledigten Wetten.</div></div>';
+    const shown = B.doneAll ? done : done.slice(0, 40); // viele Karten auf einmal bremsen das iPhone
+    return `<div class="blist dl">${doneList(shown)}</div>${done.length > shown.length ? `<button class="more" data-act="bdmore">Alle ${done.length} anzeigen</button>` : ''}`;
+  }
+  function betsTab(v) {
+    const pg = curPage();
+    const seg = pg && $('.bseg', pg.el);
+    const body = pg && $('.bbody', pg.el);
+    if (B.tab === v) return;
+    B.tab = v;
+    if (!seg || !body) { B.anim = 'enter'; redrawTop(); B.anim = null; return; }
+    seg.style.setProperty('--k', Math.max(0, BTABS.indexOf(v)));
+    $$('button', seg).forEach((x) => x.classList.toggle('on', x.dataset.val === v));
+    lcStop();
+    B.anim = 'enter';
+    body.innerHTML = betsBody();
+    B.anim = null;
+    replay(body, 'fadein');
+    pg.el._geo = null;
+  }
+  const BTABS = ['over', 'cal', 'open', 'done'];
+  function vBets() {
+    const bets = betsAll();
+    const nOpen = bets.filter((b) => b.status === 'open').length;
+    const nDone = bets.filter((b) => b.status !== 'open').length;
+    const TABS_B = [['over', 'Übersicht'], ['cal', 'Kalender'], ['open', 'Offen', nOpen], ['done', 'Erledigt', nDone]];
+    const k = Math.max(0, BTABS.indexOf(B.tab));
+    const html = `${aura('bets')}<h1 class="ptitle">Wetten</h1>
+      <div class="seg s4 bseg" style="--k:${k}"><span class="ind"></span>${TABS_B.map(([v, l, n]) => `<button class="${B.tab === v ? 'on' : ''}" data-act="btab" data-val="${v}">${l}${n ? `<small>${n}</small>` : ''}</button>`).join('')}</div>
+      <div class="bbody">${betsBody()}</div>
       <p class="foot">Alles bleibt nur auf diesem Handy. Wetten aus den Top-Tipps und erkannte Scans prüft Result AI nach dem Abpfiff selbst, für die Erfolgsquote im Verlauf zählen nur die Top-Tipps.<br>${RG_TEXT}</p>`;
+    B.anim = null;
+    return html;
   }
   // Verlauf: Wetten aus den Top-Tipps nach Anstoß-Tag, mit ✓/✗ von Result AI
   function histBets(list) {
@@ -1895,7 +2327,7 @@
       <div class="lab" style="margin-top:24px">EINZAHLUNG ODER AUSZAHLUNG</div>
       <input class="search" type="text" inputmode="decimal" data-act="wmove" placeholder="Betrag, z. B. 20" autocomplete="off">
       <div class="bf-2"><button class="btn soft" data-act="wsave" data-mode="in">Einzahlen</button><button class="btn soft" data-act="wsave" data-mode="out">Auszahlen</button></div>
-      <p class="bf-note">Ab jetzt rechnet Result AI selbst weiter: Jede neue Wette zieht den Einsatz ab, jeder Gewinn kommt dazu, eine stornierte Wette gibt den Einsatz zurück.</p>${ws.balance != null ? '<button class="bf-reset" data-act="wreset">Guthaben zurücksetzen</button>' : ''}</div>`;
+      <p class="bf-note">Ab jetzt rechnet Result AI selbst weiter: Jede neue Wette zieht den Einsatz ab, jeder Gewinn kommt dazu, eine stornierte Wette gibt den Einsatz zurück.</p>${looksHtml()}${ws.balance != null ? '<button class="bf-reset" data-act="wreset">Guthaben zurücksetzen</button>' : ''}</div>`;
     document.body.appendChild(sh);
   }
   // Guthaben von vorne: Betrag, Ein-/Auszahlungen und Guthaben-Kurve weg. Wetten, Gewinn/Verlust und Erfolgsquote bleiben.
@@ -2165,6 +2597,7 @@
   function makePage(path) {
     const el = document.createElement('section');
     el.className = 'page' + (path.startsWith('/r/') ? ' rp' : '');
+    if (path === '/bets') B.anim = 'enter'; // Kurve und Balken bauen sich beim Öffnen auf
     el.innerHTML = barHtml(path) + `<div class="wrap">${viewHtml(path)}</div>`;
     el.addEventListener('scroll', onPageScroll, { passive: true });
     return { path, el, shown: false, drawn: { tips: T.at, ratings: !!R.data, err: T.err } };
@@ -2431,7 +2864,7 @@
     stackEl.addEventListener('touchcancel', end, { passive: true });
   })();
 
-  // Kurve im Geld-Tracker: Finger drauf → Fadenkreuz springt zum nächsten Punkt, oben stehen Wert und Datum
+  // Kurve im Geld-Tracker: Finger drauf → Fadenkreuz springt zum nächsten echten Wert, oben stehen Wert und Datum, rechts davon wird die Linie blass
   (() => {
     let on = null;
     const move = (e) => {
@@ -2445,18 +2878,15 @@
       if (i === c.i) return;
       c.i = i;
       const mh = on.closest('.mh');
-      const xl = $('.x', on);
-      xl.setAttribute('x1', c.xs[i].toFixed(1));
-      xl.setAttribute('x2', c.xs[i].toFixed(1));
-      const dot = $('.d', on);
-      dot.setAttribute('cx', c.xs[i].toFixed(1));
-      dot.setAttribute('cy', c.ys[i].toFixed(1));
+      lcPlace(on, c.xs[i], c.ys[i]);
+      $('#lc-cp rect', on).setAttribute('width', f1(c.xs[i]));
       $('.mh-n', mh).textContent = c.fmtV(c.pts[i].v);
-      $('.mh-d', mh).textContent = fmtWhen(c.pts[i].t);
+      $('.mh-d', mh).textContent = dayShort(c.pts[i].t);
     };
     document.addEventListener('pointerdown', (e) => {
       const w = e.target.closest && e.target.closest('.lc');
       if (!w || !CH.line) return;
+      lcStop();
       on = w;
       w.classList.add('scrub');
       CH.line.i = null;
@@ -2470,17 +2900,54 @@
       on = null;
       w.classList.remove('scrub');
       if (!c) return;
-      const n = c.xs.length - 1;
       const mh = w.closest('.mh');
-      $('.x', w).setAttribute('x1', c.xs[n].toFixed(1));
-      $('.x', w).setAttribute('x2', c.xs[n].toFixed(1));
-      $('.d', w).setAttribute('cx', c.xs[n].toFixed(1));
-      $('.d', w).setAttribute('cy', c.ys[n].toFixed(1));
+      lcPlace(w, c.lastX, c.lastY);
+      $('#lc-cp rect', w).setAttribute('width', c.W);
       $('.mh-n', mh).textContent = c.def.big;
       $('.mh-d', mh).innerHTML = c.def.sub;
     };
     document.addEventListener('pointerup', end, { passive: true });
     document.addEventListener('pointercancel', end, { passive: true });
+  })();
+  // Kalender: Monat mit dem Finger wechseln, das Raster geht mit
+  (() => {
+    let s = null;
+    document.addEventListener('touchstart', (e) => {
+      const g = e.target.closest && e.target.closest('.cal-swipe');
+      if (!g || e.touches.length > 1) { s = null; return; }
+      const t = e.touches[0];
+      s = { el: $('.cal-grid', g), x: t.clientX, y: t.clientY, on: false, dx: 0, blocked: false, t: performance.now() };
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (!s) return;
+      const t = e.touches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (!s.on) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { s = null; return; }
+        if (Math.abs(dx) < 10) return;
+        s.on = true;
+      }
+      s.blocked = (dx < 0 && B.cal >= ymOf(Date.now())) || (dx > 0 && B.cal <= calFirst());
+      s.dx = s.blocked ? dx * 0.22 : dx;
+      s.el.style.transform = `translateX(${s.dx.toFixed(1)}px)`;
+      s.el.style.opacity = String(1 - Math.min(0.55, Math.abs(s.dx) / 420));
+    }, { passive: true });
+    const end = () => {
+      if (!s) return;
+      const g = s;
+      s = null;
+      if (!g.on) return;
+      const fast = Math.abs(g.dx) / Math.max(1, performance.now() - g.t) > 0.5;
+      if (!g.blocked && (Math.abs(g.dx) > g.el.offsetWidth * 0.22 || fast)) { calShift(g.dx < 0 ? 1 : -1); return; }
+      const tr = g.el.style.transform;
+      const op = g.el.style.opacity;
+      g.el.style.transform = '';
+      g.el.style.opacity = '';
+      if (!reduce) g.el.animate([{ transform: tr, opacity: op }, { transform: 'translateX(0)', opacity: 1 }], { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    };
+    document.addEventListener('touchend', end, { passive: true });
+    document.addEventListener('touchcancel', end, { passive: true });
   })();
 
   // ------------------------------------------------------------------ Einstellungen (Blatt von unten, mit Federung)
@@ -2587,10 +3054,31 @@
     else if (act === 'betsave') saveDraft();
     else if (act === 'bchip') { const inp = $('[data-act="bstake"]', a.closest('.panel')); if (inp) { inp.value = nf2.format(+a.dataset.val); updateWin(); } }
     else if (act === 'bstatus') { if (B.draft) B.draft.status = a.dataset.val; $$('[data-act="bstatus"]', a.closest('.panel')).forEach((x) => x.classList.toggle('on', x === a)); }
-    else if (act === 'btab') { B.tab = a.dataset.val; redrawTop(); }
-    else if (act === 'mperiod') { B.period = a.dataset.val; B.more = false; redrawTop(); }
-    else if (act === 'mmode') { B.mode = a.dataset.val; redrawTop(); }
-    else if (act === 'bsplit') { B.split = a.dataset.val; const c = a.closest('.card'); $$('.pseg button', c).forEach((x) => x.classList.toggle('on', x === a)); $('.srs', c).innerHTML = splitRows(settledBets().filter((b) => b.status !== 'void' && b.done >= periodFrom())); }
+    else if (act === 'btab') betsTab(a.dataset.val);
+    else if (act === 'bdmore') { B.doneAll = true; const pg = curPage(); $('.bbody', pg.el).innerHTML = betsBody(); pg.el._geo = null; }
+    else if (act === 'calgo') calShift(+a.dataset.val);
+    else if (act === 'calmonth') calShift(0, +a.dataset.val);
+    else if (act === 'calday') calPick(+a.dataset.val);
+    else if (act === 'mlook') {
+      store.set('mlook', a.dataset.val);
+      $$('.lk', a.closest('.looks')).forEach((x) => x.classList.toggle('on', x === a));
+      const pg = curPage();
+      const mh = pg && $('.mh', pg.el);
+      if (mh) mh.dataset.look = a.dataset.val;
+      haptic();
+    }
+    else if (act === 'mperiod') { if (B.period !== a.dataset.val) { B.period = a.dataset.val; B.more = false; moneySwitch(); } }
+    else if (act === 'mmode') { if (B.mode !== a.dataset.val) { B.mode = a.dataset.val; moneySwitch(); } }
+    else if (act === 'bsplit') {
+      B.split = a.dataset.val;
+      const c = a.closest('.card');
+      const seg = $('.pseg', c);
+      seg.style.setProperty('--k', Math.max(0, SPLITS.findIndex((x) => x[0] === B.split)));
+      $$('button', seg).forEach((x) => x.classList.toggle('on', x === a));
+      const srs = $('.srs', c);
+      srs.innerHTML = splitRows(betsFrom(periodFrom()));
+      replay(srs, 'in');
+    }
     else if (act === 'lgmore') { B.more = !B.more; redrawTop(); }
     else if (act === 'barpick') {
       const c = a.closest('.card');
@@ -2674,7 +3162,7 @@
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel aus der BVB-App); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = '.tsave, .gsave, .bact, .bc-acts button, .bc-del, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .kib, .kl-row, a.spot, a.tmc, a.bil, .pseg button, .mseg button, .more, .lg-back';
+    const PRESS = '.tsave, .gsave, .bact, .bc-acts button, .bc-del, a.group, a.row, a.card, .btn, .round, .sbtn, .seg button, .slot, .res-row, .stepper button, .swap, a.tcard, .tabbar button, .chips button, a.k-leg, .snav button, .kib, .kl-row, a.spot, a.tmc, a.bil, .pseg button, .mseg button, .more, .lg-back, .cal-nav, button.cd, button.cy, .cal-r, .lk';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };

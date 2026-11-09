@@ -121,17 +121,24 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
   „'$GIT_DIR' too big“ – dann einen kurzen Pfad nehmen.
 - Node.js ist auf dem Laptop nicht installiert (Tests laufen auf GitHub); lokal ansehen: `.claude/launch.json` (Python-Server, Port 8098).
 
-**Niklas' Checkliste vom 08.11.2026 – alle 9 Punkte eingebaut (App-Stand `ra-shell-v19`):**
+**Niklas' Checkliste vom 08.11.2026 – alle 9 Punkte eingebaut (App-Stand `ra-shell-v21`):**
 1. **Quoten nur von Tipico.** `scripts/tipico.py` holt sie über The Odds API (`tipico_de`, Region `eu`); GitHub-Secret `ODDS_API_KEY`
-   (Konto und Schlüssel macht Niklas selbst; Gratis-Plan 500 Credits im Monat, ob Tipico darin enthalten ist, ist **nicht bestätigt**).
+   (Konto und Schlüssel macht Niklas selbst; Gratis-Plan 500 Credits im Monat). **Läuft live seit 09.11.2026** (erster Abruf: 8 Ligen, 16 Credits,
+   alle Vereinsspiele zugeordnet). Die Credits werden je Spieltag eingeteilt: ein Abruf je Liga und Runde, Auffrischen nur mit dem, was übrig ist
+   (Test über einen Monat: 97,9 % der Spiele haben beim Anpfiff eine Quote). 52 von 87 Wettbewerben gibt es beim Anbieter, der Rest bleibt „k. A.“.
+   Stand und Einteilung stehen in der KI-Zentrale (`tipicoCard`). Nations League im ersten Abruf: 28 Spiele, 0 zugeordnet, die Namen passen aber (geprüft),
+   also vermutlich noch keine Tipico-Quoten. `tipico.fetched[].offers` zeigt das ab dem nächsten Abruf (11.11.2026), **dann prüfen**.
    Tipico selbst auslesen ist abgelehnt (Bot-Schutz, nicht umgehen). Quoten anderer Anbieter werden **nie angezeigt**, Unbekanntes
    ist „k. A.“ (Doppelchance und Beide treffen liefert diese Schnittstelle nicht). Für die **Prozente** darf der Markt intern weiter
-   einfließen, das ist genauer. Bisher nur gegen das dokumentierte Format getestet (`tests/tipico.test.py`), noch nie live.
+   einfließen, das ist genauer. Tests: `tests/tipico.test.py`.
 2. **Ladebildschirm:** `#splash` steht direkt in `web/index.html` (Ring + Name, nur transform/opacity), Startbilder hell und dunkel in `web/icons/`.
 3. **Länder:** `scripts/nations.py` (ESPN, rund 4.500 Länderspiele, 218 Teams) mit eigenem `natModel` (Tor-Niveau, Heimvorteil, Halbwertszeit 3 Jahre),
    in den Stärken `lg:'nat'`, `nat:true`, `grp:1000`. Backtest 1.200 Spiele (Sep. 2025 bis Okt. 2026, inkl. WM 2026): Log-Loss 0,8532, Favorit in 60 % richtig.
-4. **Geld-Tracker** (`#/bets`, ganz in `web/app.js`): Kurve Guthaben/Gewinn mit Zeitraum (Finger drauf zeigt Wert und Datum), Kennzahlen, Gewinn je Tag/Woche/Monat,
-   Aufschlüsselung nach Art/Wette/Quote, Höhepunkte, Kontoauszug. Alles nur auf dem Handy, `ra_wallet` hat jetzt `start` und `fixes`. Nie Beispieldaten ausliefern.
+4. **Geld-Tracker** (`#/bets`, ganz in `web/app.js`, großes Update 09.11.2026). **Kein Grün beim Geld** (Niklas): Plus = Violett, Minus = Rose, immer mit Vorzeichen
+   (`--pos`, `--neg`, `--posf`, `--negf`). Die große Karte gibt es in vier Farben (`ra_mlook`, Blatt „Guthaben“). Reiter oben: Übersicht, Kalender, Offen, Erledigt.
+   Beim Umschalten zeichnet sich die Kurve fließend um (`lcMorph`, 110 Stützstellen, am Ende die exakte Linie durch jeden echten Wert), die Zahl läuft mit, die Knöpfe gleiten; die Seite wird dafür nicht neu aufgebaut (`moneySwitch`, `betsTab`).
+   Die Gewinn-Ansicht startet im Zeitraum bei null. Kalender: Plus/Minus je Tag, Monat wischen, Tag antippen, 12-Monats-Leiste. Eine Wette zählt am Tag ihres letzten Anpfiffs (`settleT`), Geld wird in ganzen Cent addiert.
+   Alles nur auf dem Handy, `ra_wallet` hat `start` und `fixes`. Nie Beispieldaten ausliefern.
 5. **3. Liga Deutschland in den Tipps:** ohne Marktquoten (`MODEL_ONLY`), Spiele und Ergebnisse von FotMob (`fmg:…`, Ergebnisse in `tips.json` → `res`).
 6. **Bilanz:** eigene Abteilung auf dem Start plus Seite `#/bilanz`; Beispiel-Wetten sind raus.
 7. **Design:** Die neutrale „Design-Runde 5“ hat Niklas noch am selben Abend zurückgenommen („alle Farben und 3D-Wappen wie vorher, sofort“). `web/app.css` ist wieder der Stand davor,

@@ -289,11 +289,12 @@ def refresh(raw, prev, now, when, log):
         found = match(events, gs, when)
         for gid, q in found.items():
             tq[gid] = {'q': q, 'at': iso(now)}
-        row = {'t': iso(now), 'comp': gs[0].get('comp') or slug, 'events': len(events), 'matched': len(found), 'cost': cost, 'why': cls}
+        offers = sum(1 for e in events if parse_event(e))  # 0 = Tipico bietet dort gerade nichts an (kein Zuordnungs-Problem)
+        row = {'t': iso(now), 'comp': gs[0].get('comp') or slug, 'events': len(events), 'offers': offers, 'matched': len(found), 'cost': cost, 'why': cls}
         st['fetched'].append(dict(row, slug=slug))
         st['log'].append(row)
         st['lastFetch'] = iso(now)
-        log('Tipico: %s – %d Spiele, %d zugeordnet, %d Credits' % (slug, len(events), len(found), cost))
+        log('Tipico: %s – %d Spiele, %d mit Tipico-Quote, %d zugeordnet, %d Credits' % (slug, len(events), offers, len(found), cost))
     st['log'] = st['log'][-LOG_KEEP:]
     st['remaining'] = remaining
     st['updatedAt'] = iso(now)
