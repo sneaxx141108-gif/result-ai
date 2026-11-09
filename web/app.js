@@ -1095,6 +1095,7 @@
       if (s.moved) parts.push(`${s.moved} angepasst`);
       if (s.gone) parts.push(`${s.gone} raus`);
       if (s.checked) parts.push(`${s.checked} ausgewertet (${s.won} ✓)`);
+      if (s.tf) parts.push(`Tipico: ${s.tf} ${s.tf === 1 ? 'Liga' : 'Ligen'}`);
       return parts.length ? parts.join(' · ') : `${s.games || 0} Spiele geprüft · keine Änderung`;
     }
     const parts = [`${s.teams} Teams neu berechnet`];
@@ -1105,6 +1106,7 @@
   function runDetails(r) {
     let h = '';
     if (r.job === 'tips') {
+      if (r.tipico && r.tipico.length) h += `<div class="kd-h">Tipico-Quoten geholt</div>${r.tipico.map((x) => `<div class="kd-row"><span class="grow"><b>${esc(x.comp)}</b><span>${x.matched} ${x.matched === 1 ? 'Spiel' : 'Spiele'} mit Quote</span></span><span class="kd-v"><b>${x.cost} Cr.</b></span></div>`).join('')}`;
       if (r.added && r.added.length) {
         h += `<div class="kd-h">Neu in den Listen</div>${r.added.map((t) => {
           const hn = tipTeam({ id: t.hid, name: t.h });
@@ -1179,6 +1181,7 @@
     });
     if (lastDay) log += '</div>';
     return head + `<div class="card ks" style="margin-top:18px">${status}</div><div class="ktiles">${tiles}</div>
+      ${tipicoCard()}
       <section class="sec"><div class="sec-h"><h2>Letzte 7 Tage</h2><span class="note">neue Tipps</span></div><div class="card">${chart}<p class="kc-cap">Balken = neue Tipps · darunter, wie oft gesucht wurde</p></div></section>
       <section class="sec"><div class="sec-h"><h2>Protokoll</h2><span class="note">antippen für Einzelheiten</span></div>${log || '<div class="empty">Noch keine Läufe protokolliert.</div>'}</section>
       <p class="foot">Die Rechner arbeiten ohne Sprach-KI: Mathe aus Ergebnissen, Toren und Marktpreisen, bei Zahlen genauer und ohne Erfundenes.<br>Gemini liest auf dem Cloudflare-Server deine Wettschein-Screenshots. Der Server startet auch die Tipp-Suche, wenn GitHub sie auslässt.</p>`;
@@ -1195,13 +1198,43 @@
     }
     return Z.loading;
   }
-  // Tipico: verbunden? Wie viele Abrufe sind diesen Monat noch frei? (Schlüssel als GitHub-Secret, die App sieht ihn nie)
-  function tipicoRow() {
+  // Tipico: verbunden? Wie viele Credits sind diesen Monat noch frei? (Schlüssel als GitHub-Secret, die App sieht ihn nie)
+  function tipicoState() {
     const t = T.data && T.data.tipico;
-    const st = !t ? 'idle' : !t.connected ? 'warn' : t.err ? 'bad' : 'ok';
-    const txt = !t ? 'wird geprüft …' : !t.connected ? 'nicht verbunden' : t.err ? 'Fehler' : 'verbunden';
-    const sub = t && t.connected ? `${t.covered || 0} Spiele mit Quote · noch ${t.remaining != null ? t.remaining : 'k. A.'} Abrufe diesen Monat` : 'trägt die echten Tipico-Quoten ein';
+    const st = !t ? 'idle' : !t.connected ? 'warn' : t.err ? 'bad' : t.updatedAt ? 'ok' : 'warn';
+    const txt = !t ? 'wird geprüft …' : !t.connected ? 'nicht verbunden' : t.err ? 'Fehler' : t.updatedAt ? 'verbunden' : 'wartet auf Abruf';
+    return { t, st, txt };
+  }
+  function tipicoRow() {
+    const { t, st, txt } = tipicoState();
+    const sub = t && t.connected ? (t.err ? t.err : `${t.covered || 0} Spiele mit Quote · noch ${t.remaining != null ? t.remaining : 'k. A.'} Credits`) : 'trägt die echten Tipico-Quoten ein';
     return `<div class="ks-row"><span class="ks-ic">${I.ticket}</span><span class="grow"><b>Tipico-Quoten</b><span>${esc(sub)}</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>`;
+  }
+  // Tipico-Karte (Niklas, 09.11.2026: die Einteilung soll in der KI-Zentrale stehen, zum Merken)
+  function tipicoCard() {
+    const { t, st, txt } = tipicoState();
+    if (!t) return '';
+    const when = (x) => `${dayDiff(x) === 0 ? 'heute' : dayDiff(x) === -1 ? 'gestern' : dayDiff(x) === 1 ? 'morgen' : new Date(x).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric' })}, ${hm(x)}`;
+    const rules = `<div class="tp-h">So werden die Credits eingeteilt</div><ul class="tp-rules">
+      <li>Jede Liga wird einmal abgerufen, sobald ihr Spieltag in 36 Stunden beginnt. Ein Abruf kostet 2 Credits und bringt alle Spiele der Liga.</li>
+      <li>Bundesliga, Champions League, die anderen Top-Ligen und die Nations League werden kurz vor Anpfiff noch einmal aufgefrischt.</li>
+      <li>Ligen mit aktuellen Top-Tipps kommen zuerst dran. Ruhige Tage sparen Credits für volle Spieltage.</li>
+      <li>Bei kleineren Ligen kann eine Quote beim Anpfiff ein paar Tage alt sein. Ligen, die der Anbieter nicht führt, bleiben bei „k. A.“.</li></ul>`;
+    if (!t.connected) return `<section class="sec"><div class="sec-h"><h2>Tipico</h2></div><div class="card tp"><div class="tp-top"><span class="tp-l">Noch kein Schlüssel eingetragen</span><span class="ks-st ${st}"><i></i>${txt}</span></div>${rules}</div></section>`;
+    const left = t.remaining;
+    const limit = left != null && t.used != null ? left + t.used : null;
+    const bar = limit ? `<div class="tp-bar" role="img" aria-label="${left} von ${limit} Credits übrig"><i style="transform:scaleX(${(left / limit).toFixed(3)})"></i></div>` : '';
+    const fact = (l, v) => `<div><span>${l}</span><b>${esc(v)}</b></div>`;
+    const facts = fact('Spiele mit Quote', `${t.covered || 0} von ${t.total != null ? t.total : 'k. A.'}`)
+      + fact('Letzter Abruf', t.lastFetch ? when(t.lastFetch) : 'noch keiner')
+      + fact('Heute verbraucht', `${t.spent || 0} Credits`)
+      + fact('Pro Tag übrig', t.share != null ? `etwa ${Math.round(t.share)} Credits` : 'k. A.');
+    const next = (t.next || []).length ? `<div class="tp-h">Als Nächstes dran</div>${t.next.map((x) => `<div class="tp-row"><b>${esc(x.comp)}</b><span>${esc(when(x.at))}</span></div>`).join('')}` : '';
+    const log = (t.log || []).slice(-6).reverse();
+    const last = log.length ? `<div class="tp-h">Letzte Abrufe</div>${log.map((x) => `<div class="tp-row"><b>${esc(x.comp)}</b><span>${x.matched} ${x.matched === 1 ? 'Spiel' : 'Spiele'} · ${esc(when(x.t))}</span></div>`).join('')}` : '';
+    return `<section class="sec"><div class="sec-h"><h2>Tipico</h2><span class="note">Quoten über The Odds API</span></div><div class="card tp">
+      <div class="tp-top"><div><b class="tp-n">${left != null ? left : 'k. A.'}</b><span class="tp-l">${limit ? `von ${limit} ` : ''}Credits übrig</span></div><span class="ks-st ${st}"><i></i>${txt}</span></div>${bar}
+      ${t.err ? `<p class="tp-err">${esc(t.err)}</p>` : ''}<div class="tp-facts">${facts}</div>${rules}${next}${last}</div></section>`;
   }
   function serverRow(tipsSt) {
     const s = Z.st;

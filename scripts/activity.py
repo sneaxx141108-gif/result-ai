@@ -36,7 +36,7 @@ def log_run(job, now, sec, summary, details=None, ok=True):
     runs.append(entry)
     runs.sort(key=lambda r: r['t'])
     for r in runs[:-DETAIL_RUNS]:  # ältere Einträge: nur noch die Zahlen
-        for k in ('added', 'results', 'movers', 'newTeams'):
+        for k in ('added', 'results', 'tipico', 'movers', 'newTeams'):
             r.pop(k, None)
     with open(PATH, 'w', encoding='utf-8') as f:
         json.dump({'updatedAt': entry['t'], 'runs': runs}, f, ensure_ascii=False, separators=(',', ':'))

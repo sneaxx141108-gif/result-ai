@@ -67,6 +67,13 @@ DE = {
     'Benin': 'Benin', 'Togo': 'Togo', 'Libya': 'Libyen', 'Sudan': 'Sudan', 'Ethiopia': 'Äthiopien', 'Equatorial Guinea': 'Äquatorialguinea', 'Madagascar': 'Madagaskar', 'Mauritania': 'Mauretanien',
     'Gambia': 'Gambia', 'Sierra Leone': 'Sierra Leone', 'Liberia': 'Liberia', 'Comoros': 'Komoren', 'Botswana': 'Botswana', 'Rwanda': 'Ruanda', 'Burundi': 'Burundi', 'Malawi': 'Malawi',
     'New Zealand': 'Neuseeland', 'Fiji': 'Fidschi', 'Solomon Islands': 'Salomonen', 'Tahiti': 'Tahiti', 'New Caledonia': 'Neukaledonien', 'Papua New Guinea': 'Papua-Neuguinea',
+    'American Samoa': 'Amerikanisch-Samoa', 'Antigua and Barbuda': 'Antigua und Barbuda', 'Bangladesh': 'Bangladesch', 'British Virgin Islands': 'Britische Jungferninseln', 'Brunei Darussalam': 'Brunei',
+    'Cambodia': 'Kambodscha', 'Cayman Islands': 'Kaimaninseln', 'Central African Republic': 'Zentralafrikanische Republik', 'Chad': 'Tschad', 'Chinese Taipei': 'Taiwan',
+    'Cook Islands': 'Cookinseln', 'Cuba': 'Kuba', 'Djibouti': 'Dschibuti', 'Dominican Republic': 'Dominikanische Republik', 'French Guiana': 'Französisch-Guayana',
+    'Hong Kong': 'Hongkong', 'Kyrgyz Republic': 'Kirgisistan', 'Maldives': 'Malediven', 'Mongolia': 'Mongolei', 'Northern Mariana Islands': 'Nördliche Marianen',
+    'Sao Tome and Principe': 'São Tomé und Príncipe', 'Seychelles': 'Seychellen', 'Singapore': 'Singapur', 'South Sudan': 'Südsudan', 'St. Kitts and Nevis': 'St. Kitts und Nevis',
+    'St. Vincent and the Grenadines': 'St. Vincent und die Grenadinen', 'Tajikistan': 'Tadschikistan', 'Timor-Leste': 'Osttimor', 'Turks and Caicos Islands': 'Turks- und Caicosinseln', 'US Virgin Islands': 'Amerikanische Jungferninseln',
+    'Yemen': 'Jemen', 'Zanzibar': 'Sansibar', 'Turkmenistan': 'Turkmenistan',
 }
 
 
@@ -152,7 +159,7 @@ def build(get, pick_color, log=print):
             x['n'] += 0.5 ** (age / SETTINGS['half_life'])
     teams = []
     for tid, x in info.items():
-        if tid not in r['att'] or x['n'] < 1.0 or x['last'] < NOW - timedelta(days=800):
+        if tid not in r['att'] or x['n'] < 1.0 or x['last'] < NOW - timedelta(days=1200):
             continue
         name = DE.get(x['name'], x['name'])
         teams.append({'id': tid, 'name': name, 'short': None, 'abbr': x['abbr'] or None, 'alias': sorted({x['name'], name}), 'lg': 'nat', 'nat': True,

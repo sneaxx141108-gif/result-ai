@@ -285,6 +285,11 @@ def main():
                         'home': team_of(side['home']), 'away': team_of(side['away']), 'od': ev['odds'], 'sig': real_odds(comp) if ev['odds'] else {}})
     raw += fotmob_games(rd, results)
     tq, tip_st = tipico.refresh(raw, prev, NOW, when, log)
+    for r in raw:  # Länder auf Deutsch und in den korrigierten Farben (erst jetzt: der Abgleich mit Tipico braucht die englischen Namen)
+        for side in ('home', 'away'):
+            t = teams.get(r[side]['id'])
+            if t and t.get('nat'):
+                r[side].update(name=t['name'], short=None, color=t.get('color') or r[side].get('color'))
 
     games, compact, cands = {}, [], []
     for r in raw:
@@ -430,12 +435,12 @@ def main():
         c, g = cur_tips[k], games[k[0]]
         added.append({'g': k[0], 'm': k[1], 'list': k[2], 'p': c['p'], 'q': c['q'], 'real': c['real'], 'comp': g['comp'], 'kick': g['t'],
                       'h': g['home']['name'], 'a': g['away']['name'], 'hid': g['home']['id'], 'aid': g['away']['id']})
-    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'rec': len(rec), 'kombis': len(kombis), 'tipico': len(tq) if tip_st.get('connected') else None,
+    summary = {'games': len(games), 'safe': len(safe), 'top': len(top), 'rec': len(rec), 'kombis': len(kombis), 'tipico': len(tq) if tip_st.get('connected') else None, 'tf': len(tip_st.get('fetched') or []),
                'checked': len(res_info), 'won': sum(1 for r in res_info if r['won']),
                'via': os.environ.get('RA_VIA') or None}  # wer die Suche gestartet hat: zeitgeber (Cloudflare), github, hand
     if prev:  # ohne Vergleich gibt es keine Zahlen (die App zeigt dann einfach keine)
         summary.update(new=len(new), gone=len(gone), moved=len(moved))
-    runs = activity.log_run('tips', NOW, time.time() - t0, summary, {'added': added, 'results': res_info[:30]})
+    runs = activity.log_run('tips', NOW, time.time() - t0, summary, {'added': added, 'results': res_info[:30], 'tipico': [{k: x[k] for k in ('comp', 'matched', 'cost')} for x in tip_st.get('fetched') or []]})
     out['ki'] = activity.today_summary(runs, NOW)
 
     with open(OUT, 'w', encoding='utf-8') as f:
