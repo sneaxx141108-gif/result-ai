@@ -110,7 +110,7 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   am Ende kurz berichten.
 - Unter Windows: größere Änderungen per kleinem Python-Skript statt Bash-Heredoc (Backslashes/Backticks gingen dort kaputt).
 
-## HIER WEITERMACHEN – Stand 08.11.2026, abends
+## HIER WEITERMACHEN – Stand 09.11.2026, abends
 
 **So geht's am Laptop los:** Claude öffnen → Repository `result-ai` (Ordner klonen: `git clone
 https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browser **claude.ai/code** → GitHub verbinden →
@@ -121,7 +121,7 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
   „'$GIT_DIR' too big“ – dann einen kurzen Pfad nehmen.
 - Node.js ist auf dem Laptop nicht installiert (Tests laufen auf GitHub); lokal ansehen: `.claude/launch.json` (Python-Server, Port 8098).
 
-**Niklas' Checkliste vom 08.11.2026 – alle 9 Punkte eingebaut (App-Stand `ra-shell-v21`):**
+**Niklas' Checkliste vom 08.11.2026 – alle 9 Punkte eingebaut (App-Stand `ra-shell-v22`):**
 1. **Quoten nur von Tipico.** `scripts/tipico.py` holt sie über The Odds API (`tipico_de`, Region `eu`); GitHub-Secret `ODDS_API_KEY`
    (Konto und Schlüssel macht Niklas selbst; Gratis-Plan 500 Credits im Monat). **Läuft live seit 09.11.2026** (erster Abruf: 8 Ligen, 16 Credits,
    alle Vereinsspiele zugeordnet). Die Credits werden je Spieltag eingeteilt: ein Abruf je Liga und Runde, Auffrischen nur mit dem, was übrig ist
@@ -134,10 +134,11 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
 2. **Ladebildschirm:** `#splash` steht direkt in `web/index.html` (Ring + Name, nur transform/opacity), Startbilder hell und dunkel in `web/icons/`.
 3. **Länder:** `scripts/nations.py` (ESPN, rund 4.500 Länderspiele, 218 Teams) mit eigenem `natModel` (Tor-Niveau, Heimvorteil, Halbwertszeit 3 Jahre),
    in den Stärken `lg:'nat'`, `nat:true`, `grp:1000`. Backtest 1.200 Spiele (Sep. 2025 bis Okt. 2026, inkl. WM 2026): Log-Loss 0,8532, Favorit in 60 % richtig.
-4. **Geld-Tracker** (`#/bets`, ganz in `web/app.js`, großes Update 09.11.2026). **Kein Grün beim Geld** (Niklas): Plus = Violett, Minus = Rose, immer mit Vorzeichen
-   (`--pos`, `--neg`, `--posf`, `--negf`). Die große Karte gibt es in vier Farben (`ra_mlook`, Blatt „Guthaben“). Reiter oben: Übersicht, Kalender, Offen, Erledigt.
+4. **Geld-Tracker** (`#/bets`, ganz in `web/app.js`, großes Update 09.11.2026). **Plus grün mit +, Minus rot mit −** bei allem, was Geld oder Abstand ist (Niklas, 09.11.2026, ersetzt das frühere „kein Grün beim Geld“):
+   Farben `--pos`, `--neg`, `--posf`, `--negf`, im Fließtext `pm(wert, text)`, sonst Klasse aus `plusMinus(wert)`. Die große Karte gibt es in vier Farben (`ra_mlook`, Blatt „Guthaben“), Standard ist **Schwarz-Weiß**
+   (hell: Weiß mit leichtem Schwarz, dunkel umgekehrt; der Schlüssel heißt weiter `uv`). Nur dort ist die große Zahl im Gewinn-Modus grün/rot, auf den bunten Karten bliebe sie unlesbar. Reiter oben: Übersicht, Kalender, Offen, Erledigt.
    Beim Umschalten zeichnet sich die Kurve fließend um (`lcMorph`, 110 Stützstellen, am Ende die exakte Linie durch jeden echten Wert), die Zahl läuft mit, die Knöpfe gleiten; die Seite wird dafür nicht neu aufgebaut (`moneySwitch`, `betsTab`).
-   Die Gewinn-Ansicht startet im Zeitraum bei null. Kalender: Plus/Minus je Tag, Monat wischen, Tag antippen, 12-Monats-Leiste. Eine Wette zählt am Tag ihres letzten Anpfiffs (`settleT`), Geld wird in ganzen Cent addiert.
+   Die Gewinn-Ansicht startet im Zeitraum bei null. Kalender: Plus/Minus je Tag (Zelle getönt, Zahl grün/rot, je kräftiger, desto mehr Geld), Monat wischen, Tag antippen, 12-Monats-Leiste mit dem Betrag unter jedem Monat. Eine Wette zählt am Tag ihres letzten Anpfiffs (`settleT`), Geld wird in ganzen Cent addiert.
    Alles nur auf dem Handy, `ra_wallet` hat `start` und `fixes`. Nie Beispieldaten ausliefern.
 5. **3. Liga Deutschland in den Tipps:** ohne Marktquoten (`MODEL_ONLY`), Spiele und Ergebnisse von FotMob (`fmg:…`, Ergebnisse in `tips.json` → `res`).
 6. **Bilanz:** eigene Abteilung auf dem Start plus Seite `#/bilanz`; Beispiel-Wetten sind raus.
@@ -153,7 +154,25 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
 
 **Wichtig fürs Hochladen:** `pages.yml` testet die `web/data/tips.json` aus dem Repository, die der Bot nicht mehr committet. Ändert sich ihr Format, muss eine frische Datei mit (`python scripts/tips.py`, danach `tips_log.json` und `activity.json` wieder zurücksetzen).
 
-**Noch zu prüfen:** alles auf Niklas' iPhone, ein echter Wettschein (bisher nur mit nachgestellter Server-Antwort getestet), Tipico sobald der Schlüssel eingetragen ist.
+**Rechnen-Upgrade (09.11.2026, alles per Backtest, Log-Loss, kleiner = besser):**
+- *Vor dem Spiel* (Test 17.724 Spiele): feste Ergebnis-Tabelle `SCORE_TABLE` + Dixon-Coles (`MAXG=10`, `RHO=-0.07`) + neue `CAL`, gespiegelt in `web/engine.js`, `scripts/forecast.py`, `scripts/tips.py`.
+  Genaues Ergebnis 2,8746 → 2,8706, Tore 1,7976 → 1,7962, 1X2 0,9959 → 0,9957. Aus Team-Stärken: 1X2 1,0111 → 1,0103, Ü2,5 0,6946 → 0,6938, Beide treffen 0,6947 → 0,6924, Ergebnis 3,0049 → 3,0013.
+  Marktpreise sind fast nicht zu schlagen, die Gewinne sind klein. Echte Tipps bisher: 205 von 322 gewonnen, erwartet 204,0.
+- *Im Test durchgefallen, nicht wieder einbauen ohne neuen Beleg:* anderes `RHO`, IPF, Kalibrierung von 1X2 und Torlinien, Tabellen je Liga-Stärke, Mittel aus zwei Buchmachern, Heimvorteil je Liga, Frailty und Form je Team im Live-Modell.
+- *Live:* exaktes Modell Minute für Minute in `web/engine.js` (`playOut`, `nextGoal`, `GOAL_BINS`, `STATE_HOME`, `STATE_AWAY`, `RED`): Tore je Minute inkl. Nachspielzeit, Spielstand, rote Karten. Gefittet bis Juni 2025 (26.368 Spiele), Test danach (8.545),
+  Schnitt über die Minuten 1/15/30/46/60/75/85: 1X2 0,7765 → 0,7703, Ü2,5 0,4699 → 0,4663, Beide treffen 0,4840 → 0,4779, Ergebnis 2,1062 → 2,0934.
+  Halbzeit vor dem Spiel 1,0390 → 1,0382, ab Minute 15 0,8954 → 0,8935, ab Minute 30 0,6688 → 0,6650. Nächstes Tor „wer“ 0,9478 → 0,9397, „in 10 Min.“ 0,5694 → 0,5672.
+  Vor dem Anpfiff bleibt die Tabelle: die Minuten-Rechnung war dort nur 0,42 Punkte anders, die Tabelle trifft die Marktpreise exakt. Vor dem Spiel und für die Tipps gilt also weiter nur der Teil in `forecast.py`/`tips.py`.
+- *Bilanz:* `record.all` (alle Tipps, additiv, die App kommt ohne aus), Abstand zur eigenen Vorhersage in Prozentpunkten (`recDiff`), Rendite mit 1 € je Tipp (`roiLine`).
+
+**Handy oder iPad** (Einstellungen → Gerät, `ra_device`, `data-device` auf `<html>`, beim ersten Start nach Bildschirmgröße). Das Layout steht am Ende von `web/app.css`:
+- Ab 700 px Breite (iPad hochkant, Leiste unten): mehr Spalten.
+- **iPad quer** (Niklas: „im quer also breiten Format“; CSS `min-width: 960px` und Querformat, in JS `ipadSide()`, beides muss zusammenpassen): Leiste links (`--side: 92px`, `.side-brand`, `.side-foot` mit KI und Einstellungen), keine Kopfzeile auf den Bereichen (`.bar.tabtop`),
+  Wetten-Übersicht links Karte und Diagramme, rechts die Zahlen (`.ovg`), Ergebnis links Spiel, große Zahl und Sprung-Leiste (`.res-l`, bleibt stehen), rechts die Karten.
+- Karten-Raster ohne Lücken: `ipadPack()` (Zeilen von 1 px, `gridRowEnd = span Höhe + 18`). Dort **immer `row-gap: 0`** und keine eigenen Außenabstände an den Karten, sonst überlappen oder strecken sie sich. Beim Drehen zeichnet `redrawAll` alles neu.
+- Geprüft im Browser bei 1180×820, 1133×744, 1024×768, 1366×1024, hochkant 820×1180 und Handy 390 px, hell und dunkel. Am echten iPad noch nicht.
+
+**Noch zu prüfen:** alles auf Niklas' iPhone und iPad, ein echter Wettschein (bisher nur mit nachgestellter Server-Antwort getestet).
 
 **Neu am 06.11.2026 abends (gebaut im Zweig `wett-tracker`, seit spätabends in `main` und online; siehe Abschnitt „Wetten,
 Empfohlen, Cloudflare-Server“):** Wett-Tracker mit

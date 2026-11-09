@@ -98,10 +98,27 @@ def pois_vec(lam):
     return p
 
 
+# Ergebnis-Tabelle (wie in web/engine.js): Wie viel häufiger oder seltener ein genaues Ergebnis wirklich vorkommt als im Tormodell.
+# Vor allem hohe Remis und knappe Spiele (2:2, 3:3, 3:2) sind häufiger: Wer zurückliegt, riskiert mehr. Zeile = Tore Heim, Spalte = Tore Gast.
+# Backtest 09.11.2026, 110.165 Spiele 2012–2026 mit Schlussquoten; gelernt bis 2023/24, geprüft an 17.724 späteren Spielen:
+# Log-Loss genaues Ergebnis 2,8746 → 2,8706, Anzahl Tore 1,7976 → 1,7962, Sieg/Remis/Niederlage nicht schlechter. Auch die Team-Stärken werden genauer
+# (3 Zeiträume, 5.283 Spiele: Sieg/Remis/Niederlage 1,0111 → 1,0103, Beide treffen 0,6947 → 0,6924). Heim/Gast gleich behandelt, danach an allen Jahren gelernt.
+SCORE_TABLE = [[0.863, 0.996, 0.918, 0.959, 0.953, 0.959],
+               [0.996, 1.014, 1.089, 1.019, 1.003, 1.025],
+               [0.918, 1.089, 1.239, 1.212, 1.064, 1.038],
+               [0.959, 1.019, 1.212, 1.339, 1.24, 0.981],
+               [0.953, 1.003, 1.064, 1.24, 1.336, 1.14],
+               [0.959, 1.025, 1.038, 0.981, 1.14, 1.0]]
+_ST = [[SCORE_TABLE[x][y] if x < 6 and y < 6 else 1.0 for y in range(MAXG + 1)] for x in range(MAXG + 1)]
+_ONE = [[1.0] * (MAXG + 1) for _ in range(MAXG + 1)]
+USE_TABLE = True  # nur für Vergleichstests abschaltbar
+
+
 def score_matrix(lh, la, rho=DC_RHO):
-    """Wahrscheinlichkeit jedes Ergebnisses x:y (Poisson mit Dixon-Coles-Korrektur)."""
+    """Wahrscheinlichkeit jedes Ergebnisses x:y (Poisson mit Ergebnis-Tabelle und Dixon-Coles-Korrektur)."""
     ph, pa = pois_vec(lh), pois_vec(la)
-    m = [[ph[x] * pa[y] for y in range(MAXG + 1)] for x in range(MAXG + 1)]
+    T = _ST if USE_TABLE else _ONE
+    m = [[ph[x] * pa[y] * T[x][y] for y in range(MAXG + 1)] for x in range(MAXG + 1)]
     m[0][0] *= max(0.0, 1 - lh * la * rho)
     m[0][1] *= max(0.0, 1 + lh * rho)
     m[1][0] *= max(0.0, 1 + la * rho)

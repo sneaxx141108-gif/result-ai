@@ -1,18 +1,65 @@
 /* Result AI – Rechen-Kern (ohne KI, ohne Zufall).
-   Aus der Tor-Erwartung beider Teams (bzw. aus Quoten) wird exakt gerechnet: Poisson-Tormodell mit Dixon-Coles-Korrektur
-   (wie forecast.py der BVB-App). Gleiche Eingabe -> immer exakt dasselbe Ergebnis. Läuft im Browser und in Node (Tests). */
+   Aus der Tor-Erwartung beider Teams (bzw. aus Quoten) wird exakt gerechnet: vor dem Spiel Poisson-Tormodell mit Dixon-Coles-Korrektur und Ergebnis-Tabelle,
+   im Spiel Minute für Minute mit gelernten Tor-Zeiten, Spielstand und roten Karten. Gleiche Eingabe -> immer exakt dasselbe Ergebnis. Läuft im Browser und in Node (Tests). */
 (function (root) {
   'use strict';
 
   const MAXG = 10; // Tore je Team, die betrachtet werden (mehr kommt praktisch nie vor)
   const RHO = -0.07; // Dixon-Coles: etwas mehr 0:0/1:1, etwas weniger 1:0/0:1 als reines Poisson
-  // Torverteilung über die Spielzeit: ~45 % der Tore in Halbzeit 1 (inkl. ~1 Min. Nachspielzeit), ~55 % in Halbzeit 2 (~4 Min.)
-  const H1_SHARE = 0.45;
+  // Spiel-Uhr in Schritten: 1–45 = Minute 1–45, 46 = Nachspielzeit Halbzeit 1, 47–91 = Minute 46–90, 92–95 = Nachspielzeit Halbzeit 2
   const H1_LEN = 46;
   const H2_LEN = 49;
-  // Rote Karte: das Team in Unterzahl trifft seltener, der Gegner öfter (je Karte, nur für die Restzeit)
-  const RED_OWN = 0.67;
-  const RED_OPP = 1.22;
+  const STEPS = H1_LEN + H2_LEN;
+  const SUB = 2; // Teilschritte je Minute beim Durchrechnen (genau so wurde gelernt)
+  /* Live-Modell: gelernt an echten Tor-Minuten. Backtest 09.11.2026: 34.913 Ligaspiele mit Minuten (ESPN) und Schlussquoten (football-data),
+     gelernt bis Juni 2025, geprüft an 8.545 späteren Spielen, jeweils ab Minute 1, 15, 30, Halbzeit, 60, 75, 85 (Log-Loss, kleiner = besser):
+     alte Formel → dieses Modell: Sieg/Remis/Niederlage 0,7765 → 0,7703 · Über 2,5 Tore 0,4699 → 0,4663 · beide treffen 0,4840 → 0,4779 ·
+     genauer Endstand 2,1062 → 2,0934 · wer das nächste Tor schießt 0,9478 → 0,9397 · Halbzeit-Stand ab Minute 30 0,6688 → 0,6650.
+     Abgelehnt, weil schlechter: aus den bisherigen Toren eines Spiels auf die restlichen schließen (beide Varianten).
+     Änderungen nur nach neuem Backtest.
+     GOAL_BINS: Anteil der Tore je Stück (1.–45. in Fünfern, Nachspielzeit 1, 46.–90. in Fünfern, Nachspielzeit 2), bezogen auf „es steht unentschieden“.
+     Die Summe liegt über 1, weil wer führt, im Schnitt seltener trifft. */
+  const GOAL_BINS = [0.0385, 0.0491, 0.0495, 0.05, 0.0502, 0.0505, 0.0513, 0.0508, 0.0505, 0.0307, 0.0498, 0.0597, 0.0586, 0.0562, 0.0544, 0.0531, 0.0551, 0.0564, 0.0564, 0.0714];
+  // Wie sehr der Spielstand das Treffen ändert. Zeile: eigene Tore minus gegnerische (−2 oder weniger … +2 oder mehr), Spalte: Spielphase (bis 30., bis Halbzeit, bis 60., bis 75., Rest)
+  const STATE_HOME = [
+    [0.946, 1.085, 1.119, 1.136, 1.103],
+    [0.953, 1.071, 1.121, 1.101, 1.182],
+    [1, 1, 1, 1, 1],
+    [0.892, 0.929, 0.91, 0.906, 0.835],
+    [0.829, 0.905, 0.895, 0.922, 0.85],
+  ];
+  const STATE_AWAY = [
+    [0.928, 1.041, 1.1, 1.127, 1.109],
+    [1.017, 1.033, 1.1, 1.15, 1.175],
+    [1, 1, 1, 1, 1],
+    [0.942, 0.925, 0.988, 0.944, 0.867],
+    [0.791, 0.993, 0.944, 0.975, 0.906],
+  ];
+  // Rote Karten: eigene minus gegnerische (−2 … +2). Wirkung auf die eigenen Tore, für die Restzeit
+  const RED = [2.287, 1.665, 1, 0.543, 0.38];
+  const BIN = new Array(STEPS + 1).fill(0);
+  const WIDTH = new Array(GOAL_BINS.length).fill(0);
+  for (let t = 1; t <= STEPS; t++) {
+    BIN[t] = t <= 45 ? Math.floor((t - 1) / 5) : t === 46 ? 9 : t <= 91 ? 10 + Math.floor((t - 47) / 5) : 19;
+    WIDTH[BIN[t]]++;
+  }
+  const GOALS = BIN.map((b, t) => (t ? GOAL_BINS[b] / WIDTH[b] : 0)); // Tor-Anteil je Schritt
+  const CUM = [0];
+  for (let t = 1; t <= STEPS; t++) CUM[t] = CUM[t - 1] + GOALS[t];
+  const PHASE = BIN.map((b, t) => (t <= 30 ? 0 : t <= 46 ? 1 : t <= 61 ? 2 : t <= 76 ? 3 : 4));
+  const diffIdx = (d) => Math.max(-2, Math.min(2, d)) + 2;
+  /* Ergebnis-Tabelle (wie SCORE_TABLE in forecast.py): Wie viel häufiger oder seltener ein genaues Ergebnis wirklich vorkommt als im reinen Tormodell.
+     Vor allem hohe Remis und knappe Spiele (2:2, 3:3, 3:2) sind häufiger: Wer zurückliegt, riskiert mehr. Zeile = Tore Heim, Spalte = Tore Gast.
+     Backtest 09.11.2026 (110.165 Spiele 2012–2026 mit Schlussquoten, gelernt bis 2023/24, geprüft an 17.724 späteren Spielen):
+     Log-Loss genaues Ergebnis 2,8746 → 2,8706, Anzahl Tore 1,7976 → 1,7962. Heim/Gast gleich behandelt (ebenso genau), danach an allen Jahren gelernt. Gilt nur vor dem Spiel. */
+  const TABLE = [
+    [0.863, 0.996, 0.918, 0.959, 0.953, 0.959],
+    [0.996, 1.014, 1.089, 1.019, 1.003, 1.025],
+    [0.918, 1.089, 1.239, 1.212, 1.064, 1.038],
+    [0.959, 1.019, 1.212, 1.339, 1.24, 0.981],
+    [0.953, 1.003, 1.064, 1.24, 1.336, 1.14],
+    [0.959, 1.025, 1.038, 0.981, 1.14, 1],
+  ];
 
   function poisVec(lam, n = MAXG) {
     const out = new Array(n + 1);
@@ -24,11 +71,11 @@
     return out;
   }
 
-  // Wahrscheinlichkeit jedes Ergebnisses x:y; dc = Dixon-Coles-Korrektur (nur für ganze Spiele ab 0:0)
+  // Wahrscheinlichkeit jedes Ergebnisses x:y; dc = Ergebnis-Tabelle und Dixon-Coles-Korrektur (nur für ganze Spiele ab 0:0)
   function scoreMatrix(lh, la, dc = true) {
     const ph = poisVec(lh);
     const pa = poisVec(la);
-    const m = ph.map((a) => pa.map((b) => a * b));
+    const m = ph.map((a, x) => pa.map((b, y) => a * b * (dc && x < 6 && y < 6 ? TABLE[x][y] : 1)));
     if (dc) {
       m[0][0] *= Math.max(0, 1 - lh * la * RHO);
       m[0][1] *= Math.max(0, 1 + lh * RHO);
@@ -55,15 +102,14 @@
   // Anteil der Tore, die bis zur Minute t im Schnitt schon gefallen sind (0..1)
   function goalShareUntil(t) {
     if (t <= 0) return 0;
-    if (t <= H1_LEN) return H1_SHARE * (t / H1_LEN);
-    const t2 = Math.min(H2_LEN, t - H1_LEN);
-    return H1_SHARE + (1 - H1_SHARE) * (t2 / H2_LEN);
+    return CUM[Math.min(STEPS, Math.floor(t))] / CUM[STEPS];
   }
 
   // Minute aus dem Screenshot -> verstrichene Spielzeit in "Modell-Minuten" (Halbzeit 1 = 0..46, Halbzeit 2 = 46..95)
   function clock(minute, half) {
     if (minute == null || minute <= 0) return 0;
     if (half === 'ht') return H1_LEN;
+    if (half === 1) return Math.min(H1_LEN, minute); // 45+2 steht oft als 47 da, ist aber noch Halbzeit 1
     if (half === 2 || minute > 45) return H1_LEN + Math.min(H2_LEN, Math.max(0, minute - 45));
     return Math.min(H1_LEN, minute);
   }
@@ -95,6 +141,70 @@
     return all.slice(0, n);
   }
 
+  /* Das Spiel ab Schritt t0 bis tEnd exakt durchrechnen, Minute für Minute: Nach jedem Tor ändert sich der Spielstand und damit, wie oft beide treffen.
+     Ergebnis: Wahrscheinlichkeit für x weitere Heimtore und y weitere Gasttore. Rote Karten gelten so, wie sie gerade stehen. */
+  function playOut(lh, la, t0, tEnd, score, reds) {
+    const n = MAXG + 1;
+    let cur = new Float64Array(n * n);
+    let nxt = new Float64Array(n * n);
+    cur[0] = 1;
+    const rd = (reds[0] || 0) - (reds[1] || 0);
+    const rh = RED[diffIdx(rd)];
+    const ra = RED[diffIdx(-rd)];
+    for (let t = t0 + 1; t <= tEnd; t++) {
+      const ph = PHASE[t];
+      const gh = (lh * GOALS[t] * rh) / SUB;
+      const ga = (la * GOALS[t] * ra) / SUB;
+      for (let s = 0; s < SUB; s++) {
+        nxt.fill(0);
+        for (let x = 0; x < n; x++) {
+          for (let y = 0; y < n; y++) {
+            const v = cur[x * n + y];
+            if (!v) continue;
+            const d = diffIdx(score[0] + x - score[1] - y);
+            const eh = gh * STATE_HOME[d][ph];
+            const ea = ga * STATE_AWAY[4 - d][ph];
+            nxt[x * n + y] += v * (1 - eh - ea);
+            nxt[Math.min(n - 1, x + 1) * n + y] += v * eh;
+            nxt[x * n + Math.min(n - 1, y + 1)] += v * ea;
+          }
+        }
+        const tmp = cur;
+        cur = nxt;
+        nxt = tmp;
+      }
+    }
+    return Array.from({ length: n }, (_, x) => Array.from(cur.subarray(x * n, x * n + n)));
+  }
+
+  /* Nächstes Tor: Bis es fällt, bleibt der Spielstand gleich. S[t] = Chance, dass bis einschließlich Schritt t kein Tor mehr gefallen ist.
+     target: vor dem Spiel die Chance auf 0:0 aus der Ergebnis-Tabelle, damit „kein Tor“ und das 0:0 dieselbe Zahl zeigen. */
+  function nextGoal(lh, la, t0, score, reds, target) {
+    const d = diffIdx(score[0] - score[1]);
+    const rd = (reds[0] || 0) - (reds[1] || 0);
+    const run = (c) => {
+      const S = new Array(STEPS + 1).fill(1);
+      let left = 1;
+      let home = 0;
+      let away = 0;
+      for (let t = t0 + 1; t <= STEPS; t++) {
+        const ph = PHASE[t];
+        const eh = (c * lh * GOALS[t] * STATE_HOME[d][ph] * RED[diffIdx(rd)]) / SUB;
+        const ea = (c * la * GOALS[t] * STATE_AWAY[4 - d][ph] * RED[diffIdx(-rd)]) / SUB;
+        for (let s = 0; s < SUB; s++) {
+          home += left * eh;
+          away += left * ea;
+          left *= 1 - eh - ea;
+        }
+        S[t] = left;
+      }
+      return { S, home, away, none: left };
+    };
+    const r = run(1);
+    return target > 0 && target < 1 && r.none > 0 && r.none < 1 ? run(Math.log(target) / Math.log(r.none)) : r;
+  }
+  const minuteOf = (t) => (t <= 45 ? t : t === 46 ? 45 : t <= 91 ? t - 1 : 90); // Schritt -> Spielminute
+
   /* Hauptfunktion.
      input: { lh, la }            Tor-Erwartung für ein ganzes Spiel (Heim, Gast)
             minute, half          Spielminute aus dem Screenshot (0 / leer = vor dem Spiel), half: 1, 2 oder 'ht'
@@ -106,50 +216,47 @@
     const la = Math.max(0.02, +input.la || 0);
     const score = input.score || [0, 0];
     const reds = input.reds || [0, 0];
-    const t = input.finished ? H1_LEN + H2_LEN : clock(input.minute, input.half);
+    const t = input.finished ? STEPS : clock(input.minute, input.half);
     const live = t > 0;
-    const rest = 1 - goalShareUntil(t);
-    let fh = 1;
-    let fa = 1;
-    for (let i = 0; i < (reds[0] || 0); i++) { fh *= RED_OWN; fa *= RED_OPP; }
-    for (let i = 0; i < (reds[1] || 0); i++) { fa *= RED_OWN; fh *= RED_OPP; }
-    const rh = lh * rest * fh;
-    const ra = la * rest * fa;
-    // Restliche Tore: vor dem Spiel mit Dixon-Coles, im Spiel reines Poisson; dann um den Spielstand verschieben
-    const add = scoreMatrix(rh, ra, !live);
-    const fin = shift(add, score[0] || 0, score[1] || 0);
+    const sc = [score[0] || 0, score[1] || 0];
+    // Vor dem Spiel: Ergebnis-Tabelle aus den Marktpreisen (trifft die Quoten genau). Im Spiel: der Rest wird Minute für Minute durchgerechnet.
+    const add = live ? playOut(lh, la, t, STEPS, sc, reds) : scoreMatrix(lh, la, true);
+    let rh = lh;
+    let ra = la;
+    if (live) {
+      rh = 0;
+      ra = 0;
+      add.forEach((row, x) => row.forEach((v, y) => { rh += x * v; ra += y * v; }));
+    }
+    const fin = shift(add, sc[0], sc[1]);
     const res = outcome(fin);
-    const total = (score[0] || 0) + (score[1] || 0);
+    const total = sc[0] + sc[1];
     const lines = [0.5, 1.5, 2.5, 3.5, 4.5].filter((l) => l > total - 0.5 || !live);
     // Nächstes Tor (Restzeit): wer trifft zuerst, und wann
-    const restRate = rh + ra; // erwartete Tore bis Schluss
-    const pNone = Math.exp(-restRate);
-    const restMin = Math.max(1, H1_LEN + H2_LEN - t);
-    const perMin = restRate / restMin;
-    const within = (k) => 1 - Math.exp(-perMin * Math.min(k, restMin));
+    const nx = nextGoal(lh, la, t, sc, reds, live ? null : add[0][0]);
+    const within = (k) => 1 - nx.S[Math.min(STEPS, t + k)];
+    let median = null;
+    for (let i = t + 1; i <= STEPS && median == null; i++) if (nx.S[i] <= 0.5) median = minuteOf(i);
     // Halbzeit (nur wenn sie noch nicht vorbei ist)
     let ht = null;
     if (t < H1_LEN) {
-      const restH1 = (H1_SHARE - goalShareUntil(t));
-      const m1 = shift(scoreMatrix(lh * restH1 * fh, la * restH1 * fa, !live), score[0] || 0, score[1] || 0);
+      const m1 = shift(playOut(lh, la, t, H1_LEN, sc, reds), sc[0], sc[1]);
       ht = Object.assign(outcome(m1), { top: topScores(m1, 3) });
     }
     // Gesamttore am Ende: 0, 1, …, 5 und „6 oder mehr“
     const totals = new Array(7).fill(0);
     fin.forEach((row, x) => row.forEach((v, y) => { totals[Math.min(6, x + y)] += v; }));
     // Tor-Kurve: Wahrscheinlichkeit, dass bis zur Minute m (noch) ein Tor fällt – in 5-Minuten-Schritten bis Abpfiff
-    const rate = lh * fh + la * fa; // Tore je ganzes Spiel bei aktueller Spielerzahl
-    const shareNow = goalShareUntil(t);
     const curve = [];
     for (let m = live ? Math.ceil(((input.minute || 0) + 0.5) / 5) * 5 : 0; m <= 90; m += 5) {
-      curve.push({ m, p: 1 - Math.exp(-rate * Math.max(0, goalShareUntil(clock(m, m > 45 ? 2 : 1)) - shareNow)) });
+      curve.push({ m, p: 1 - nx.S[Math.max(t, clock(m, m > 45 ? 2 : 1))] });
     }
-    curve.push({ m: 95, p: 1 - pNone }); // inkl. Nachspielzeit
+    curve.push({ m: 95, p: 1 - nx.none }); // inkl. Nachspielzeit
     return {
       live,
       minute: input.minute || 0,
-      score: [score[0] || 0, score[1] || 0],
-      xg: { home: (score[0] || 0) + rh, away: (score[1] || 0) + ra },
+      score: sc,
+      xg: { home: sc[0] + rh, away: sc[1] + ra },
       rest: { home: rh, away: ra },
       probs: res,
       double: { '1X': res.home + res.draw, X2: res.draw + res.away, 12: res.home + res.away },
@@ -160,14 +267,14 @@
       hs: 1 - fin[0].reduce((s, v) => s + v, 0),
       as: 1 - fin.reduce((s, row) => s + row[0], 0),
       next: {
-        home: restRate > 0 ? (rh / restRate) * (1 - pNone) : 0,
-        away: restRate > 0 ? (ra / restRate) * (1 - pNone) : 0,
-        none: pNone,
+        home: nx.home,
+        away: nx.away,
+        none: nx.none,
         in10: within(10),
         in20: within(20),
         in30: within(30),
         // Minute, bis zu der das nächste Tor mit 50 % gefallen ist (null = eher kein Tor mehr)
-        median: pNone < 0.5 ? Math.round((input.minute || 0) + Math.log(2) / perMin) : null,
+        median,
         curve,
       },
       totals,
@@ -215,9 +322,9 @@
     }
     return [lh, la];
   }
-  /* Feinabgleich der Tor-Wetten (Backtest 08.11.2026, 48.603 Spiele, in drei Test-Saisons immer besser): aus Quoten gerechnete Chancen
-     für „beide treffen“, „Heim trifft“ und „Gast trifft“ leicht nachjustieren. a/b gelernt an allen Jahren. */
-  const CAL = { BY: [0.0615, 0.923], HS: [-0.0119, 1.0616], AS: [0.0599, 1.0035] };
+  /* Feinabgleich der Tor-Wetten: aus Quoten gerechnete Chancen für „beide treffen“, „Heim trifft“ und „Gast trifft“ leicht nachjustieren.
+     a/b an allen Jahren gelernt (09.11.2026, 110.165 Spiele), passend zur Ergebnis-Tabelle. */
+  const CAL = { BY: [0.0299, 0.8561], HS: [-0.0164, 1.0292], AS: [0.0459, 0.9617] };
   function calibrate(code, p) {
     const c = CAL[code === 'BN' ? 'BY' : code];
     if (!c || !(p > 0 && p < 1)) return p;
@@ -235,6 +342,24 @@
     const raw = { H: a.probs.home, D: a.probs.draw, A: a.probs.away, HD: a.double['1X'], DA: a.double.X2, HA: a.double['12'], HS: a.hs, AS: a.as }[code];
     if (raw == null) return null;
     return market ? calibrate(code, raw) : raw;
+  }
+
+  // Geht die Wette (Wett-Code wie in tips.py) bei diesem Endstand auf?
+  function codeWins(code, x, y) {
+    const m = /^([OU])(\d)(\d)$/.exec(code);
+    if (m) { const l = +m[2] + +m[3] / 10; return m[1] === 'O' ? x + y > l : x + y < l; }
+    if (code === 'BY') return x > 0 && y > 0;
+    if (code === 'BN') return !(x > 0 && y > 0);
+    if (code === 'HS') return x > 0;
+    if (code === 'AS') return y > 0;
+    return code.includes(x > y ? 'H' : x === y ? 'D' : 'A');
+  }
+  // Mehrere Wetten aufs selbe Spiel zusammen: alle Endstände aufsummieren, bei denen jede davon aufgeht (sie hängen ja zusammen)
+  function jointProb(lh, la, codes) {
+    if (!codes.length || codes.some((c) => !c)) return null;
+    let p = 0;
+    scoreMatrix(lh, la).forEach((row, x) => row.forEach((v, y) => { if (codes.every((c) => codeWins(c, x, y))) p += v; }));
+    return p;
   }
 
   /* Quoten -> Tor-Erwartung (wie market_lambdas der BVB-App).
@@ -278,7 +403,7 @@
     return { lh: Math.max(0.05, (total + s) / 2), la: Math.max(0.05, (total - s) / 2), market };
   }
 
-  const api = { MAXG, analyze, fromOdds, scoreMatrix, outcome, poisVec, goalShareUntil, devig, calibrate, codeProb };
+  const api = { MAXG, STEPS, analyze, playOut, fromOdds, scoreMatrix, outcome, poisVec, goalShareUntil, devig, calibrate, codeProb, codeWins, jointProb };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.RE = api;
 })(typeof self !== 'undefined' ? self : this);

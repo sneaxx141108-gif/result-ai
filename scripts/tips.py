@@ -37,8 +37,8 @@ KEEP_DAYS = 31    # so lange bleibt die Bilanz (die App zeigt die letzten 30 Tag
 MARGIN = 0.06     # typische Buchmacher-Marge → nur zum Einordnen, wo keine Quote bekannt ist (Doppelchance, Beide treffen …), wird nie angezeigt
 FM_LIGA3 = 208    # FotMob-Liga-ID der 3. Liga
 MODEL_ONLY = {'ger.3'}  # Ligen ohne Marktdaten: Chance aus den Team-Stärken von Result AI
-# Feinabgleich der aus Quoten gerechneten Tor-Wetten (Backtest 08.11.2026, 48.603 Spiele; in drei Test-Saisons immer besser), wie in engine.js
-CAL = {'BY': (0.0615, 0.923), 'HS': (-0.0119, 1.0616), 'AS': (0.0599, 1.0035)}
+# Feinabgleich der aus Quoten gerechneten Tor-Wetten (an allen Jahren gelernt, 09.11.2026, 110.165 Spiele, passend zur Ergebnis-Tabelle), wie in engine.js
+CAL = {'BY': (0.0299, 0.8561), 'HS': (-0.0164, 1.0292), 'AS': (0.0459, 0.9617)}
 MIN_Q = 1.12      # kleinere Quoten lohnen nicht (z. B. „Über 0,5 Tore“)
 SAFE = (0.70, 1.20)  # Liste „Sicher“: Chance ab 70 %, Quote ab 1,20
 TOP = (0.50, 1.60)   # Liste „Top-Quote“: Chance über 50 %, Quote ab 1,60
@@ -136,6 +136,36 @@ def won(code, x, y):
         line = int(code[1:]) / 10.0
         return x + y > line if code[0] == 'O' else x + y < line
     return {'HS': x > 0, 'AS': y > 0, 'BY': x > 0 and y > 0, 'BN': not (x > 0 and y > 0)}[code]
+
+
+def regular_time(e, ev):
+    """Stand nach 90 Minuten plus Nachspielzeit: so wertet der Buchmacher. Tore in der Verlängerung und im Elfmeterschießen zählen nicht.
+    Lässt sich das nicht sicher bestimmen → None: dann bleibt der Tipp offen, statt falsch gewertet zu werden."""
+    comp = (e.get('competitions') or [{}])[0]
+    name = str((((comp.get('status') or e.get('status') or {}).get('type')) or {}).get('name') or '')
+    if not re.search('AET|PEN|EXTRA|SHOOTOUT', name, re.I):
+        return ev['hs'], ev['as']
+    sides = {str((c.get('team') or {}).get('id')): c.get('homeAway') for c in comp.get('competitors') or []}
+    details = comp.get('details')
+    if not details:
+        return None
+    x = y = 0
+    for d in details:
+        if not d.get('scoringPlay') or d.get('shootout'):
+            continue
+        m = re.match(r'\s*(\d+)', str((d.get('clock') or {}).get('displayValue') or ''))  # Nachspielzeit steht als 90'+3', die Verlängerung ab 91'
+        if not m:
+            return None
+        if int(m.group(1)) > 90:
+            continue
+        side = sides.get(str((d.get('team') or {}).get('id')))  # bei Eigentoren nennt ESPN das Team, dem das Tor zählt
+        if side == 'home':
+            x += 1
+        elif side == 'away':
+            y += 1
+        else:
+            return None
+    return x, y
 
 
 def months():
@@ -274,7 +304,9 @@ def main():
                 continue
             seen.add(ev['id'])
             if ev['done']:
-                results[ev['id']] = (ev['hs'], ev['as'])
+                r90 = regular_time(e, ev)
+                if r90:
+                    results[ev['id']] = r90
                 continue
             t = when(ev['date'])
             if ev['state'] != 'pre' or not t or not (NOW < t < NOW + timedelta(days=DAYS)):
@@ -392,9 +424,24 @@ def main():
     entries = [e for e in entries if when(e['t']) > NOW - timedelta(days=KEEP_DAYS)]
     entries.sort(key=lambda e: e['t'])
 
+    def tally(es):
+        """exp = erwartete Treffer, var = ihre Streuung (zeigt, ob die Abweichung noch Zufall ist), qpl/qn = Gewinn bei 1 € je Tipp mit echter Tipico-Quote."""
+        priced = [e for e in es if e.get('q')]
+        return {'n': len(es), 'won': sum(1 for e in es if e['res']['won']), 'exp': round(sum(e['p'] for e in es), 2),
+                'var': round(sum(e['p'] * (1 - e['p']) for e in es), 2), 'qn': len(priced),
+                'qpl': round(sum((e['q'] - 1 if e['res']['won'] else -1) for e in priced), 2)}
+
     def record(days, lst):
-        es = [e for e in entries if e['list'] == lst and e.get('res') and when(e['t']) > NOW - timedelta(days=days)]
-        return {'n': len(es), 'won': sum(1 for e in es if e['res']['won']), 'exp': round(sum(e['p'] for e in es), 2)}
+        return tally([e for e in entries if e['list'] == lst and e.get('res') and when(e['t']) > NOW - timedelta(days=days)])
+
+    def record_all(days):
+        """Alle Listen zusammen, jeder Tipp nur einmal (derselbe Tipp kann in zwei Listen stehen)."""
+        once, es = set(), []
+        for e in entries:
+            if e.get('res') and when(e['t']) > NOW - timedelta(days=days) and (e['g'], e['m']) not in once:
+                once.add((e['g'], e['m']))
+                es.append(e)
+        return tally(es)
     done = [e for e in reversed(entries) if e.get('res')]
     recent, keys = [], set()
     for e in done:  # zuletzt ausgewertet, jeder Tipp nur einmal (stand er in beiden Listen)
@@ -413,7 +460,7 @@ def main():
            'safe': [{k: c[k] for k in ('g', 'm', 'p', 'q', 'real', 'pm')} for c in safe],
            'rec': [{k: c[k] for k in ('g', 'm', 'p', 'q', 'real', 'pm')} for c in rec],
            'kombis': kombis,
-           'record': {lst: {'7': record(7, lst), '30': record(30, lst)} for lst in ('top', 'safe', 'rec')},
+           'record': dict({lst: {'7': record(7, lst), '30': record(30, lst)} for lst in ('top', 'safe', 'rec')}, all={'7': record_all(7), '30': record_all(30)}),
            'recent': recent}
     # KI-Zentrale: was ist seit der letzten Suche neu, weggefallen, verschoben, ausgewertet?
     pg = (prev or {}).get('games') or {}

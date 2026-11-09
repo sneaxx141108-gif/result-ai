@@ -82,6 +82,16 @@
   // ------------------------------------------------------------------ Darstellung: hell (Standard) oder dunkel
   const isDark = () => document.documentElement.dataset.theme === 'dark';
   const mqDark = matchMedia('(prefers-color-scheme: dark)');
+  /* Handy oder iPad (Niklas, 09.11.2026): in den Einstellungen umstellbar. Das breite Layout steht am Ende von app.css und greift erst
+     ab 700 px Breite, auf einem Handy bleibt also alles benutzbar. Beim ersten Start wird das Gerät an der Bildschirmgröße erkannt. */
+  const ipadWide = () => document.documentElement.dataset.device === 'ipad' && innerWidth >= 700;
+  // iPad quer: Leiste links, Seiten in Spalten (muss zur Bedingung am Ende von app.css passen)
+  const ipadSide = () => ipadWide() && innerWidth >= 960 && innerWidth > innerHeight;
+  const deviceGuess = () => (Math.min(screen.width || 0, screen.height || 0) >= 700 ? 'ipad' : 'phone');
+  function applyDevice(v) {
+    document.documentElement.dataset.device = v;
+    store.set('device', v);
+  }
   function applyTheme(t) {
     const dark = t === 'dark' || (t === 'auto' && mqDark.matches);
     if (dark) document.documentElement.dataset.theme = 'dark'; else delete document.documentElement.dataset.theme;
@@ -210,7 +220,7 @@
     if (path.startsWith('/r/')) { const m = findMatch(decodeURIComponent(path.slice(3))); if (m) tt = miniMatch(m); }
     const lead = path === '/' ? `<span class="brand">${logo()}<span>Result AI</span></span>`
       : isTab(path) ? '' : `<button class="round" data-act="back" aria-label="Zurück">${I.back}</button>`;
-    return `<header class="bar">${lead}<span class="tt">${tt}</span>
+    return `<header class="bar${isTab(path) ? ' tabtop' : ''}">${lead}<span class="tt">${tt}</span>
       <span class="end">${path === '/' ? `<button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button>` : ''}<button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span></header>`;
   }
   function viewHtml(path) {
@@ -236,14 +246,14 @@
     const hist = store.get('history', []);
     return `${aura('home')}<section class="hello"><h1>${esc(greet())}</h1><p>${esc(todayLong())}</p></section>
       <div class="spot-slot">${spotlight()}</div>
-      <section class="sec"><div class="sec-h"><h2>Top-Tipps</h2><button class="link" data-act="tab" data-tab="/tips">Alle</button></div><div class="tips-prev">${tipCarousel()}</div></section>
-      <section class="sec"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="bil-slot">${bilanzCard()}</div></section>
+      <section class="sec h-tips"><div class="sec-h"><h2>Top-Tipps</h2><button class="link" data-act="tab" data-tab="/tips">Alle</button></div><div class="tips-prev">${tipCarousel()}</div></section>
+      <section class="sec h-bil"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="bil-slot">${bilanzCard()}</div></section>
       <section class="scan-card">${decoRing}
         <div class="sc-phone" aria-hidden="true"><div class="sc-screen"><span class="sc-lg">PREMIER LEAGUE</span><div class="sc-sb"><i style="background:#EF0107"></i><b>1 – 1</b><i style="background:#034694"></i></div><span class="sc-min">63'</span><span class="sc-box"></span><span class="sc-line"></span></div></div>
         <div class="sc-text"><span class="sc-eb">${I.scan}Wettschein scannen</span><h2>Schein rein.<br><span>Prozente raus.</span></h2><p>Result AI liest jede Wette und rechnet nach, wie gut sie wirklich ist.</p></div>
         ${scanBtns()}</section>
-      <section class="sec"><div class="group"><a class="row" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Vereine und Länder aus ${Object.keys(R.leagues).length || 'über 50'} Ligen</div></span><span class="chev">›</span></a>${homeBets()}</div></section>
-      ${hist.length ? `<section class="sec"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="link" data-act="tab" data-tab="/hist">Alle</button>' : ''}</div><div class="group">${hist.slice(0, 3).map(histRow).join('')}</div></section>` : ''}
+      <section class="sec h-more${hist.length ? '' : ' solo'}"><div class="group"><a class="row" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Vereine und Länder aus ${Object.keys(R.leagues).length || 'über 50'} Ligen</div></span><span class="chev">›</span></a>${homeBets()}</div></section>
+      ${hist.length ? `<section class="sec h-last"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="link" data-act="tab" data-tab="/hist">Alle</button>' : ''}</div><div class="group">${hist.slice(0, 3).map(histRow).join('')}</div></section>` : ''}
       <p class="foot">${RG_TEXT}</p>`;
   }
 
@@ -308,7 +318,7 @@
       S.url = URL.createObjectURL(file);
       S.file = file;
       S.slip = null;
-      if (curPath() === '/scan') { const p = S.stack[S.stack.length - 1]; p.el.innerHTML = barHtml('/scan') + `<div class="wrap">${vScan()}</div>`; runScan(p.el); } else location.hash = '#/scan';
+      if (curPath() === '/scan') { const p = S.stack[S.stack.length - 1]; p.el.innerHTML = barHtml('/scan') + `<div class="wrap" data-p="scan">${vScan()}</div>`; runScan(p.el); } else location.hash = '#/scan';
     };
     if (!String(store.get('invite', '') || '').trim()) inviteSheet(go); else go();
   }
@@ -432,17 +442,24 @@
     if (p == null) { item.src = null; item.why = 'Diese Wettart rechnet Result AI nicht nach'; return item; }
     item.p = p;
     leg.p = p;
+    item.lam = lam;
+    item.code = code;
     item.value = mk && leg.q ? p * leg.q - 1 : null; // „Wert“ nur gegen echte Marktpreise, die Team-Stärken allein sind dafür nicht genau genug
     return item;
   }
   function buildSlip(x) {
     const items = (x.legs || []).map(slipLeg);
     const games = items.map((i) => i.leg.g || `${norm(i.leg.home)}|${norm(i.leg.away)}`);
-    const sameGame = new Set(games).size < games.length; // Wetten aufs selbe Spiel hängen zusammen, das Produkt wäre falsch
+    const sameGame = new Set(games).size < games.length; // Wetten aufs selbe Spiel hängen zusammen: Sie werden gemeinsam aus den Ergebnissen gerechnet
     const prod = items.length && items.every((i) => i.leg.q) ? items.reduce((a, i) => a * i.leg.q, 1) : null;
-    const q0 = x.totalOdds || prod;
+    const q0 = x.totalOdds || (sameGame ? null : prod); // beim Buchmacher ist die Quote einer Kombi im selben Spiel nicht das Produkt
     const q = q0 ? Math.round(q0 * 100) / 100 : null;
-    const p = items.length && !sameGame && items.every((i) => i.p != null) ? items.reduce((a, i) => a * i.p, 1) : null;
+    let p = null;
+    if (items.length && items.every((i) => i.p != null)) {
+      const seen = new Map();
+      items.forEach((i, k) => { if (!seen.has(games[k])) seen.set(games[k], []); seen.get(games[k]).push(i); });
+      p = [...seen.values()].reduce((a, g) => (a == null ? null : g.length === 1 ? a * g[0].p : (() => { const j = RE.jointProb(g[0].lam[0], g[0].lam[1], g.map((i) => i.code)); return j == null ? null : a * j; })()), 1);
+    }
     return { items, q, p, value: p != null && q && items.every((i) => i.src === 'market') ? p * q - 1 : null, stake: x.stake || null, win: x.potentialWin || null,
       status: ['won', 'lost', 'void'].includes(x.status) ? x.status : 'open', bookie: x.bookmaker || null, note: x.note || null,
       key: 'scan|' + items.map((i) => `${norm(i.leg.pick)}:${i.leg.q || ''}`).join(',') + '|' + (x.stake || ''),
@@ -457,7 +474,7 @@
     if (!s.items.length) return `<h1 class="ptitle">Wettschein</h1><div class="empty" style="margin-top:18px">Auf dem Schein konnte keine einzelne Wette gelesen werden.</div>`;
     const fair = s.p ? nf2.format(1 / s.p) : 'k. A.';
     const verdict = s.p == null ? 'Nicht jede Wette lässt sich nachrechnen, deshalb hier keine Gesamtzahl.'
-      : s.value == null ? 'Mindestens ein Spiel ist nur aus den Team-Stärken geschätzt, deshalb hier kein Vergleich mit der Quote.'
+      : s.value == null ? (s.q ? 'Mindestens ein Spiel ist nur aus den Team-Stärken geschätzt, deshalb hier kein Vergleich mit der Quote.' : 'Auf dem Schein steht keine Gesamtquote, deshalb hier kein Vergleich.')
       : s.value > 0.03 ? 'Die Quote auf dem Schein ist besser als der faire Preis.' : s.value < -0.03 ? 'Die Quote auf dem Schein ist schlechter als der faire Preis.' : 'Die Quote auf dem Schein liegt etwa beim fairen Preis.';
     const legs = s.items.map((x) => {
       const l = x.leg;
@@ -521,15 +538,14 @@
     const hc = teamColor(m.home);
     const ac = teamColor(m.away);
     const fcol = favHome ? hc : ac;
-    let out = `<div class="res" style="--hgl:${rgba(hc, 0.3)};--agl:${rgba(ac, 0.3)};--hgd:${rgba(hc, 0.55)};--agd:${rgba(ac, 0.55)};--fvl:${rgba(fcol, 0.1)};--fvd:${rgba(fcol, 0.24)}"><div class="glow" aria-hidden="true"></div><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
+    let out = `<div class="res" style="--hgl:${rgba(hc, 0.3)};--agl:${rgba(ac, 0.3)};--hgd:${rgba(hc, 0.55)};--agd:${rgba(ac, 0.55)};--fvl:${rgba(fcol, 0.1)};--fvd:${rgba(fcol, 0.24)}"><div class="glow" aria-hidden="true"></div><div class="res-l"><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
       <div class="match-top">${live ? `<span class="chip live">LIVE ${m.minute}'</span>` : `<span class="chip glass">${m.kind === 'odds' ? 'Tipico-Quoten' : 'Vor dem Spiel'}</span>`}<span class="chip glass">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
       <div class="versus"><div class="side">${plate(m.home, 80, redCards(m, 0))}<span class="nm">${esc(m.home)}</span></div>
         <div class="mid">${live ? `<div class="sc">${m.score[0]}:${m.score[1]}</div><div class="sub">${m.minute}. Minute</div>` : '<div class="vs">VS</div>'}</div>
-        <div class="side">${plate(m.away, 80, redCards(m, 1))}<span class="nm">${esc(m.away)}</span></div></div></section>
-      ${secNav(m, a)}<div class="cards">`;
+        <div class="side">${plate(m.away, 80, redCards(m, 1))}<span class="nm">${esc(m.away)}</span></div></div></section>`;
 
-    // 1) Prognose mit der großen Zahl
-    out += `<section class="card prob big" data-sec="ov" style="--i:0"><div class="top"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
+    // 1) Prognose mit der großen Zahl (iPad quer: links neben den Karten, sonst die erste Karte)
+    const probCard = `<section class="card prob big" data-sec="ov" style="--i:0"><div class="top"><div class="big-n">${roller(r[kIdx])}<span class="pc">%</span></div>
         <span class="badge" style="background:${badge[1]};color:${badge[2]};--bgc:${badge[1]}">${badge[0]}</span></div>
       <div class="big-l">${esc(label)}</div><div class="big-s">${live ? `beim Stand von ${m.score[0]}:${m.score[1]} in der ${m.minute}. Minute${shortHanded(m)}` : 'vor dem Anpfiff'}</div>
       <div class="split" role="img" aria-label="Sieg ${esc(m.home)} ${r[0]} Prozent, Remis ${r[1]} Prozent, Sieg ${esc(m.away)} ${r[2]} Prozent">
@@ -537,6 +553,7 @@
       <div class="legend3"><div class="it">${crest(m.home, 24)}<div class="tx"><b>${r[0]} %</b><span>${esc(m.home)}</span></div></div>
         <div class="it"><span class="dot">X</span><div class="tx"><b>${r[1]} %</b><span>Remis</span></div></div>
         <div class="it"><div class="tx"><b>${r[2]} %</b><span>${esc(m.away)}</span></div>${crest(m.away, 24)}</div></div></section>`;
+    out += ipadSide() ? `${probCard}${secNav(m, a)}</div><div class="cards">` : `${secNav(m, a)}</div><div class="cards">${probCard}`;
 
     // 1b) Top-Tipps zu diesem Spiel (man kommt ja über einen Tipp hierher)
     if (m.src === 'tips') out += tipsForGame(m, 1);
@@ -574,7 +591,7 @@
 
     // 8) Erklärung
     out += `<section class="card explain" data-sec="ex" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
-    out += `</div><p class="foot">${m.src === 'tips' ? `${m.mo ? 'Für dieses Spiel gibt es keine Marktpreise, die Chancen kommen allein aus den Team-Stärken.' : 'Chancen aus den Marktpreisen ohne die Marge der Buchmacher, Tore zusätzlich mit Result AI.'} Angezeigte Quoten nur von Tipico.<br>` : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (${Object.keys(R.leagues).length || 'viele'} Ligen + Europapokal).<br>` : ''}Poisson-Tormodell mit Dixon-Coles · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
+    out += `</div><p class="foot">${m.src === 'tips' ? `${m.mo ? 'Für dieses Spiel gibt es keine Marktpreise, die Chancen kommen allein aus den Team-Stärken.' : 'Chancen aus den Marktpreisen ohne die Marge der Buchmacher, Tore zusätzlich mit Result AI.'} Angezeigte Quoten nur von Tipico.<br>` : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (${Object.keys(R.leagues).length || 'viele'} Ligen + Europapokal).<br>` : ''}${m.kind === 'live' ? 'Tormodell Minute für Minute: Spielstand, rote Karten und Restzeit' : 'Poisson-Tormodell mit Dixon-Coles'} · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
     return out;
   }
   function heatmap(a, m, c) {
@@ -757,7 +774,7 @@
         <label class="tgl"><span class="grow"><b>Spiel läuft schon</b><small>Spielstand, Minute und rote Karten eingeben</small></span><input type="checkbox" data-act="opt" data-k="live" ${P.live ? 'checked' : ''}><i></i></label>
         ${P.live ? liveInputs() : ''}</div>
       ${P.msg ? `<div class="notice"><b>Das rechnet Result AI so nicht</b><p>${P.msg}</p></div>` : ''}
-      <div style="margin-top:16px"><button class="btn" data-act="calc" ${P.home && P.away ? '' : 'disabled'}>Prognose berechnen</button></div>
+      <div class="calc-w" style="margin-top:16px"><button class="btn" data-act="calc" ${P.home && P.away ? '' : 'disabled'}>Prognose berechnen</button></div>
       <p class="foot">Stärken vom ${esc(fmtDay(d.updatedAt))} · ${d.teams.length} Teams aus ${d.leagues.length} Ligen + Europapokal und Länderspielen<br>Jeden Morgen neu gerechnet – am selben Tag immer dieselben Zahlen.</p>`;
   }
   const stepper = (k, i, v) => `<span class="stepper"><button data-act="step" data-k="${k}" data-i="${i}" data-d="-1" aria-label="weniger">−</button><b>${v}</b><button data-act="step" data-k="${k}" data-i="${i}" data-d="1" aria-label="mehr">+</button></span>`;
@@ -837,11 +854,12 @@
     location.hash = '#/r/' + encodeURIComponent(id);
   }
   // oberste Seite neu zeichnen (z. B. nach einer Eingabe), Scrollstand bleibt
+  const pageKey = (path) => (path === '/' ? 'home' : path.split('/')[1] || 'home'); // z. B. /r/abc -> r
   function redrawTop() { redrawPage(S.stack[S.stack.length - 1]); }
   function redrawPage(p) {
     if (!p || !p.el.isConnected) return;
     const y = p.el.scrollTop;
-    p.el.innerHTML = barHtml(p.path) + `<div class="wrap">${viewHtml(p.path)}</div>`;
+    p.el.innerHTML = barHtml(p.path) + `<div class="wrap" data-p="${pageKey(p.path)}">${viewHtml(p.path)}</div>`;
     p.drawn = { tips: T.at, ratings: !!R.data, err: T.err };
     p.el._geo = null;
     p.el.scrollTop = y;
@@ -985,11 +1003,25 @@
   }
   // Bilanz der letzten 30 Tage: alle angezeigten Tipps, nach dem Abpfiff ausgewertet (eigene Abteilung auf dem Start, Niklas 08.11.2026)
   const REC_LISTS = [['safe', 'Sicher'], ['rec', 'Empfohlen'], ['top', 'Top-Quote']];
+  // Abstand zur eigenen Vorhersage in Prozentpunkten: im Plus grün, im Minus rot
+  const recDiff = (x) => {
+    if (!x || !x.n) return '';
+    const d = Math.round(((x.won - x.exp) / x.n) * 1000) / 10;
+    return d ? ` · ${pm(d, `${d > 0 ? '+' : '−'}${nf1.format(Math.abs(d))} Pkt.`)}` : '';
+  };
   const recRow = (label, x) => (x && x.n
-    ? `<div class="rec-row"><span class="grow"><b>${label}</b><small>${x.won} von ${x.n} richtig</small></span><span class="rp"><b>${pctR(x.won / x.n)}</b><small>erwartet ${pct0(x.exp / x.n)}</small></span></div>`
+    ? `<div class="rec-row"><span class="grow"><b>${label}</b><small>${x.won} von ${x.n} richtig</small></span><span class="rp"><b>${pctR(x.won / x.n)}</b><small>erwartet ${pct0(x.exp / x.n)}${recDiff(x)}</small></span></div>`
     : `<div class="rec-row"><span class="grow"><b>${label}</b><small>noch keine beendeten Spiele</small></span></div>`);
+  // Liegt die Trefferzahl im Rahmen dessen, was vorher zu erwarten war? (95-%-Spanne aus den einzelnen Chancen)
+  const recVerdict = (x) => {
+    if (!x || !x.n || x.var == null || x.n < 20) return '';
+    const z = (x.won - x.exp) / Math.sqrt(Math.max(x.var, 1e-9));
+    return Math.abs(z) <= 1.96 ? ' · passt' : z > 0 ? ' · besser als erwartet' : ' · schlechter als erwartet';
+  };
+  const recRoi = (x) => (x && x.qn >= 10 ? x.qpl / x.qn : null); // Rendite bei 1 € je Tipp, nur Tipps mit echter Tipico-Quote
   function recTotals(d) {
     const r = d.record || {};
+    if (r.all && r.all['30']) return r.all['30']; // jeder Tipp einmal, auch wenn er in zwei Listen steht
     return REC_LISTS.map(([k]) => (r[k] || {})['30'] || { n: 0, won: 0, exp: 0 }).reduce((a, x) => ({ n: a.n + x.n, won: a.won + x.won, exp: a.exp + x.exp }), { n: 0, won: 0, exp: 0 });
   }
   function bilanzCard() {
@@ -998,7 +1030,11 @@
     const t = recTotals(T.data);
     if (!t.n) return '<div class="empty">Noch keine beendeten Spiele. Jeder Tipp wird nach dem Abpfiff ehrlich ausgewertet.</div>';
     const cells = REC_LISTS.filter(([k]) => r[k]).map(([k, l]) => { const x = r[k]['30'] || { n: 0 }; return `<div><span>${l}</span><b>${x.n ? pctR(x.won / x.n) : 'k. A.'}</b><small>${x.n ? `${x.won} von ${x.n}` : ''}</small></div>`; }).join('');
-    return `<a class="card bil" href="#/bilanz"><div class="rec-hero">${ring(t.won / t.n)}<div class="grow"><b>${t.won} von ${t.n}</b><span>Tipps aufgegangen · erwartet ${pct0(t.exp / t.n)}</span></div><span class="chev">›</span></div><div class="bil-3">${cells}</div></a>`;
+    return `<a class="card bil" href="#/bilanz"><div class="rec-hero">${ring(t.won / t.n)}<div class="grow"><b>${t.won} von ${t.n}</b><span>Tipps aufgegangen · erwartet ${pct0(t.exp / t.n)}${recDiff(t)}${recVerdict(t)}</span></div><span class="chev">›</span></div><div class="bil-3">${cells}</div></a>`;
+  }
+  function roiLine(t) {
+    const v = recRoi(t);
+    return v == null ? '' : `<p class="tl-note" style="margin-top:14px">Hättest du jeden der ${t.qn} Tipps mit echter Tipico-Quote mit 1 € gespielt: ${pm(v, `${v > 0 ? '+' : v < 0 ? '−' : ''}${nf1.format(Math.abs(v) * 100)} %`)} Rendite.</p>`;
   }
   function vBilanz() {
     const head = aura('hist') + '<h1 class="ptitle">Bilanz</h1><p class="psub">Jeder angezeigte Tipp wird festgehalten und nach dem Abpfiff ausgewertet, auch die, die danebengehen.</p>';
@@ -1011,9 +1047,9 @@
       const a = tipTeam({ id: e.aid, name: e.away });
       return `<div class="rec-it ${e.res.won ? 'won' : 'lost'}"><span class="mk">${e.res.won ? '✓' : '✗'}</span><span class="grow"><b>${esc(tipLabel(e.m, h, a))}</b><span>${esc(h)} ${e.res.hs}:${e.res.as} ${esc(a)}</span></span><span class="rp2">${pct0(e.p)}</span></div>`;
     }).join('');
-    return head + `<div class="card rec" style="margin-top:16px">${t.n ? `<div class="rec-hero">${ring(t.won / t.n)}<div class="grow"><b>${t.won} von ${t.n}</b><span>Tipps aufgegangen · erwartet ${pct0(t.exp / t.n)}</span></div></div>` : ''}${REC_LISTS.filter(([k]) => r[k] || k !== 'rec').map(([k, l]) => recRow(l, (r[k] || {})['30'])).join('')}</div>
+    return head + `<div class="card rec" style="margin-top:16px">${t.n ? `<div class="rec-hero">${ring(t.won / t.n)}<div class="grow"><b>${t.won} von ${t.n}</b><span>Tipps aufgegangen · erwartet ${pct0(t.exp / t.n)}${recDiff(t)}${recVerdict(t)}</span></div></div>` : ''}${REC_LISTS.filter(([k]) => r[k] || k !== 'rec').map(([k, l]) => recRow(l, (r[k] || {})['30'])).join('')}</div>
       ${recent ? `<section class="sec"><div class="sec-h"><h2>Zuletzt ausgewertet</h2></div><div class="card rec"><div class="rec-list" style="border-top:0">${recent}</div></div></section>` : ''}
-      <p class="foot">Gezählt werden die letzten 30 Tage. „Erwartet“ ist die Quote an Treffern, die Result AI vorher selbst genannt hat. Nah beieinander heißt: Die Prozente stimmen.</p>`;
+      ${roiLine(t)}<p class="foot">Gezählt werden die letzten 30 Tage, jeder Tipp einmal, gewertet nach 90 Minuten wie beim Buchmacher. „Erwartet“ ist die Quote an Treffern, die Result AI vorher selbst genannt hat. „Passt“ heißt: Der Unterschied liegt im Rahmen des Zufalls.</p>`;
   }
   function vTips() {
     const head = aura('tips') + '<h1 class="ptitle">Top-Tipps</h1>';
@@ -1041,7 +1077,7 @@
         $$('.tips-prev', p.el).forEach((x) => { x.innerHTML = tipCarousel(); });
         $$('.bil-slot', p.el).forEach((x) => { x.innerHTML = bilanzCard(); });
         $$('.spot-slot', p.el).forEach((x) => { x.innerHTML = spotlight(); });
-        $$('.kib', p.el).forEach((x) => { x.innerHTML = kiBadge(); });
+        $$('.kib').forEach((x) => { x.innerHTML = kiBadge(); }); // auch der in der Leiste links
         p.drawn = now;
       } else redrawPage(p);
     });
@@ -1054,7 +1090,7 @@
     const s = betStats();
     const nOpen = auto.filter((b) => b.status === 'open').length;
     return `${aura('hist')}<h1 class="ptitle">Verlauf</h1><p class="psub">Deine Wetten aus den Top-Tipps und deine Prognosen – nur auf diesem Handy gespeichert.</p>
-      <a class="card accrow" href="#/acc">${s.n ? ring(s.won / s.n) : `<span class="round">${I.target}</span>`}<span class="grow"><b>Erfolgsquote</b><span>${s.n ? `${s.won} von ${s.n} Wetten gewonnen · ${signed(s.pl)}` : nOpen ? `${nOpen} ${nOpen === 1 ? 'Wette wartet' : 'Wetten warten'} auf den Abpfiff` : 'Noch keine Wette ausgewertet'}</span></span><span class="chev">›</span></a>
+      <a class="card accrow" href="#/acc">${s.n ? ring(s.won / s.n) : `<span class="round">${I.target}</span>`}<span class="grow"><b>Erfolgsquote</b><span>${s.n ? `${s.won} von ${s.n} Wetten gewonnen · ${pm(s.pl, signed(s.pl))}` : nOpen ? `${nOpen} ${nOpen === 1 ? 'Wette wartet' : 'Wetten warten'} auf den Abpfiff` : 'Noch keine Wette ausgewertet'}</span></span><span class="chev">›</span></a>
       <section class="sec"><div class="sec-h"><h2>Deine Wetten</h2><span class="note">aus den Top-Tipps</span></div>
         ${auto.length ? histBets(auto) : '<div class="empty">Noch keine gespeichert. Tipp in den Top-Tipps bei einer Wette auf „Wette speichern“ – Result AI prüft sie nach dem Abpfiff selbst.</div>'}</section>
       <section class="sec"><div class="sec-h"><h2>Deine Prognosen</h2>${hist.length ? `<span class="note">${hist.length}</span>` : ''}</div>
@@ -1489,6 +1525,9 @@
   const settledBets = () => betsAll().filter((b) => b.status !== 'open' && b.done).sort((x, y) => settleT(x) - settleT(y));
   const betsFrom = (from) => settledBets().filter((b) => b.status !== 'void' && settleT(b) >= from);
   const plusMinus = (v) => (v > 0.004 ? 'up' : v < -0.004 ? 'down' : '');
+  // Plus grün, Minus rot, auch mitten im Satz (Niklas, 09.11.2026)
+  const pm = (v, txt) => `<em class="pm ${plusMinus(v)}">${txt}</em>`;
+  const mhTone = (mode, v) => (mode === 'pl' ? plusMinus(v) : '');
   const replay = (el, cls) => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
   const curPage = () => S.stack[S.stack.length - 1];
 
@@ -1541,8 +1580,22 @@
   // Kurve: weiche Linie ohne Überschwingen, sie läuft exakt durch jeden echten Wert. Beim Umschalten zeichnet sie sich um, statt neu aufzutauchen.
   const CH = { line: null, bars: null };
   const LC = { W: 358, H: 190, R: 52, PT: 12, PB: 26, N: 110 };
-  const lcRight = LC.W - LC.R;
-  const LCX = Array.from({ length: LC.N }, (_, i) => ((i / (LC.N - 1)) * lcRight).toFixed(1));
+  let lcRight = LC.W - LC.R;
+  let LCX = Array.from({ length: LC.N }, (_, i) => ((i / (LC.N - 1)) * lcRight).toFixed(1));
+  // iPad: Diagramm in echter Breite zeichnen, sonst würde es einfach hochgezogen (Schrift und Höhe viel zu groß)
+  function lcFit() {
+    const wide = ipadWide();
+    const side = ipadSide();
+    // iPad quer: die Karte füllt die linke Spalte (7 von 12 Teilen, Maße wie am Ende von app.css)
+    const W = side ? Math.round(((Math.min(1320, innerWidth - 92) - 48 - 18) * 7) / 12) : wide ? Math.min(1128, innerWidth) - 64 : 358;
+    const H = side ? 230 : wide ? 270 : 190;
+    if (W === LC.W && H === LC.H) return;
+    LC.W = W;
+    LC.H = H;
+    lcRight = LC.W - LC.R;
+    LCX = Array.from({ length: LC.N }, (_, i) => ((i / (LC.N - 1)) * lcRight).toFixed(1));
+    CH.line = null; // alte Kurve passt nicht mehr zur neuen Breite
+  }
   const f1 = (v) => v.toFixed(1);
   function monoSlopes(xs, ys) {
     const n = xs.length;
@@ -1577,6 +1630,7 @@
   const samplePath = (y) => { let s = ''; for (let i = 0; i < LC.N; i++) s += `${i ? 'L' : 'M'}${LCX[i]} ${y[i].toFixed(1)}`; return s; };
   const sampleArea = (y, b) => `${samplePath(y)}L${lcRight} ${b.toFixed(1)}L0 ${b.toFixed(1)}Z`;
   function lineModel(pts) {
+    lcFit();
     const { W, H, R, PT, PB } = LC;
     const vs = pts.map((p) => p.v);
     const { ticks, step } = niceTicks(Math.min(...vs), Math.max(...vs));
@@ -1714,10 +1768,10 @@
   const bucketLong = (k, unit) => (unit === 'day' ? new Date(k.t0).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })
     : unit === 'week' ? `Woche ab ${fmtDate(k.t0)}` : new Date(k.t0).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }));
   const bucketShort = (k, unit) => { const d = new Date(k.t0); return unit === 'month' ? d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '') : `${d.getDate()}.${d.getMonth() + 1}.`; };
-  const bucketRead = (k, unit) => `${bucketLong(k, unit)} · ${k.n ? `${signed(k.v)} · ${k.n} ${k.n === 1 ? 'Wette' : 'Wetten'}` : 'keine Wette ausgewertet'}`;
+  const bucketRead = (k, unit) => `${esc(bucketLong(k, unit))} · ${k.n ? `${pm(k.v, signed(k.v))} · ${k.n} ${k.n === 1 ? 'Wette' : 'Wetten'}` : 'keine Wette ausgewertet'}`;
   function barChart(bk, unit) {
-    const W = 322;
-    const H = 150;
+    const W = ipadSide() ? 560 : ipadWide() ? 500 : 322;
+    const H = ipadWide() ? 200 : 150;
     const PL = 40;
     const PR = 2;
     const PT = 18;
@@ -1746,7 +1800,7 @@
         const dy = up ? r : -r;
         path = `<path class="${up ? 'pos' : 'neg'}" style="--i:${i}" d="M${f1(x)} ${f1(y0)} L${f1(x)} ${f1(yv + dy)} A${r} ${r} 0 0 ${s1} ${f1(x + r)} ${f1(yv)} L${f1(x + bw - r)} ${f1(yv)} A${r} ${r} 0 0 ${s1} ${f1(x + bw)} ${f1(yv + dy)} L${f1(x + bw)} ${f1(y0)} Z"/>`;
       }
-      const lab = k.n && (k.v === mx || k.v === mn) && h >= 0.5 ? `<text class="v" x="${f1(x + bw / 2)}" y="${f1(up ? yv - 5 : yv + 13)}" text-anchor="middle">${esc((k.v > 0 ? '+' : '−') + Math.round(Math.abs(k.v)))}</text>` : '';
+      const lab = k.n && (k.v === mx || k.v === mn) && h >= 0.5 ? `<text class="v ${up ? 'p' : 'n'}" x="${f1(x + bw / 2)}" y="${f1(up ? yv - 5 : yv + 13)}" text-anchor="middle">${esc((k.v > 0 ? '+' : '−') + Math.round(Math.abs(k.v)))}</text>` : '';
       const xl = (bk.length - 1 - i) % every === 0 ? `<text x="${f1(x + bw / 2)}" y="${H - 5}" text-anchor="middle">${esc(bucketShort(k, unit))}</text>` : '';
       return `<g class="bm">${path}${lab}${xl}<rect class="hit" data-act="barpick" data-i="${i}" x="${f1(PL + slot * i)}" y="0" width="${f1(slot)}" height="${H}"/></g>`;
     }).join('');
@@ -1784,7 +1838,7 @@
   function splitRows(list) {
     const rows = groupBets(list, SPLITS.find((s) => s[0] === B.split)[2]).sort((a, b) => b.c - a.c);
     const mx = Math.max(1, ...rows.map((r) => Math.abs(r.c)));
-    return rows.slice(0, 12).map((r, i) => `<div class="sr-row"><div class="sr-t"><b>${esc(r.k)}</b><span>${r.won} von ${r.n} gewonnen${r.st ? ` · ${pctSigned(r.c / r.st)}` : ''}</span></div><b class="sr-v ${plusMinus(r.c / 100)}">${signed(r.c / 100)}</b><div class="sr-bar"><i class="${r.c < 0 ? 'neg' : 'pos'}" style="--i:${i};transform:scaleX(${(Math.abs(r.c) / mx).toFixed(3)})"></i></div></div>`).join('');
+    return rows.slice(0, 12).map((r, i) => `<div class="sr-row"><div class="sr-t"><b>${esc(r.k)}</b><span>${r.won} von ${r.n} gewonnen${r.st ? ` · ${pm(r.c, pctSigned(r.c / r.st))}` : ''}</span></div><b class="sr-v ${plusMinus(r.c / 100)}">${signed(r.c / 100)}</b><div class="sr-bar"><i class="${r.c < 0 ? 'neg' : 'pos'}" style="--i:${i};transform:scaleX(${(Math.abs(r.c) / mx).toFixed(3)})"></i></div></div>`).join('');
   }
   function betLine(b, label, noDate) {
     regTeams(b);
@@ -1801,10 +1855,10 @@
     if (!rows.length) return '';
     const NAMES = { stake: 'Einsatz', won: 'Gewinn ausgezahlt', void: 'Einsatz zurück', in: 'Einzahlung', out: 'Auszahlung', fix: 'Korrektur' };
     const shown = B.more ? rows.slice(0, 200) : rows.slice(0, 6);
-    return `<section class="sec"><div class="sec-h"><h2>Kontoauszug</h2><span class="note">${esc(PERIOD_TXT[B.period])}</span></div><div class="group">${shown.map((e) => `<div class="row lgr"><span class="grow"><div class="t">${NAMES[e.k]}</div><div class="s">${esc([e.k === 'won' || e.k === 'void' ? fmtDate(e.t) : fmtWhen(e.t), e.txt].filter(Boolean).join(' · '))}</div></span><span class="lgv"><b class="${e.v > 0 ? 'up' : ''}">${signed(e.v)}</b>${e.bal != null ? `<span>${eur(e.bal)}</span>` : ''}</span></div>`).join('')}</div>${rows.length > 6 ? `<button class="more" data-act="lgmore">${B.more ? 'Weniger anzeigen' : `Alle ${rows.length} anzeigen`}</button>` : ''}</section>`;
+    return `<section class="sec ov-led"><div class="sec-h"><h2>Kontoauszug</h2><span class="note">${esc(PERIOD_TXT[B.period])}</span></div><div class="group">${shown.map((e) => `<div class="row lgr"><span class="grow"><div class="t">${NAMES[e.k]}</div><div class="s">${esc([e.k === 'won' || e.k === 'void' ? fmtDate(e.t) : fmtWhen(e.t), e.txt].filter(Boolean).join(' · '))}</div></span><span class="lgv"><b class="${plusMinus(e.v)}">${signed(e.v)}</b>${e.bal != null ? `<span>${eur(e.bal)}</span>` : ''}</span></div>`).join('')}</div>${rows.length > 6 ? `<button class="more" data-act="lgmore">${B.more ? 'Weniger anzeigen' : `Alle ${rows.length} anzeigen`}</button>` : ''}</section>`;
   }
   // Farbe der großen Karte (Niklas sucht sie im Blatt „Guthaben“ aus)
-  const LOOKS = [['uv', 'Ultraviolett'], ['fire', 'Inferno'], ['gold', 'Gold'], ['ice', 'Ozean']];
+  const LOOKS = [['uv', 'Schwarz-Weiß'], ['fire', 'Inferno'], ['gold', 'Gold'], ['ice', 'Ozean']];
   const looksHtml = () => { const cur = store.get('mlook', 'uv'); return `<div class="lab" style="margin-top:24px">FARBE DER KARTE</div><div class="looks">${LOOKS.map(([v, l]) => `<button class="lk${cur === v ? ' on' : ''}" data-act="mlook" data-val="${v}"><i class="lk-${v}"></i><span>${l}</span></button>`).join('')}</div>`; };
   // Große Karte: Guthaben oder Gewinn im gewählten Zeitraum
   function heroData(ws, lg) {
@@ -1826,11 +1880,11 @@
       val = pts.length ? pts[pts.length - 1].v : 0;
     }
     const fmtV = mode === 'bal' ? eur : signed;
-    const dir = pl > 0.004 ? '▲ ' : pl < -0.004 ? '▼ ' : '';
+    const tone = plusMinus(pl);
     const when = esc(sinceStart ? 'seit dem Eintragen' : PERIOD_TXT[B.period]);
     const rend = stake ? pctSigned(pl / stake) : '';
-    const sub = mode === 'bal' ? `<span class="mh-chg">${dir}${esc(eur(Math.abs(pl)))}${rend ? ` · ${rend}` : ''}</span><span class="mh-w">${when}</span>`
-      : `${rend ? `<span class="mh-chg">${rend}</span>` : ''}<span class="mh-w">${list.length ? `${won} von ${list.length} gewonnen` : 'keine Wette in diesem Zeitraum'}</span>`;
+    const sub = mode === 'bal' ? `<span class="mh-chg ${tone}">${esc(signed(pl))}${rend ? ` · ${rend}` : ''}</span><span class="mh-w">${when}</span>`
+      : `${rend ? `<span class="mh-chg ${tone}">${rend}</span>` : ''}<span class="mh-w">${list.length ? `${won} von ${list.length} gewonnen` : 'keine Wette in diesem Zeitraum'}</span>`;
     return { mode, hasW, pts, val, fmtV, big: fmtV(val), sub, label: mode === 'bal' ? 'Guthaben' : 'Gewinn und Verlust' };
   }
   function moneyHero(ws, lg) {
@@ -1848,7 +1902,7 @@
     if (h.pts.length >= 2) chart = lineChart(h);
     else { lcStop(); CH.line = null; chart = '<p class="mh-empty">Noch nichts in diesem Zeitraum. Sobald die erste Wette ausgewertet ist, erscheint hier deine Kurve.</p>'; }
     const k = Math.max(0, PERIODS_M.findIndex(([v]) => v === B.period));
-    return `<section class="mh" data-look="${esc(look)}"><div class="mh-top">${top}</div><div class="mh-n">${esc(h.big)}</div><div class="mh-d">${h.sub}</div>${chart}
+    return `<section class="mh" data-look="${esc(look)}"><div class="mh-top">${top}</div><div class="mh-n ${mhTone(h.mode, h.val)}">${esc(h.big)}</div><div class="mh-d">${h.sub}</div>${chart}
       <div class="pseg" style="--k:${k};--n:${PERIODS_M.length}"><span class="ind"></span>${PERIODS_M.map(([v, l]) => `<button class="${B.period === v ? 'on' : ''}" data-act="mperiod" data-val="${v}">${l}</button>`).join('')}</div>
       <div class="mh-open"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Möglicher Gewinn</span><b>${eur(ws.openWin)}</b></div><div><span>Offen</span><b>${ws.nOpen}</b></div></div></section>`;
   }
@@ -1878,6 +1932,7 @@
     swapFade($('.lc-g:not(.out)', lc), m.grid);
     swapFade($('.lc-xl:not(.out)', lc), m.xl);
     lc.setAttribute('aria-label', lcAria(h, m));
+    num.className = `mh-n ${mhTone(h.mode, h.val)}`;
     const sub = $('.mh-d', mh);
     sub.innerHTML = h.sub;
     replay(sub, 'fadein');
@@ -1891,15 +1946,15 @@
     const out = [];
     const usable = (key, min) => groupBets(list, key).filter((r) => r.n >= (min || 3) && !/^(Sonstige|Ohne Liga|Mehrere Ligen)$/.test(r.k));
     const mkt = usable(marketOf).sort((a, b) => b.c - a.c);
-    if (mkt.length && mkt[0].c >= 100) out.push(`Am besten läuft bei dir <b>${esc(mkt[0].k)}</b>: ${signed(mkt[0].c / 100)} aus ${mkt[0].n} Wetten.`);
-    if (mkt.length && mkt[mkt.length - 1].c <= -100) out.push(`Am meisten kostet dich <b>${esc(mkt[mkt.length - 1].k)}</b>: ${signed(mkt[mkt.length - 1].c / 100)} aus ${mkt[mkt.length - 1].n} Wetten.`);
+    if (mkt.length && mkt[0].c >= 100) out.push(`Am besten läuft bei dir <b>${esc(mkt[0].k)}</b>: ${pm(mkt[0].c, signed(mkt[0].c / 100))} aus ${mkt[0].n} Wetten.`);
+    if (mkt.length && mkt[mkt.length - 1].c <= -100) out.push(`Am meisten kostet dich <b>${esc(mkt[mkt.length - 1].k)}</b>: ${pm(mkt[mkt.length - 1].c, signed(mkt[mkt.length - 1].c / 100))} aus ${mkt[mkt.length - 1].n} Wetten.`);
     const odds = usable(bandOf, 4).sort((a, b) => b.c / b.st - a.c / a.st);
-    if (odds.length >= 2 && odds[0].c > 0) out.push(`Die beste Rendite holst du bei Quoten <b>${esc(odds[0].k)}</b>: ${pctSigned(odds[0].c / odds[0].st)}.`);
+    if (odds.length >= 2 && odds[0].c > 0) out.push(`Die beste Rendite holst du bei Quoten <b>${esc(odds[0].k)}</b>: ${pm(odds[0].c, pctSigned(odds[0].c / odds[0].st))}.`);
     const wd = usable(weekdayOf).sort((a, b) => b.c - a.c);
-    if (wd.length >= 2 && wd[0].c >= 100) out.push(`Dein stärkster Tag ist der <b>${esc(wd[0].k)}</b>: ${signed(wd[0].c / 100)}.`);
+    if (wd.length >= 2 && wd[0].c >= 100) out.push(`Dein stärkster Tag ist der <b>${esc(wd[0].k)}</b>: ${pm(wd[0].c, signed(wd[0].c / 100))}.`);
     if (!out.length) return '';
     const note = list.length < 30 ? `<p class="ins-n">Bei ${list.length} Wetten spielt der Zufall noch eine große Rolle.</p>` : '';
-    return `<section class="sec"><div class="sec-h"><h2>Das fällt auf</h2></div><div class="card ins">${out.slice(0, 3).map((t) => `<p>${t}</p>`).join('')}${note}</div></section>`;
+    return `<section class="sec ov-ins"><div class="sec-h"><h2>Das fällt auf</h2></div><div class="card ins">${out.slice(0, 3).map((t) => `<p>${t}</p>`).join('')}${note}</div></section>`;
   }
   function moneyOverview(lg) {
     const from = periodFrom();
@@ -1935,9 +1990,9 @@
       + tile('Trefferquote', pctR(won / list.length), `${won} von ${list.length} gewonnen`)
       + tile('Ø Quote', nf2.format(avgQ), `ab ${pctR(fair)} Treffern im Plus`)
       + tile('Aktuelle Serie', `${cur} ${curW ? (cur === 1 ? 'Sieg' : 'Siege') : (cur === 1 ? 'Niederlage' : 'Niederlagen')}`, `längste Siegesserie: ${best}`)
-      + tile('Größter Rückgang', dd ? `−${eur(dd / 100)}` : eur(0), 'vom Höchststand aus')
+      + tile('Größter Rückgang', dd ? `−${eur(dd / 100)}` : eur(0), 'vom Höchststand aus', dd ? 'down' : '')
       + tile('Ø Einsatz', eur(stake / list.length), `${list.length} ${list.length === 1 ? 'Wette' : 'Wetten'}`)
-      + (withP.length >= 5 ? tile('Erwartet laut Chancen', signed(expC / 100), `echt: ${signed(actC / 100)} · ${withP.length} Wetten`) : tile('Größter Gewinn', signed(Math.max(...list.map(betPL))), 'bei einer einzelnen Wette'));
+      + (withP.length >= 5 ? tile('Erwartet laut Chancen', signed(expC / 100), `echt: ${pm(actC, signed(actC / 100))} · ${withP.length} Wetten`, plusMinus(expC / 100)) : tile('Größter Gewinn', signed(Math.max(...list.map(betPL))), 'bei einer einzelnen Wette', plusMinus(Math.max(...list.map(betPL)))));
     const last10 = list.slice(-10);
     const form = `<div class="card fcard"><div class="f-h"><b>Form</b><span>letzte ${last10.length}, die neueste rechts</span></div><div class="fstrip">${last10.map((b) => `<i class="${b.status === 'won' ? 'w' : 'l'}" title="${esc(betTitle(b))}">${b.status === 'won' ? '✓' : '✗'}</i>`).join('')}</div></div>`;
     const { unit, bk } = bucketize(list, from);
@@ -1950,10 +2005,10 @@
     const dayRows = days.length >= 2 ? (days[0].c > 0 ? dayRow(days[0], 'Bester Tag') : '') + (days[days.length - 1].c < 0 ? dayRow(days[days.length - 1], 'Schlechtester Tag') : '') : '';
     const kSplit = Math.max(0, SPLITS.findIndex((s) => s[0] === B.split));
     return `<div class="kpis">${kpis}</div>${form}
-      <section class="sec"><div class="sec-h"><h2>Gewinn je ${{ day: 'Tag', week: 'Woche', month: 'Monat' }[unit]}</h2></div><div class="card"><p class="bc-read">${esc(bucketRead(lastK, unit))}</p>${barChart(bk, unit)}</div></section>
+      <section class="sec ov-bars"><div class="sec-h"><h2>Gewinn je ${{ day: 'Tag', week: 'Woche', month: 'Monat' }[unit]}</h2></div><div class="card"><p class="bc-read">${bucketRead(lastK, unit)}</p>${barChart(bk, unit)}</div></section>
       ${insightsHtml(list)}
-      <section class="sec"><div class="sec-h"><h2>Wo du gewinnst</h2></div><div class="card"><div class="pseg in" style="--k:${kSplit};--n:${SPLITS.length}"><span class="ind"></span>${SPLITS.map(([v, l]) => `<button class="${B.split === v ? 'on' : ''}" data-act="bsplit" data-val="${v}">${l}</button>`).join('')}</div><div class="srs${B.anim ? ' in' : ''}">${splitRows(list)}</div></div></section>
-      <section class="sec"><div class="sec-h"><h2>Höhepunkte</h2></div><div class="card rec"><div class="rec-list" style="border-top:0">${betLine(bestB, 'Beste Wette')}${worstB !== bestB ? betLine(worstB, 'Schlechteste Wette') : ''}${dayRows}</div></div></section>
+      <section class="sec ov-split"><div class="sec-h"><h2>Wo du gewinnst</h2></div><div class="card"><div class="pseg in" style="--k:${kSplit};--n:${SPLITS.length}"><span class="ind"></span>${SPLITS.map(([v, l]) => `<button class="${B.split === v ? 'on' : ''}" data-act="bsplit" data-val="${v}">${l}</button>`).join('')}</div><div class="srs${B.anim ? ' in' : ''}">${splitRows(list)}</div></div></section>
+      <section class="sec ov-high"><div class="sec-h"><h2>Höhepunkte</h2></div><div class="card rec"><div class="rec-list" style="border-top:0">${betLine(bestB, 'Beste Wette')}${worstB !== bestB ? betLine(worstB, 'Schlechteste Wette') : ''}${dayRows}</div></div></section>
       ${ledgerHtml(lg)}`;
   }
 
@@ -2039,7 +2094,7 @@
     return `<section class="card cal-c">
         <div class="cal-h"><button class="cal-nav" data-act="calgo" data-val="-1" aria-label="Voriger Monat"${ym <= calFirst() ? ' disabled' : ''}>‹</button><b class="cal-m">${esc(new Date(y, mo, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }))}</b><button class="cal-nav" data-act="calgo" data-val="1" aria-label="Nächster Monat"${ym >= nowYm ? ' disabled' : ''}>›</button></div>
         <div class="cal-big ${plusMinus(total / 100)}">${signed(total / 100)}</div>
-        <div class="cal-sub">${n ? `${n} ${n === 1 ? 'Wette' : 'Wetten'} · ${won} gewonnen${stake ? ` · Rendite ${pctSigned(total / stake)}` : ''}` : 'Keine Wette in diesem Monat ausgewertet'}</div>
+        <div class="cal-sub">${n ? `${n} ${n === 1 ? 'Wette' : 'Wetten'} · ${won} gewonnen${stake ? ` · Rendite ${pm(total, pctSigned(total / stake))}` : ''}` : 'Keine Wette in diesem Monat ausgewertet'}</div>
         <div class="cal-wd">${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((w) => `<span>${w}</span>`).join('')}</div>
         <div class="cal-swipe"><div class="cal-grid">${cells}</div></div>
         <p class="cal-leg"><i class="cd p3"></i>Plus<i class="cd n3"></i>Minus<em>Je kräftiger, desto mehr Geld</em></p>
@@ -2057,6 +2112,7 @@
     if (!rows.length) return '';
     return `<section class="sec"><div class="sec-h"><h2>Alle Tage</h2></div><div class="group">${rows.slice().reverse().map((r) => `<button class="row cal-r" data-act="calday" data-val="${r.d}"><span class="grow"><div class="t">${esc(dayLong(r.t))}</div><div class="s">${r.list.length} ${r.list.length === 1 ? 'Wette' : 'Wetten'}${r.n ? ` · ${r.won} gewonnen` : ''}</div></span><b class="sv ${plusMinus(r.c / 100)}">${signed(r.c / 100)}</b><span class="chev">›</span></button>`).join('')}</div></section>`;
   }
+  const monthC = (c) => { const v = Math.abs(c) / 100; return `${c > 0 ? '+' : '−'}${v >= 999.5 ? `${(v / 1000).toFixed(1).replace('.', ',')}k` : Math.round(v)}`; };
   function yearStrip(book, ym, nowYm) {
     const months = [];
     for (let k = nowYm - 11; k <= nowYm; k++) months.push({ k, c: 0, n: 0 });
@@ -2072,8 +2128,8 @@
       const on = m.k === ym ? ' on' : '';
       const lab = d.toLocaleDateString('de-DE', { month: 'narrow' });
       const bar = h ? `<i class="${m.c > 0 ? 'p' : 'n'}" style="--h:${h / 100};--i:${i}"></i>` : '';
-      return m.k < first ? `<span class="cy off"><span class="cy-p"></span><span class="cy-l">${lab}</span></span>`
-        : `<button class="cy${on}" data-act="calmonth" data-val="${m.k}" aria-label="${esc(d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }))}: ${esc(signed(m.c / 100))}"><span class="cy-p">${bar}</span><span class="cy-l">${lab}</span></button>`;
+      return m.k < first ? `<span class="cy off"><span class="cy-p"></span><span class="cy-l">${lab}</span><span class="cy-v"></span></span>`
+        : `<button class="cy${on}" data-act="calmonth" data-val="${m.k}" aria-label="${esc(d.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }))}: ${esc(signed(m.c / 100))}"><span class="cy-p">${bar}</span><span class="cy-l">${lab}</span><span class="cy-v ${plusMinus(m.c / 100)}">${m.c ? monthC(m.c) : ''}</span></button>`;
     }).join('')}</div></section>`;
   }
   // Monat wechseln: dir = 1 nach vorn, −1 zurück; ym = direkt zu einem Monat
@@ -2138,7 +2194,7 @@
     if (B.tab === 'over') {
       const ws = walletState();
       const lg = ledger();
-      return `${moneyHero(ws, lg)}${betActs()}<div class="ovw">${moneyOverview(lg)}</div>`;
+      return `<div class="ovg">${moneyHero(ws, lg)}${betActs()}<div class="ovw">${moneyOverview(lg)}</div></div>`;
     }
     if (B.tab === 'open') {
       const open = bets.filter((b) => b.status === 'open').sort(openSort);
@@ -2524,14 +2580,15 @@
   const tabbar = document.createElement('nav');
   tabbar.className = 'tabbar';
   tabbar.setAttribute('aria-label', 'Bereiche');
-  tabbar.innerHTML = '<span class="tab-ind" aria-hidden="true"></span>' + TABS.map(([p, label, ic]) => `<button data-act="tab" data-tab="${p}"><span class="ti"><span class="o">${I[ic]}</span><span class="f">${I[ic + 'F'] || I[ic]}</span></span><span class="tl">${label}</span></button>`).join('');
+  tabbar.innerHTML = `<span class="tab-ind" aria-hidden="true"></span><span class="side-brand" aria-hidden="true">${logo()}</span>` + TABS.map(([p, label, ic]) => `<button data-act="tab" data-tab="${p}"><span class="ti"><span class="o">${I[ic]}</span><span class="f">${I[ic + 'F'] || I[ic]}</span></span><span class="tl">${label}</span></button>`).join('')
+    + `<span class="side-foot"><button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button><button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span>`;
   document.body.appendChild(tabbar);
   function syncTabs() {
     const root = S.stack[0] ? S.stack[0].path : '/';
     const i = Math.max(0, TABS.findIndex((t) => t[0] === root));
     tabbar.style.setProperty('--i', i);
     tabbar.dataset.tab = TABS[i][0];
-    $$('button', tabbar).forEach((b, k) => { b.classList.toggle('on', k === i); if (k === i) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    $$('button[data-tab]', tabbar).forEach((b, k) => { b.classList.toggle('on', k === i); if (k === i) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   // Bereich wechseln: ohne Schieben (wie bei iPhone-Apps), der Scrollstand je Bereich bleibt
   function switchTab(path) {
@@ -2579,12 +2636,12 @@
     const mc = $('.match', el);
     const nav = $('.snav', el);
     const navTop = nav ? (mc ? pos(mc) + mc.offsetHeight + parseFloat(getComputedStyle(nav).marginTop || 0) : pos(nav)) : 0;
-    return { title: mc ? pos(mc) + mc.offsetHeight - bar - 10 : 64, nav, navAt: nav ? navTop - bar - 1 : 0, off: bar + (nav ? nav.offsetHeight : 0) + 8,
-      secs: nav ? $$('[data-sec]', el).filter((x) => !x.closest('.snav')).map((x) => [x.dataset.sec, pos(x)]) : [], cur: null };
+    return { title: mc ? pos(mc) + mc.offsetHeight - bar - 10 : 64, nav, navAt: nav ? navTop - bar - 1 : 0, off: bar + (nav && getComputedStyle(nav).position === 'sticky' ? nav.offsetHeight : 0) + 8,
+      secs: nav ? $$('[data-sec]', el).filter((x) => !x.closest('.snav')).map((x) => [x.dataset.sec, x.closest('.res-l') ? 0 : pos(x)]) : [], cur: null };
   }
   function spy(el, g, y) {
     let cur = g.secs.length ? g.secs[0][0] : null;
-    g.secs.forEach(([k, t]) => { if (t - g.off <= y + 4) cur = k; });
+    if (y > 4) g.secs.forEach(([k, t]) => { if (t - g.off <= y + 4) cur = k; }); // ganz oben ist immer der erste Abschnitt dran
     if (g.secs.length && y + el.clientHeight >= el.scrollHeight - 4) cur = g.secs[g.secs.length - 1][0]; // ganz unten: letzter Abschnitt
     if (!cur || g.cur === cur) return;
     g.cur = cur;
@@ -2598,7 +2655,7 @@
     const el = document.createElement('section');
     el.className = 'page' + (path.startsWith('/r/') ? ' rp' : '');
     if (path === '/bets') B.anim = 'enter'; // Kurve und Balken bauen sich beim Öffnen auf
-    el.innerHTML = barHtml(path) + `<div class="wrap">${viewHtml(path)}</div>`;
+    el.innerHTML = barHtml(path) + `<div class="wrap" data-p="${pageKey(path)}">${viewHtml(path)}</div>`;
     el.addEventListener('scroll', onPageScroll, { passive: true });
     return { path, el, shown: false, drawn: { tips: T.at, ratings: !!R.data, err: T.err } };
   }
@@ -2786,7 +2843,7 @@
       if (p.path === '/scan' || (only && !only(p.path))) return;
       const y = p.el.scrollTop;
       p.el.classList.add('still');
-      p.el.innerHTML = barHtml(p.path) + `<div class="wrap">${viewHtml(p.path)}</div>`;
+      p.el.innerHTML = barHtml(p.path) + `<div class="wrap" data-p="${pageKey(p.path)}">${viewHtml(p.path)}</div>`;
       p.el._geo = null;
       const big = $('.big', p.el);
       if (big) big.classList.add('go');
@@ -2825,7 +2882,7 @@
     stackEl.addEventListener('touchstart', (e) => {
       if (S.busy || S.stack.length < 2 || e.touches.length > 1 || $('.sheet')) return;
       const t = e.touches[0];
-      if (t.clientX > 24) return;
+      if (t.clientX - stackEl.getBoundingClientRect().left > 24) return;
       d = { x0: t.clientX, y0: t.clientY, dx: 0, t0: performance.now(), on: false, top: S.stack[S.stack.length - 1], prev: S.stack[S.stack.length - 2] };
       stackEl.addEventListener('touchmove', move, { passive: false });
     }, { passive: true });
@@ -2881,6 +2938,7 @@
       lcPlace(on, c.xs[i], c.ys[i]);
       $('#lc-cp rect', on).setAttribute('width', f1(c.xs[i]));
       $('.mh-n', mh).textContent = c.fmtV(c.pts[i].v);
+      $('.mh-n', mh).className = `mh-n ${mhTone(c.def.mode, c.pts[i].v)}`;
       $('.mh-d', mh).textContent = dayShort(c.pts[i].t);
     };
     document.addEventListener('pointerdown', (e) => {
@@ -2904,6 +2962,7 @@
       lcPlace(w, c.lastX, c.lastY);
       $('#lc-cp rect', w).setAttribute('width', c.W);
       $('.mh-n', mh).textContent = c.def.big;
+      $('.mh-n', mh).className = `mh-n ${mhTone(c.def.mode, c.def.val)}`;
       $('.mh-d', mh).innerHTML = c.def.sub;
     };
     document.addEventListener('pointerup', end, { passive: true });
@@ -2955,6 +3014,7 @@
     if ($('.sheet')) return;
     const th = store.get('theme', 'light');
     const k = Math.max(0, ['light', 'dark', 'auto'].indexOf(th));
+    const dv = store.get('device', deviceGuess());
     const sh = document.createElement('div');
     sh.className = 'sheet';
     sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel" role="dialog" aria-label="Einstellungen"><div class="grip" data-grip></div>
@@ -2962,6 +3022,9 @@
       <input class="search name-in" type="text" placeholder="für die Begrüßung, z. B. Niklas" value="${esc(store.get('name', ''))}" data-act="name" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
       <div class="lab" style="margin-top:20px">DARSTELLUNG</div>
       <div class="seg s3" data-v="${th}" style="--k:${k}"><span class="ind"></span>${[['light', 'Hell'], ['dark', 'Dunkel'], ['auto', 'Automatisch']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-val="${v}">${l}</button>`).join('')}</div>
+      <div class="lab" style="margin-top:20px">GERÄT</div>
+      <div class="seg s2" style="--k:${dv === 'ipad' ? 1 : 0}"><span class="ind"></span>${[['phone', 'Handy'], ['ipad', 'iPad']].map(([v, l]) => `<button class="${dv === v ? 'on' : ''}" data-act="device" data-val="${v}">${l}</button>`).join('')}</div>
+      <p class="dev-note">${deviceNote(dv)}</p>
       <div class="lab" style="margin-top:20px">EINLADUNGSCODE</div>
       <input class="search" type="text" placeholder="für die KI, z. B. den Wettschein-Scan" value="${esc(store.get('invite', ''))}" data-act="invite" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
       <p class="inv-st"></p>
@@ -2969,6 +3032,7 @@
     document.body.appendChild(sh);
     checkInvite(sh);
   }
+  const deviceNote = (v) => (v === 'ipad' ? (innerWidth < 700 ? 'Auf diesem Bildschirm ist zu wenig Platz. Die iPad-Ansicht zeigt sich auf dem iPad.' : 'Fürs Querformat gemacht: Leiste links, Karten nebeneinander. Hochkant gibt es zwei Spalten.') : 'Schmale Ansicht wie auf dem iPhone.');
   // Einladungscode beim Server prüfen (schützt das Gratis-Kontingent der KI vor Fremden)
   let invT = 0;
   function checkInvite(sh) {
@@ -3084,7 +3148,7 @@
       const c = a.closest('.card');
       const i = +a.dataset.i;
       $$('.bm', c).forEach((g, k) => g.classList.toggle('dim', k !== i));
-      if (CH.bars) $('.bc-read', c).textContent = bucketRead(CH.bars.bk[i], CH.bars.unit);
+      if (CH.bars) $('.bc-read', c).innerHTML = bucketRead(CH.bars.bk[i], CH.bars.unit);
     }
     else if (act === 'settle') settleManual(a.dataset.id, a.dataset.val);
     else if (act === 'delbet') {
@@ -3136,6 +3200,14 @@
       seg.style.setProperty('--k', $$('button', seg).indexOf(a));
       $$('button', seg).forEach((b) => b.classList.toggle('on', b === a));
       if (isDark() !== wasDark) redrawAll();
+    } else if (act === 'device') {
+      const seg = a.closest('.seg');
+      applyDevice(a.dataset.val);
+      seg.style.setProperty('--k', $$('button', seg).indexOf(a));
+      $$('button', seg).forEach((b) => b.classList.toggle('on', b === a));
+      const note = $('.dev-note');
+      if (note) note.textContent = deviceNote(a.dataset.val);
+      redrawAll(); // Diagramme passen sich der neuen Breite an
     }
   });
   document.addEventListener('change', (e) => {
@@ -3198,6 +3270,31 @@
 
   // ------------------------------------------------------------------ Start: Startseite unten im Stapel; Direktlink obendrauf
   applyTheme(store.get('theme', 'light'));
+  applyDevice(store.get('device', deviceGuess()));
+  /* iPad: Karten in Spalten ohne Lücken. Das Raster hat Mini-Zeilen von 1 px, jede Karte belegt so viele, wie sie hoch ist – die Reihenfolge
+     im Dokument bleibt, nichts wird umgehängt. Läuft nach jeder Änderung an den Seiten (auch beim Umschalten im Tracker). */
+  let packT = 0;
+  function ipadPack() {
+    clearTimeout(packT);
+    packT = setTimeout(() => {
+      if (!ipadWide()) return;
+      $$('.cards, .ovw, .ovg, .wrap[data-p="bilanz"], .wrap[data-p="acc"], .wrap[data-p="ki"], .wrap[data-p="pick"]').forEach((box) => {
+        [...box.children].forEach((c) => {
+          if (getComputedStyle(c).position === 'absolute') return;
+          c.style.gridRowEnd = `span ${Math.max(1, c.offsetHeight + 18)}`;
+        });
+      });
+    }, 40);
+  }
+  try { new MutationObserver(ipadPack).observe(document.body, { childList: true, subtree: true }); } catch (e) { /* sehr alte Browser: dann eben nicht gepackt */ }
+  let rzW = innerWidth;
+  let rzT = 0;
+  addEventListener('resize', () => {
+    if (Math.abs(innerWidth - rzW) < 40) return;
+    rzW = innerWidth;
+    clearTimeout(rzT);
+    rzT = setTimeout(() => { if (document.documentElement.dataset.device === 'ipad') redrawAll(); ipadPack(); }, 180);
+  });
   const start = curPath();
   const home = makePage(isTab(start) ? start : '/');
   stackEl.appendChild(home.el);

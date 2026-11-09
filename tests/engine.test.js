@@ -50,6 +50,31 @@ ok(near(n.next.home + n.next.away + n.next.none, 1, 1e-9), 'nächstes Tor: Heim+
 ok(n.next.in10 < n.next.in20 && n.next.in20 < n.next.in30, 'Tor in 10 < 20 < 30 Min.');
 console.log('     1:1 (60.): nächstes Tor Heim', pct(n.next.home), 'Gast', pct(n.next.away), 'keins', pct(n.next.none), '| in 10 Min.', pct(n.next.in10), '| Median-Minute', n.next.median);
 
+// 8b) Live-Modell: Wer zurückliegt, trifft öfter, wer in Unterzahl ist, seltener; alles summiert sich zu 100 %
+const lv = (o) => RE.analyze(Object.assign({ lh: 1.5, la: 1.2, minute: 60, half: 2, score: [0, 0] }, o));
+ok(lv({ score: [0, 1] }).rest.home > lv({}).rest.home, 'Rückstand: Heim trifft öfter als bei 0:0');
+ok(lv({ score: [0, 1] }).rest.away < lv({}).rest.away, 'Führung: Gast trifft seltener als bei 0:0');
+ok(lv({ reds: [1, 0] }).rest.home < lv({}).rest.home && lv({ reds: [1, 0] }).rest.away > lv({}).rest.away, 'rote Karte: Unterzahl trifft seltener, Gegner öfter');
+ok(lv({ minute: 75 }).rest.home < lv({}).rest.home, 'später im Spiel: weniger Tore übrig');
+ok(near(lv({ score: [2, 1], reds: [0, 1] }).probs.home + lv({ score: [2, 1], reds: [0, 1] }).probs.draw + lv({ score: [2, 1], reds: [0, 1] }).probs.away, 1, 1e-9), 'live: Sieg + Remis + Niederlage = 100 %');
+{
+  let g = 0;
+  RE.playOut(1.5, 1.2, 10, RE.STEPS, [1, 0], [0, 0]).forEach((row) => row.forEach((v) => { g += v; }));
+  ok(near(g, 1, 1e-9), 'Durchrechnen: alle Ergebnisse zusammen = 100 %');
+}
+ok(near(RE.goalShareUntil(RE.STEPS), 1, 1e-9) && near(RE.goalShareUntil(46), 0.45, 0.02), 'Tor-Zeiten: bis zur Halbzeit fallen rund 45 % der Tore, ' + pct(RE.goalShareUntil(46)));
+{
+  const pre = RE.analyze({ lh: 1.5, la: 1.2 });
+  ok(near(pre.next.none, pre.matrix[0][0], 1e-3), 'vor dem Spiel: „kein Tor“ = Chance auf 0:0');
+  ok(pre.ht && near(pre.ht.home + pre.ht.draw + pre.ht.away, 1, 1e-9), 'vor dem Spiel: Halbzeit-Prognose summiert sich zu 100 %');
+  ok(near(pre.xg.home, 1.5, 1e-9), 'vor dem Spiel: erwartete Tore = Eingabe');
+}
+{
+  const a1 = RE.analyze({ lh: 1.5, la: 1.2, minute: 47, half: 1, score: [0, 0] });
+  const a2 = RE.analyze({ lh: 1.5, la: 1.2, minute: 45, half: 'ht', score: [0, 0] });
+  ok(near(a1.probs.home, a2.probs.home, 1e-12), 'Nachspielzeit Halbzeit 1 (45+2) zählt nicht als 2. Halbzeit');
+}
+
 // 9) Abgepfiffen: Endstand steht fest
 const f = RE.analyze({ lh: 1.6, la: 1.1, finished: true, minute: 90, score: [3, 1] });
 ok(near(f.probs.home, 1, 1e-9) && f.top[0].h === 3 && f.top[0].a === 1, 'abgepfiffen 3:1 -> 100 % Heimsieg');
