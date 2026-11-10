@@ -139,8 +139,26 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
    Quoten-Check (Quote vom Screenshot gegen den fairen Preis), Antippen zum Ändern (Team falsch erkannt), vertauschte Heim/Gast wird erkannt,
    „Ganze Analyse“ öffnet die Spielseite, die letzten 10 Scans (`ra_scans`). Alte Links `#/pick` und `#/slip` führen zu `#/scan`; `/bet` bleibt auf dem
    Server für alte App-Stände.
-6. **Rechnen** – in Arbeit.
-7. **Extra-Bereich** – in Arbeit.
+6. **Rechnen** – angefangen, **morgen weiter** (Niklas am 10.11.2026 um 23:45: „hör auf für heute, machen morgen weiter“).
+   *Befund:* Die Stärken-Rangliste ist schief: Ferencváros Platz 15 vor Atlético, Juventus und Dortmund; Győri ETO, Debrecen und Omonia vor
+   Napoli (Platz 43). Ursache: Das Liga-Niveau kleiner Ligen hängt an wenigen Europapokal-*Ergebnissen* (gute EL-Spiele von Ferencváros heben
+   ganz Ungarn), Europapokal-Spiele haben keine Quoten. Gegen die Marktpreise des 4. CL-Spieltags 2026/27 (18 Spiele, archiviert in
+   `bvb09/docs/data/model.json`) ist die Rechnung bei Top-Teams zu extrem: Arsenal 91 % statt 75 %, Man City 81 % statt 61 % (KL 0,0436,
+   Abstand der Überlegenheit 0,323). ClubElo wäre ideal, hat aber einen Cloudflare-Bot-Schutz → **nicht nutzen, nicht umgehen**.
+   *Plan:* (a) Europapokal-Marktpreise sammeln: `tips.py` hält für CL/EL/ECL-Spiele, die in 48 Std. beginnen, die Marktpreise (erwartete Tore
+   ohne Marge) in `data/cup_odds.json` fest (nicht in `web/`, wird nicht veröffentlicht; `tips.yml` muss die Datei mit committen), `ratings.py`
+   nutzt sie nach dem Spiel wie Schlussquoten (Gewicht `W_MARKET` × Europapokal-Gewicht); Startbestand = die 18 CL-Spiele aus der BVB-App.
+   (b) Rollierender Backtest: Stichtage alle 14 Tage ab Sep. 2025, je 450 Tage Daten davor (dafür 3 Spielzeiten laden: football-data
+   `mmz4281` ab 24/25, ESPN-Europapokal ab 2024), vorhersagen: die Spiele der nächsten 14 Tage, CL/EL/ECL getrennt und Ligen (gegen
+   Schlussquoten). Varianten: `W_EURO` 6/10/16, `HALF_LIFE` 180, eigene Halbwertszeit fürs Europapokal (365), `TAU_L` 5 und 0,2, CL stärker als
+   EL/ECL, `SPREAD` 1,0, mit Europapokal-Marktpreisen. Dazu Marktvergleich mit dem 4. CL-Spieltag und mit dem kommenden Spieltag (Marktpreise
+   der kommenden CL-/EL-Spiele stehen in der veröffentlichten `tips.json` → `all`, Kennung 0 = Markt). Ein Lauf ≈ 15 s, alle Varianten mit
+   6 Prozessen ≈ 15 Min. **Nur übernehmen, was im Backtest besser ist.**
+7. **Extra-Bereich** – noch nicht angefangen. Ideen: „Prognosen“ (Meister- und CL-Sieger-Chancen per Simulation, `cl_forecast`/`bl_forecast`
+   gibt es schon in `forecast.py`) oder ein Live-Center (alle laufenden Spiele mit Live-Prozenten aus `RE.analyze`).
+
+**Stand 10.11.2026 nachts:** App `ra-shell-v23` ist online, der Cloudflare-Worker aber noch die alte Version (`2026-11-06`, ohne `konten`) →
+Spiel-Scan und Konto funktionieren erst nach dem Worker-Update + D1 (nächster Absatz). Das als Erstes mit Niklas machen.
 
 **Einmal bei Cloudflare (macht Niklas, Claude erklärt):** D1-Datenbank anlegen (Storage & Databases → D1 → Create, Name z. B. `result-ai`), im Worker
 `result-ai` unter Bindings eine D1-Bindung mit dem Variablennamen **`DB`** auf diese Datenbank anlegen, dann den neuen `worker/worker.js` einfügen und
