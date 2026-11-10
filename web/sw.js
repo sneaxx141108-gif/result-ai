@@ -1,8 +1,8 @@
 /* Result AI – Service Worker: App startet auch ohne Netz, Updates kommen beim ersten Öffnen an.
    Bei jeder App-Änderung SHELL hochzählen. */
-const SHELL = 'ra-shell-v22';
+const SHELL = 'ra-shell-v23';
 const IMG = 'ra-img-v1'; // Vereinswappen (ESPN), bleiben gespeichert
-const FILES = ['./', 'index.html', 'app.css', 'app.js', 'engine.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const FILES = ['./', 'index.html', 'app.css', 'app.js', 'engine.js', 'sync.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 // Beim Installieren am Browser-Zwischenspeicher vorbei laden, sonst landet evtl. noch eine alte Datei im Cache
 self.addEventListener('install', (e) => {

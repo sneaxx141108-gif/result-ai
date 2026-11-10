@@ -1,6 +1,6 @@
-/* Result AI – App. Hash-Routen: #/ Start, #/scan Wettschein wird gelesen, #/slip Wettschein nachgerechnet, #/r/<id> Ergebnis, #/acc Erfolgsquote,
-   #/bilanz Bilanz der Tipps, #/tips Top-Tipps, #/bets Geld-Tracker, #/pick Spiel auswählen, #/hist Verlauf, #/ki KI-Zentrale.
-   Die Prozente rechnet engine.js (RE) – exakt, ohne Zufall, ohne KI. Nur das Lesen der Wettscheine macht eine KI
+/* Result AI – App. Hash-Routen: #/ Start, #/scan Spiel scannen, #/scan/run Scan läuft, #/scan/res/<id> erkannte Spiele, #/r/<id> Ergebnis,
+   #/acc Erfolgsquote, #/bilanz Bilanz der Tipps, #/tips Top-Tipps, #/bets Geld-Tracker, #/hist Verlauf, #/ki KI-Zentrale.
+   Die Prozente rechnet engine.js (RE) – exakt, ohne Zufall, ohne KI. Nur das Lesen der Screenshots macht eine KI
    (Cloudflare-Server worker/worker.js, Adresse in API). Angezeigte Quoten kommen nur von Tipico, unbekannt = „k. A.“.
    Seiten liegen wie in einer iPhone-App übereinander: neue Seiten schieben sich von rechts herein, zurück geht es per Knopf
    oder Wischen vom linken Rand. Animiert wird nur transform/opacity (iPhone-12-Regeln aus der BVB-App). */
@@ -12,10 +12,21 @@
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const store = {
     get(k, d) { try { const v = localStorage.getItem('ra_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem('ra_' + k, JSON.stringify(v)); } catch (e) { /* privater Modus */ } },
+    set(k, v) {
+      try {
+        const json = JSON.stringify(v);
+        const old = localStorage.getItem('ra_' + k);
+        if (old === json) return;
+        localStorage.setItem('ra_' + k, json);
+        if (store.onSet) store.onSet(k, old, v); // Konto-Abgleich: Änderung vermerken (siehe „Konto“)
+      } catch (e) { /* privater Modus */ }
+    },
+    onSet: null,
   };
-  // Cloudflare-Server (worker/worker.js): liest Wettscheine mit Gemini und stößt die Tipp-Suche an – leer = noch nicht eingerichtet
+  // Cloudflare-Server (worker/worker.js): liest Screenshots mit Gemini, hält die Konten und stößt die Tipp-Suche an – leer = noch nicht eingerichtet
   const API = 'https://result-ai.sneaxx141108.workers.dev';
+  // nur beim Testen auf dem PC (localhost): eigener Test-Server statt Cloudflare (ra_api)
+  const api = () => (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && store.get('api', '')) || API;
   const nf1 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const nf2 = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const eurF = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
@@ -72,6 +83,13 @@
     ticketF: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4.5 5.4h15A1.6 1.6 0 0 1 21.1 7v3.4a1.7 1.7 0 0 0 0 3.2V17a1.6 1.6 0 0 1-1.6 1.6h-15A1.6 1.6 0 0 1 2.9 17v-3.4a1.7 1.7 0 0 0 0-3.2V7a1.6 1.6 0 0 1 1.6-1.6z"/><path d="M15 7.2v1.6M15 11.2v1.6M15 15.2v1.6" stroke="var(--card)" stroke-width="2" stroke-linecap="round"/></svg>',
     save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>',
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    scanF: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>',
+    paste: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="4" width="13" height="17" rx="2.5"/><path d="M9 4.5v-1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9.5 11h5M9.5 15h5"/></svg>',
+    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5c1.2-3.8 4.2-5.6 7.5-5.6s6.3 1.8 7.5 5.6"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1c.5-.1.9-.1 1.4-.1 6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+    pulse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg>',
     pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19.2 8.8a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
   };
   const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><g fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 18 18)">
@@ -209,27 +227,27 @@
   }
 
   // ------------------------------------------------------------------ Seiten
-  const S = { stack: [], busy: false, pending: false, swipe: null, url: null, file: null, slip: null, tabScroll: {} };
+  const S = { stack: [], busy: false, pending: false, swipe: null, tabScroll: {} };
   // Leiste unten: vier Bereiche mit eigener Startseite (wie die Tab-Leiste einer iPhone-App)
-  const TABS = [['/', 'Start', 'home'], ['/tips', 'Top-Tipps', 'flame'], ['/bets', 'Wetten', 'ticket'], ['/pick', 'Auswählen', 'search'], ['/hist', 'Verlauf', 'clock']];
+  const TABS = [['/', 'Start', 'home'], ['/tips', 'Top-Tipps', 'flame'], ['/bets', 'Wetten', 'ticket'], ['/scan', 'Scannen', 'scan'], ['/hist', 'Verlauf', 'clock']];
   const isTab = (p) => TABS.some((t) => t[0] === p);
-  const TITLES = { '/': '', '/ki': 'KI-Zentrale', '/scan': 'Wettschein', '/slip': 'Wettschein', '/bilanz': 'Bilanz', '/acc': 'Erfolgsquote', '/pick': 'Spiel auswählen', '/tips': 'Top-Tipps', '/hist': 'Verlauf', '/bets': 'Wetten' };
-  const titleOf = (path) => (path in TITLES ? TITLES[path] : 'Ergebnis');
+  const TITLES = { '/': '', '/ki': 'KI-Zentrale', '/scan': 'Scannen', '/scan/run': 'Scan', '/bilanz': 'Bilanz', '/acc': 'Erfolgsquote', '/tips': 'Top-Tipps', '/hist': 'Verlauf', '/bets': 'Wetten' };
+  const titleOf = (path) => (path in TITLES ? TITLES[path] : path.startsWith('/scan/') ? 'Scan' : 'Ergebnis');
   function barHtml(path) {
     let tt = esc(titleOf(path));
     if (path.startsWith('/r/')) { const m = findMatch(decodeURIComponent(path.slice(3))); if (m) tt = miniMatch(m); }
     const lead = path === '/' ? `<span class="brand">${logo()}<span>Result AI</span></span>`
       : isTab(path) ? '' : `<button class="round" data-act="back" aria-label="Zurück">${I.back}</button>`;
     return `<header class="bar${isTab(path) ? ' tabtop' : ''}">${lead}<span class="tt">${tt}</span>
-      <span class="end">${path === '/' ? `<button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button>` : ''}<button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span></header>`;
+      <span class="end">${path === '/' ? `<button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button>${accBtn()}` : ''}<button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span></header>`;
   }
   function viewHtml(path) {
     if (path === '/') return vHome();
     if (path === '/scan') return vScan();
-    if (path === '/slip') return vSlip();
+    if (path === '/scan/run') return vScanRun();
+    if (path.startsWith('/scan/res/')) return vScanRes(decodeURIComponent(path.slice(10)));
     if (path === '/bilanz') return vBilanz();
     if (path === '/acc') return vAccuracy();
-    if (path === '/pick') return vPick();
     if (path === '/tips') return vTips();
     if (path === '/hist') return vHist();
     if (path === '/bets') return vBets();
@@ -240,29 +258,36 @@
 
   // ------------------------------------------------------------------ Startseite
   const RG_TEXT = 'Keine Garantie. Wetten erst ab 18 · Glücksspiel kann süchtig machen – Hilfe bei check-dein-spiel.de oder kostenlos unter 0800 1 37 27 00 (BZgA).';
-  const scanBtns = () => `<div class="acts"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein aus den Fotos wählen"></label>
-    <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="scanbet" aria-label="Wettschein fotografieren"></label></div>`;
+  // Knöpfe für den Scan: Fotos, Kamera und (wo der Browser es kann) Einfügen aus der Zwischenablage
+  const canPaste = () => !!(navigator.clipboard && navigator.clipboard.read);
+  const scanBtns = (paste) => `<div class="acts${paste && canPaste() ? ' a3' : ''}"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="scanpic" aria-label="Screenshot aus den Fotos wählen"></label>
+    <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="scanpic" aria-label="Spiel fotografieren"></label>${paste && canPaste() ? `<button class="sbtn alt" data-act="scanpaste">${I.paste}<span>Einfügen</span></button>` : ''}</div>`;
+  const scPhone = '<div class="sc-phone" aria-hidden="true"><div class="sc-screen"><span class="sc-lg">PREMIER LEAGUE</span><div class="sc-sb"><i style="background:#EF0107"></i><b>1 – 1</b><i style="background:#034694"></i></div><span class="sc-min">63\'</span><span class="sc-box"></span><span class="sc-line"></span></div></div>';
   function vHome() {
     const hist = store.get('history', []);
+    const hb = homeBets();
     return `${aura('home')}<section class="hello"><h1>${esc(greet())}</h1><p>${esc(todayLong())}</p></section>
       <div class="spot-slot">${spotlight()}</div>
       <section class="sec h-tips"><div class="sec-h"><h2>Top-Tipps</h2><button class="link" data-act="tab" data-tab="/tips">Alle</button></div><div class="tips-prev">${tipCarousel()}</div></section>
       <section class="sec h-bil"><div class="sec-h"><h2>Bilanz</h2><span class="note">letzte 30 Tage</span></div><div class="bil-slot">${bilanzCard()}</div></section>
       <section class="scan-card">${decoRing}
-        <div class="sc-phone" aria-hidden="true"><div class="sc-screen"><span class="sc-lg">PREMIER LEAGUE</span><div class="sc-sb"><i style="background:#EF0107"></i><b>1 – 1</b><i style="background:#034694"></i></div><span class="sc-min">63'</span><span class="sc-box"></span><span class="sc-line"></span></div></div>
-        <div class="sc-text"><span class="sc-eb">${I.scan}Wettschein scannen</span><h2>Schein rein.<br><span>Prozente raus.</span></h2><p>Result AI liest jede Wette und rechnet nach, wie gut sie wirklich ist.</p></div>
+        ${scPhone}
+        <div class="sc-text"><span class="sc-eb">${I.scan}Spiel scannen</span><h2>Screenshot rein.<br><span>Prozente raus.</span></h2><p>Ein Bild von einem Spiel, das bald kommt – Result AI erkennt die Teams und rechnet die Chancen.</p></div>
         ${scanBtns()}</section>
-      <section class="sec h-more${hist.length ? '' : ' solo'}"><div class="group"><a class="row" href="#/pick"><span class="round">${I.search}</span><span class="grow"><div class="t">Spiel selbst auswählen</div><div class="s">Vereine und Länder aus ${Object.keys(R.leagues).length || 'über 50'} Ligen</div></span><span class="chev">›</span></a>${homeBets()}</div></section>
+      ${hb ? `<section class="sec h-more${hist.length ? '' : ' solo'}"><div class="group">${hb}</div></section>` : ''}
       ${hist.length ? `<section class="sec h-last"><div class="sec-h"><h2>Zuletzt</h2>${hist.length > 3 ? '<button class="link" data-act="tab" data-tab="/hist">Alle</button>' : ''}</div><div class="group">${hist.slice(0, 3).map(histRow).join('')}</div></section>` : ''}
       <p class="foot">${RG_TEXT}</p>`;
   }
 
-  // ------------------------------------------------------------------ Wettschein-Scan: KI liest den Schein, Result AI rechnet jede Wette nach
-  const SCAN_STEPS = ['Bild laden', 'Wettschein lesen', 'Spiele zuordnen', 'Chancen rechnen'];
+  // ------------------------------------------------------------------ Spiel scannen (Niklas, 10.11.2026: „kein Wettschein, einfach ein Screenshot von einem Spiel, das bald kommt“)
+  // Die KI (Gemini auf dem Cloudflare-Server) liest nur ab: Teams, Anstoß, Spielstand, Quoten. Gerechnet wird hier, ohne KI. Quelle je Spiel:
+  // 1. das Spiel aus der Tipp-Suche (Marktpreise ohne Marge) 2. Quoten auf dem Screenshot (nur vor dem Anpfiff) 3. die Team-Stärken.
+  const SCAN_STEPS = ['Bild laden', 'Spiele lesen', 'Teams zuordnen', 'Chancen rechnen'];
   const sleep = (ms) => new Promise((r) => setTimeout(r, reduce ? 0 : ms));
-  function vScan() {
-    if (!S.url) return `<h1 class="ptitle">Wettschein</h1><div class="empty" style="margin-top:18px">Kein Bild gewählt.</div><div class="card scan-card" style="margin-top:12px">${scanBtns()}</div>`;
-    return `<div class="scan-frame" id="frame"><img src="${S.url}" alt="Dein Wettschein"><span class="beam"></span>
+  const SC = { file: null, url: null, token: null, fix: null };
+  function vScanRun() {
+    if (!SC.url) return `<h1 class="ptitle">Scan</h1><div class="empty" style="margin-top:18px">Kein Bild gewählt.</div><div class="scan-card" style="margin-top:12px">${scanBtns(true)}</div>`;
+    return `<div class="scan-frame" id="frame"><img src="${SC.url}" alt="Dein Screenshot"><span class="beam"></span>
         <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>
       <div class="steps">${SCAN_STEPS.map((t, i) => `<div class="step"><i>${i + 1}</i><span>${t}</span></div>`).join('')}</div>
       <div class="notice-slot"></div>`;
@@ -270,57 +295,69 @@
   // Abgehakt wird nur, was wirklich passiert ist
   async function runScan(el) {
     const fr = $('#frame', el);
-    if (!fr || !S.file) return;
-    const token = (S.scanToken = {});
-    const alive = () => S.scanToken === token && el.isConnected;
+    if (!fr || !SC.file) return;
+    const token = (SC.token = {});
+    const alive = () => SC.token === token && el.isConnected;
     const steps = $$('.step', el);
     const done = (i) => { steps[i].classList.remove('on'); steps[i].classList.add('done'); $('i', steps[i]).textContent = '✓'; if (steps[i + 1]) steps[i + 1].classList.add('on'); };
     const fail = (title, text) => {
       if (!alive()) return;
       fr.classList.remove('scanning');
       $('.notice-slot', el).innerHTML = `<div class="notice"><b>${esc(title)}</b><p>${esc(text)}</p>
-        <label class="btn">Anderes Bild wählen<input type="file" accept="image/*" data-act="scanbet" aria-label="Anderes Bild wählen"></label><button class="btn soft" data-act="newbet">Wette selbst eintragen</button></div>`;
+        <label class="btn">Anderes Bild wählen<input type="file" accept="image/*" data-act="scanpic" aria-label="Anderes Bild wählen"></label></div>`;
     };
     fr.classList.add('scanning');
     steps[0].classList.add('on');
     let image;
-    try { image = await shrink(S.file); } catch (e) { fail('Bild nicht lesbar', 'Dieses Bild konnte nicht geöffnet werden. Nimm am besten einen normalen Screenshot.'); return; }
+    try { image = await shrink(SC.file); } catch (e) { fail('Bild nicht lesbar', 'Dieses Bild konnte nicht geöffnet werden. Nimm am besten einen normalen Screenshot.'); return; }
     if (!alive()) return;
     done(0);
     let d = null;
-    let ok = false;
+    let status = 0;
     try {
-      const r = await fetch(API + '/bet', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Invite': String(store.get('invite', '') || '').trim() }, body: JSON.stringify({ image }) });
+      const r = await fetch(api() + '/match', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Invite': String(store.get('invite', '') || '').trim() }, body: JSON.stringify({ image }) });
+      status = r.status;
       d = await r.json().catch(() => null);
-      ok = !!(r.ok && d && d.ok && d.bet);
     } catch (e) { d = null; }
     if (!alive()) return;
-    if (!ok) { fail('Das hat nicht geklappt', (d && d.error) || 'Der KI-Server ist gerade nicht erreichbar. Prüf die Verbindung und versuch es noch mal.'); return; }
-    if (!d.bet.isBetSlip) { fail('Kein Wettschein erkannt', 'Auf dem Bild hat die KI keine Wette gefunden. Nimm am besten einen Screenshot vom Wettschein in deiner Wett-App.'); return; }
+    if (status === 404) { fail('Server noch nicht aktualisiert', 'Der Spiel-Scan braucht den neuen Server-Code. Niklas muss ihn einmal bei Cloudflare einfügen – danach geht es sofort.'); return; }
+    if (!d || !d.ok || !d.scan) { fail('Das hat nicht geklappt', (d && d.error) || 'Der KI-Server ist gerade nicht erreichbar. Prüf die Verbindung und versuch es noch mal.'); return; }
+    if (!d.scan.games || !d.scan.games.length) { fail('Kein Spiel erkannt', 'Auf dem Bild hat die KI kein Fußballspiel mit zwei Mannschaften gefunden. Nimm am besten einen Screenshot, auf dem beide Teams zu sehen sind.'); return; }
     done(1);
     await Promise.all([loadTips(60e3).catch(() => {}), loadRatings().catch(() => {})]);
     if (!alive()) return;
-    S.slip = buildSlip(d.bet);
-    await sleep(350);
+    const sc = saveScan(d.scan);
+    await sleep(300);
     if (!alive()) return;
     done(2);
-    await sleep(350);
+    await sleep(300);
     if (!alive()) return;
     done(3);
     fr.classList.remove('scanning');
     fr.classList.add('found');
-    await sleep(420);
-    if (alive()) location.replace('#/slip');
+    await sleep(380);
+    if (alive()) location.replace('#/scan/res/' + encodeURIComponent(sc.id));
   }
   function startScan(file) {
+    if (!file || (file.type && !/^image\//.test(file.type))) { toast('Das ist kein Bild.'); return; }
     const go = () => {
-      if (S.url) URL.revokeObjectURL(S.url);
-      S.url = URL.createObjectURL(file);
-      S.file = file;
-      S.slip = null;
-      if (curPath() === '/scan') { const p = S.stack[S.stack.length - 1]; p.el.innerHTML = barHtml('/scan') + `<div class="wrap" data-p="scan">${vScan()}</div>`; runScan(p.el); } else location.hash = '#/scan';
+      if (SC.url) URL.revokeObjectURL(SC.url);
+      SC.url = URL.createObjectURL(file);
+      SC.file = file;
+      if (curPath() === '/scan/run') { const p = S.stack[S.stack.length - 1]; p.el.innerHTML = barHtml('/scan/run') + `<div class="wrap" data-p="scan">${vScanRun()}</div>`; runScan(p.el); } else location.hash = '#/scan/run';
     };
     if (!String(store.get('invite', '') || '').trim()) inviteSheet(go); else go();
+  }
+  // Einfügen: Screenshot aus der Zwischenablage (iPhone: nach dem Screenshot „Kopieren“)
+  async function scanPaste() {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const type = it.types.find((t) => /^image\//.test(t));
+        if (type) { const blob = await it.getType(type); startScan(new File([blob], 'screenshot.' + (type.split('/')[1] || 'png'), { type })); return; }
+      }
+      toast('In der Zwischenablage ist kein Bild. Erst einen Screenshot kopieren.');
+    } catch (e) { toast('Einfügen geht hier nicht – nimm „Fotos“.'); }
   }
   // Die KI hat ein begrenztes Gratis-Kontingent: einmal der Einladungscode, danach bleibt er gespeichert
   function inviteSheet(then) {
@@ -329,7 +366,7 @@
     const sh = document.createElement('div');
     sh.className = 'sheet';
     sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel" role="dialog" aria-label="Einladungscode"><div class="grip" data-grip></div><h2>Einladungscode</h2>
-      <p class="bf-note" style="margin-top:-6px">Den Wettschein liest eine KI mit begrenztem Gratis-Kontingent. Dafür brauchst du einmal deinen Code, den bekommst du von Niklas.</p>
+      <p class="bf-note" style="margin-top:-6px">Den Screenshot liest eine KI mit begrenztem Gratis-Kontingent. Dafür brauchst du einmal deinen Code, den bekommst du von Niklas.</p>
       <input class="search" type="text" placeholder="Code eingeben" data-act="invcode" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
       <button class="btn" data-act="invgo" style="margin-top:12px">Weiter</button></div>`;
     document.body.appendChild(sh);
@@ -341,7 +378,7 @@
     const code = inp ? inp.value.trim() : '';
     if (!code) { toast('Bitte den Code eintragen.'); return; }
     let ok = false;
-    try { ok = (await fetch(API + '/check', { headers: { 'X-Invite': code } })).ok; } catch (e) { toast('Der Server ist gerade nicht erreichbar.'); return; }
+    try { ok = (await fetch(api() + '/check', { headers: { 'X-Invite': code } })).ok; } catch (e) { toast('Der Server ist gerade nicht erreichbar.'); return; }
     if (!ok) { toast('Dieser Code passt nicht.'); return; }
     store.set('invite', code);
     const then = S.afterInvite;
@@ -349,7 +386,7 @@
     closeSheet();
     if (then) setTimeout(then, reduce ? 0 : 300);
   }
-  // Teamname vom Wettschein → Team in den Stärken („FC Bayern München“, „Bor. Dortmund“, „1. FC Köln“ …)
+  // Teamname vom Screenshot → Team in den Stärken („FC Bayern München“, „Bor. Dortmund“, „1. FC Köln“ …)
   // Lieber „k. A.“ als das falsche Team: ein einzelnes Wort zählt nur, wenn es eindeutig ist und nicht bloß ein Vereins-Vorname („Hapoel“, „Real“ …).
   const TEAM_FILLER = new Set('hapoel maccabi beitar ironi bnei real sporting sportiva dynamo dinamo inter internacional athletic atletico deportivo racing union united city town rovers wanderers albion county olympique olympic borussia eintracht fortuna rapid slavia spartak lokomotiv torpedo stade royal young'.split(' '));
   function resolveTeam(name) {
@@ -364,138 +401,252 @@
     const hits = words.length ? searchTeams(words[0], 2) : [];
     return hits.length === 1 ? hits[0] : null;
   }
-  // passendes kommendes Spiel aus der Tipp-Suche (Anstoß darf 36 Stunden abweichen, falls der Schein keine Uhrzeit nennt)
+  // passendes kommendes Spiel aus der Tipp-Suche (Anstoß darf 36 Stunden abweichen, falls das Bild keine Uhrzeit zeigt)
   function findGame(H, A, home, away, kick) {
     const rows = (T.data && T.data.all) || [];
     const same = (t, id, nm, raw) => (t && t.id === id) || norm(nm) === norm(raw) || (t && t._k.includes(norm(nm)));
     const when = kick ? new Date(kick).getTime() : null;
     return rows.find((r) => same(H, r[4], r[6], home) && same(A, r[5], r[7], away) && (when == null || Math.abs(new Date(r[2]).getTime() - when) < 36 * 36e5)) || null;
   }
-  // Wie gut passt ein Team zum Text der Wette? 3 = voller Name, 2 = ganzes Wort, 1 = Wortanfang, 0 = gar nicht
-  function sideScore(text, name) {
-    const t = resolveTeam(name);
-    const keys = (t ? t._k : []).concat(norm(name)).filter((k) => k.length > 2);
-    if (keys.some((k) => ` ${text} `.includes(` ${k} `))) return 3;
-    const words = text.split(' ');
-    const own = norm(name).split(' ').filter((w) => w.length > 3);
-    if (own.some((w) => words.includes(w))) return 2;
-    if (own.some((w) => words.some((x) => x.length > 3 && (x.startsWith(w) || w.startsWith(x))))) return 1;
-    return 0;
-  }
-  function sideOf(text, home, away) {
-    const a = sideScore(text, home);
-    const b = sideScore(text, away);
-    return a > b ? 'H' : b > a ? 'A' : null;
-  }
-  // Text der Wette → Wett-Code wie in tips.py; was Result AI nicht nachrechnen kann, gibt null (wird „k. A.“)
-  function pickCode(x, home, away) {
-    const mk = norm(x.market);
-    const pk = norm(x.pick);
-    const all = `${mk} ${pk}`;
-    if (/halbzeit|\bhz\b|ecken|karten|handicap|torschutz|spieler|genaues|exaktes|korrektes|ergebniswette|zeitpunkt|qualifik|weiterkomm/.test(all)) return null;
-    const ou = /(uber|over|unter|under|mehr als|weniger als)\s+(\d)\s+(\d)/.exec(all);
-    if (ou) { if (/team|heim|gast/.test(mk)) return null; return (/^(uber|over|mehr)/.test(ou[1]) ? 'O' : 'U') + ou[2] + ou[3]; }
-    if (/beide|btts|both teams/.test(all)) return /nein|\bno\b|nicht/.test(pk) ? 'BN' : 'BY';
-    const c = pk.replace(/\s+/g, '');
-    if (/doppelt|double/.test(mk) || ['1x', 'x2', '12', '2x', 'x1', '21'].includes(c)) {
-      const m = { '1x': 'HD', x1: 'HD', x2: 'DA', '2x': 'DA', 12: 'HA', 21: 'HA' }[c];
-      if (m) return m;
-      const draw = /unentschieden|remis|draw/.test(pk);
-      const sd = sideOf(pk, home, away);
-      if (draw && sd) return sd === 'H' ? 'HD' : 'DA';
-      if (!draw && sideScore(pk, home) && sideScore(pk, away)) return 'HA';
-      return null;
-    }
-    if (c === '1') return 'H';
-    if (c === '2') return 'A';
-    if (c === 'x' || (/unentschieden|remis|draw/.test(pk) && !/oder/.test(pk))) return 'D';
-    const sd = sideOf(pk, home, away);
-    if (!sd) return null;
-    if (/trifft|tor erzielt|to score/.test(all)) return sd === 'H' ? 'HS' : 'AS';
-    return sd;
-  }
-  function slipLeg(x) {
-    const leg = { home: x.home || null, away: x.away || null, event: x.event || null, comp: x.competition || null, market: x.market || null, pick: x.pick || 'Wette', q: x.odds || null, t: kickIso(x.kickoff), res: null };
-    const item = { leg, p: null, src: null, value: null, why: 'Spiel nicht erkannt' };
-    if (!x.home || !x.away) return item;
-    const H = resolveTeam(x.home);
-    const A = resolveTeam(x.away);
-    const code = pickCode(x, x.home, x.away);
-    const row = findGame(H, A, x.home, x.away, leg.t);
-    let lam = null;
-    if (row) {
-      lam = [row[8], row[9]];
-      item.src = row[10] ? 'model' : 'market';
-      leg.t = row[2];
-      leg.comp = row[3] || leg.comp;
-      if (code) { leg.g = row[0]; leg.slug = row[1]; leg.m = code; }
-    } else if (H && A && H.grp === A.grp && H.lg === A.lg) { // ohne Marktpreise nur innerhalb einer Liga: über Ligen hinweg wären die Prozente zu ungenau
-      const l = lamOf(H, A, false);
-      lam = [l.lh, l.la];
-      item.src = 'model';
-    }
-    if (H) leg.home = reg(H);
-    if (A) leg.away = reg(A);
-    if (!lam) { item.why = 'Spiel nicht in den Daten'; return item; }
-    const mk = item.src === 'market';
-    const p = code ? RE.codeProb(RE.analyze({ lh: lam[0], la: lam[1], market: mk }), code, mk) : null;
-    if (p == null) { item.src = null; item.why = 'Diese Wettart rechnet Result AI nicht nach'; return item; }
-    item.p = p;
-    leg.p = p;
-    item.lam = lam;
-    item.code = code;
-    item.value = mk && leg.q ? p * leg.q - 1 : null; // „Wert“ nur gegen echte Marktpreise, die Team-Stärken allein sind dafür nicht genau genug
-    return item;
-  }
-  function buildSlip(x) {
-    const items = (x.legs || []).map(slipLeg);
-    const games = items.map((i) => i.leg.g || `${norm(i.leg.home)}|${norm(i.leg.away)}`);
-    const sameGame = new Set(games).size < games.length; // Wetten aufs selbe Spiel hängen zusammen: Sie werden gemeinsam aus den Ergebnissen gerechnet
-    const prod = items.length && items.every((i) => i.leg.q) ? items.reduce((a, i) => a * i.leg.q, 1) : null;
-    const q0 = x.totalOdds || (sameGame ? null : prod); // beim Buchmacher ist die Quote einer Kombi im selben Spiel nicht das Produkt
-    const q = q0 ? Math.round(q0 * 100) / 100 : null;
-    let p = null;
-    if (items.length && items.every((i) => i.p != null)) {
-      const seen = new Map();
-      items.forEach((i, k) => { if (!seen.has(games[k])) seen.set(games[k], []); seen.get(games[k]).push(i); });
-      p = [...seen.values()].reduce((a, g) => (a == null ? null : g.length === 1 ? a * g[0].p : (() => { const j = RE.jointProb(g[0].lam[0], g[0].lam[1], g.map((i) => i.code)); return j == null ? null : a * j; })()), 1);
-    }
-    return { items, q, p, value: p != null && q && items.every((i) => i.src === 'market') ? p * q - 1 : null, stake: x.stake || null, win: x.potentialWin || null,
-      status: ['won', 'lost', 'void'].includes(x.status) ? x.status : 'open', bookie: x.bookmaker || null, note: x.note || null,
-      key: 'scan|' + items.map((i) => `${norm(i.leg.pick)}:${i.leg.q || ''}`).join(',') + '|' + (x.stake || ''),
-      track: items.length > 0 && items.every((i) => i.leg.g && i.leg.m) };
-  }
-  const SRC_TXT = { market: 'aus den Marktpreisen', model: 'aus den Team-Stärken' };
   const pctSigned = (v) => `${v > 0.0005 ? '+' : v < -0.0005 ? '−' : ''}${nf1.format(Math.abs(v) * 100)} %`;
   const valueCls = (v) => (v > 0.03 ? 'up' : v < -0.03 ? 'down' : '');
-  function vSlip() {
-    const s = S.slip;
-    if (!s) return `<h1 class="ptitle">Wettschein</h1><div class="empty" style="margin-top:18px">Noch kein Wettschein gescannt.</div><div class="card scan-card" style="margin-top:12px">${scanBtns()}</div>`;
-    if (!s.items.length) return `<h1 class="ptitle">Wettschein</h1><div class="empty" style="margin-top:18px">Auf dem Schein konnte keine einzelne Wette gelesen werden.</div>`;
-    const fair = s.p ? nf2.format(1 / s.p) : 'k. A.';
-    const verdict = s.p == null ? 'Nicht jede Wette lässt sich nachrechnen, deshalb hier keine Gesamtzahl.'
-      : s.value == null ? (s.q ? 'Mindestens ein Spiel ist nur aus den Team-Stärken geschätzt, deshalb hier kein Vergleich mit der Quote.' : 'Auf dem Schein steht keine Gesamtquote, deshalb hier kein Vergleich.')
-      : s.value > 0.03 ? 'Die Quote auf dem Schein ist besser als der faire Preis.' : s.value < -0.03 ? 'Die Quote auf dem Schein ist schlechter als der faire Preis.' : 'Die Quote auf dem Schein liegt etwa beim fairen Preis.';
-    const legs = s.items.map((x) => {
-      const l = x.leg;
-      return `<article class="card sl"><div class="sl-top">${l.home && l.away ? `<span class="duo">${crest(l.home, 26, true)}${crest(l.away, 26, true)}</span>` : `<span class="bl-ic">${I.ticket}</span>`}
-        <span class="grow"><b>${esc(l.pick)}</b><span>${esc([legTeams(l), l.comp, l.t ? kickoff(l.t) : ''].filter(Boolean).join(' · '))}</span></span></div>
-        <div class="tiles t3 short"><div class="tile"><span>Chance</span><b>${x.p != null ? pct0(x.p) : 'k. A.'}</b></div><div class="tile"><span>Quote</span><b>${l.q ? nf2.format(l.q) : 'k. A.'}</b></div><div class="tile"><span>Fair</span><b>${x.p ? nf2.format(1 / x.p) : 'k. A.'}</b></div></div>
-        <p class="sl-why">${x.p != null ? `Chance ${SRC_TXT[x.src]}${x.value != null ? ` · Wert <b class="${valueCls(x.value)}">${pctSigned(x.value)}</b>` : ''}` : esc(x.why)}</p></article>`;
-    }).join('');
-    return `<h1 class="ptitle">Wettschein</h1><p class="psub">${esc([s.bookie, `${s.items.length} ${s.items.length === 1 ? 'Wette' : 'Wetten'}`].filter(Boolean).join(' · '))}</p>
-      <section class="card slip-sum"><div class="rec-hero">${s.p != null ? ring(s.p) : '<span class="ring-na">k. A.</span>'}<div class="grow"><b>Chance, dass alles aufgeht</b><span>${esc(verdict)}</span></div></div>
-        <div class="tiles t3 short"><div class="tile"><span>Quote</span><b>${s.q ? nf2.format(s.q) : 'k. A.'}</b></div><div class="tile"><span>Fair</span><b>${fair}</b></div><div class="tile"><span>Wert</span><b class="${s.value != null ? valueCls(s.value) : ''}">${s.value != null ? pctSigned(s.value) : 'k. A.'}</b></div></div></section>
-      <div class="cards" style="margin-top:12px">${legs}</div>
-      <div style="margin-top:16px"><button class="btn" data-act="slipsave">In meine Wetten übernehmen</button></div>
-      <p class="foot">Fair = die Quote, bei der die Wette auf lange Sicht weder Gewinn noch Verlust bringt. Wert = so viel Prozent vom Einsatz bringt die Quote auf dem Schein im Schnitt mehr oder weniger.<br>${RG_TEXT}</p>`;
+  const scanById = (id) => store.get('scans', []).find((s) => s.id === id) || null;
+  function saveScan(x) {
+    const sc = { id: 's' + Date.now().toString(36), at: Date.now(), bookie: x.bookmaker || null, note: x.note || null, games: x.games.map(scanGame) };
+    store.set('scans', [sc].concat(store.get('scans', [])).slice(0, 10));
+    redrawAll((p) => p === '/scan'); // „Zuletzt gescannt“ im Scan-Bereich
+    return sc;
   }
-  function saveSlip() {
-    const s = S.slip;
-    if (!s) return;
-    if (savedKeys().has(s.key)) { location.replace('#/bets'); return; }
-    openBetSheet({ src: 'scan', legs: s.items.map((x) => x.leg), q: s.q, stake: s.stake, win: s.win, title: s.items.length > 1 ? 'Kombi' : null, status: s.status, bookie: s.bookie, note: s.note, p: s.p, key: s.key, track: s.track });
+  // ein erkanntes Spiel: was auf dem Bild steht + zugeordnete Teams (Stärken) + Spiel der Tipp-Suche
+  function scanGame(x) {
+    const two = (a, b) => (a != null && b != null ? [a, b] : null);
+    const kick = kickIso(x.kickoff);
+    const g = { home: x.home, away: x.away, comp: x.competition || null, kick, day: !kick && /^\d{4}-\d{2}-\d{2}/.test(x.kickoff || '') ? x.kickoff.slice(0, 10) : null,
+      st: x.status || 'unknown', min: x.minute != null ? x.minute : null, half: x.half || null, score: two(x.scoreHome, x.scoreAway),
+      reds: x.redHome != null || x.redAway != null ? [x.redHome || 0, x.redAway || 0] : null,
+      odds: x.oddsHome && x.oddsDraw && x.oddsAway ? Object.assign({ home: x.oddsHome, draw: x.oddsDraw, away: x.oddsAway }, x.line && x.oddsOver && x.oddsUnder ? { line: x.line, over: x.oddsOver, under: x.oddsUnder } : {}) : null,
+      hid: null, aid: null, gid: null, teams: {} };
+    return linkGame(g);
   }
+  // Heim und Gast tauschen (manche Apps zeigen den Gast zuerst)
+  function flipGame(g) {
+    [g.home, g.away] = [g.away, g.home];
+    if (g.score) g.score = g.score.slice().reverse();
+    if (g.reds) g.reds = g.reds.slice().reverse();
+    if (g.odds) g.odds = Object.assign({}, g.odds, { home: g.odds.away, away: g.odds.home });
+  }
+  function linkGame(g) {
+    let H = (g.hid && R.byId[g.hid]) || resolveTeam(g.home);
+    let A = (g.aid && R.byId[g.aid]) || resolveTeam(g.away);
+    const when = g.kick || (g.day ? new Date(g.day + 'T12:00:00').toISOString() : null);
+    let row = findGame(H, A, g.home, g.away, when);
+    if (!row && !g.fixed) {
+      const sw = findGame(A, H, g.away, g.home, when);
+      if (sw) { flipGame(g); [H, A] = [A, H]; row = sw; }
+    }
+    g.hid = H ? H.id : null;
+    g.aid = A ? A.id : null;
+    g.gid = row ? row[0] : null;
+    if (row && !g.comp) g.comp = row[3];
+    if (row && !g.kick && g.st === 'upcoming') g.kick = row[2];
+    const tg = row && T.data && T.data.games[row[0]];
+    g.hn = tg ? tipTeam(tg.home) : H ? reg(H) : g.home;
+    g.an = tg ? tipTeam(tg.away) : A ? reg(A) : g.away;
+    g.teams = {};
+    [g.hn, g.an].forEach((n) => { if (REG[n]) g.teams[n] = REG[n]; });
+    return g;
+  }
+  // Chancen für ein erkanntes Spiel → { m (für analyze), src: market | shot | model, model (zweite Meinung), row, why }
+  function scanCalc(g) {
+    const H = g.hid && R.byId[g.hid];
+    const A = g.aid && R.byId[g.aid];
+    const row = g.gid && T.data ? (T.data.all || []).find((r) => r[0] === g.gid) || null : null;
+    const live = (g.st === 'live' || g.st === 'halftime') && !!g.score;
+    const model = H && A && H.id !== A.id && H.grp === A.grp ? lamOf(H, A, false) : null;
+    let base = null;
+    let src = null;
+    if (row) { base = { lh: row[8], la: row[9] }; src = row[10] ? 'model' : 'market'; }
+    else if (g.odds && !live && g.st !== 'finished') { const q = RE.fromOdds(g.odds); base = { lh: q.lh, la: q.la }; src = 'shot'; }
+    else if (model) { base = model; src = 'model'; }
+    if (!base) {
+      const why = !H || !A ? `${!H && !A ? 'Beide Teams sind' : `„${!H ? g.home : g.away}“ ist`} nicht in den Daten – antippen und das richtige Team wählen.`
+        : H.id === A.id ? 'Zweimal dasselbe Team erkannt – antippen und korrigieren.'
+        : !!H.nat !== !!A.nat ? 'Nationalteam gegen Verein rechnet Result AI nicht.' : 'Diese Ligen hatten nie gemeinsame Gegner – die Zahlen wären geraten, deshalb rechnet Result AI das nicht.';
+      return { m: null, src: null, model, row, why };
+    }
+    const m = Object.assign({ market: src !== 'model' }, base);
+    if (live) Object.assign(m, { minute: g.st === 'halftime' ? 45 : Math.max(1, Math.min(90, g.min || 1)), half: g.st === 'halftime' ? 'ht' : g.half || ((g.min || 0) > 45 ? 2 : 1), score: g.score.slice(), reds: (g.reds || [0, 0]).slice() });
+    return { m, src, model: src === 'model' ? null : model, row };
+  }
+  const SRC_LINE = { market: 'Chancen aus den Marktpreisen, ohne die Marge der Buchmacher', model: 'Chancen aus den Team-Stärken', shot: 'Chancen aus den Quoten auf deinem Screenshot, ohne die Marge' };
+  // Quoten-Check: Quote vom Screenshot gegen den fairen Preis – nur mit echten Marktpreisen (die Team-Stärken allein sind dafür zu ungenau)
+  function oddsCheck(g, c, an, h, a, acc) {
+    const live = !!c.m.score;
+    let out = '';
+    if (g.odds && !live && c.src === 'market') {
+      const ps = [an.probs.home, an.probs.draw, an.probs.away];
+      const qs = [g.odds.home, g.odds.draw, g.odds.away];
+      const names = [`Sieg ${h}`, 'Unentschieden', `Sieg ${a}`];
+      acc.checks++;
+      out += `<div class="mp-q"><div class="mq-h"><b>Quoten-Check</b><span>Screenshot gegen fairen Preis</span></div><div class="mq-g">${['1', 'X', '2'].map((l, j) => {
+        const v = ps[j] * qs[j] - 1;
+        if (v > 0.03) acc.hits.push({ t: names[j], s: `${h} – ${a}`, q: qs[j], v });
+        return `<div><span class="k">${l}</span><b>${nf2.format(qs[j])}</b><span class="f">fair ${nf2.format(1 / ps[j])}</span><em class="${valueCls(v)}">${pctSigned(v)}</em></div>`;
+      }).join('')}</div></div>`;
+    } else if (!live && c.src === 'shot' && c.model) {
+      const mo = analyze(Object.assign({ market: false }, c.model));
+      const r = round100([mo.probs.home, mo.probs.draw, mo.probs.away]);
+      out += `<div class="mp-q"><div class="mq-h"><b>Zweite Meinung</b><span>Result AI aus den Team-Stärken</span></div><div class="mq-g">${['1', 'X', '2'].map((l, j) => `<div><span class="k">${l}</span><b>${r[j]} %</b></div>`).join('')}</div></div>`;
+    } else if (g.odds && !live && c.src === 'model') {
+      out += '<div class="mp-q mq-x">Quoten-Check geht nur, wenn es für dieses Spiel Marktpreise gibt – die Team-Stärken allein sind dafür zu ungenau.</div>';
+    }
+    const tg = g.gid && T.data && T.data.games[g.gid];
+    const tq = (tg && tg.odds) || (g.gid && T.data && T.data.tq && T.data.tq[g.gid] && T.data.tq[g.gid].q) || null;
+    if (!live && tq && tq.H && tq.D && tq.A) {
+      let best = '';
+      if (c.src === 'market') {
+        const vs = [an.probs.home * tq.H - 1, an.probs.draw * tq.D - 1, an.probs.away * tq.A - 1];
+        const k = vs.indexOf(Math.max(...vs));
+        if (vs[k] > 0.03) best = ` <em class="up">${['1', 'X', '2'][k]} ${pctSigned(vs[k])}</em>`;
+      }
+      out += `<div class="mq-tip"><span>Tipico</span><b>${nf2.format(tq.H)} · ${nf2.format(tq.D)} · ${nf2.format(tq.A)}${best}</b></div>`;
+    }
+    return out;
+  }
+  function scanCard(sc, g, i, acc) {
+    regTeams(g);
+    const c = scanCalc(g);
+    const h = g.hn || g.home;
+    const a = g.an || g.away;
+    const fin = g.st === 'finished';
+    const running = g.st === 'live' || g.st === 'halftime';
+    const chip = g.st === 'live' ? `<span class="chip live">LIVE${g.min ? ` ${g.min}'` : ''}</span>` : g.st === 'halftime' ? '<span class="chip live">HALBZEIT</span>'
+      : fin ? '<span class="chip glass">Beendet</span>' : `<span class="chip glass">${esc(g.kick ? kickoff(g.kick) : g.day ? fmtDay(g.day) : 'Vor dem Spiel')}</span>`;
+    const mid = g.score && (running || fin) ? `${g.score[0]}:${g.score[1]}` : 'VS';
+    let body;
+    if (fin) body = `<div class="mp-pr mp-x">Schon vorbei${g.score ? ` – Endstand ${g.score[0]}:${g.score[1]}` : ''}. Hier gibt es nichts mehr zu rechnen.</div>`;
+    else if (!c.m) body = `<div class="mp-pr mp-x">${esc(c.why)}</div>`;
+    else {
+      const an = analyze(c.m);
+      const r = round100([an.probs.home, an.probs.draw, an.probs.away]);
+      const k = r.indexOf(Math.max(...r));
+      const note = SRC_LINE[c.src] + (c.m.score ? ', mit Spielstand und Minute' : running ? ' – Spielstand nicht lesbar, deshalb von vor dem Anpfiff' : '');
+      body = `<div class="mp-pr">${[[h, 0], ['Remis', 1], [a, 2]].map(([l, j]) => `<div class="${j === k ? 'on' : ''}"><b>${r[j]} %</b><span>${esc(l)}</span></div>`).join('')}</div>`
+        + oddsCheck(g, c, an, h, a, acc) + `<div class="sc-src">${esc(note)}</div>`
+        + `<button class="sc-open" data-act="scopen" data-id="${esc(sc.id)}" data-i="${i}">Ganze Analyse<span class="chev">›</span></button>`;
+    }
+    const side = (nm, sd) => `<button class="sp-side sc-side" data-act="scfix" data-id="${esc(sc.id)}" data-i="${i}" data-side="${sd}" aria-label="${esc(nm)} – antippen zum Ändern">${plate(nm, 58, running ? redCards(g, sd === 'home' ? 0 : 1) : '')}<b>${esc(nm)}</b><em>${(sd === 'home' ? g.hid : g.aid) ? 'ändern' : 'Team wählen'}</em></button>`;
+    return `<article class="mp teamcard scg" style="background:${teamBg({ home: h, away: a })};--gl:${rgba(teamColor(h), 0.6)};--gr:${rgba(teamColor(a), 0.6)}">${wm(h, 'l')}${wm(a, 'r')}
+      <div class="mp-top">${chip}${g.comp ? `<span class="chip glass">${esc(g.comp)}</span>` : ''}</div>
+      <div class="mp-mid">${side(h, 'home')}<div class="mp-sc">${mid}</div>${side(a, 'away')}</div>${body}</article>`;
+  }
+  function vScanRes(id) {
+    const sc = scanById(id);
+    if (!sc) return '<div class="empty" style="margin-top:24px">Diesen Scan gibt es nicht (mehr).</div>';
+    if (!R.data || !T.data) return '<h1 class="ptitle">Scan</h1><div class="empty" style="margin-top:18px">Die Daten werden geladen …</div>';
+    const acc = { checks: 0, hits: [] };
+    const cards = sc.games.map((g, i) => scanCard(sc, g, i, acc)).join('');
+    const n = sc.games.length;
+    const sum = acc.checks ? `<section class="card sc-best"><div class="card-h"><h3>Quoten-Check</h3><span class="note">${acc.checks} ${acc.checks === 1 ? 'Spiel' : 'Spiele'} geprüft</span></div>
+      ${acc.hits.length ? acc.hits.sort((x, y) => y.v - x.v).map((x) => `<div class="sb-row"><span class="grow"><b>${esc(x.t)}</b><span>${esc(x.s)}</span></span><span class="sb-q">${nf2.format(x.q)}</span><em class="up">${pctSigned(x.v)}</em></div>`).join('')
+        : '<p class="muted" style="font-size:14px">Keine Quote auf dem Screenshot ist besser als der faire Preis aus den Marktpreisen.</p>'}
+      <p class="muted" style="font-size:12.5px;margin-top:10px">Wert = so viel Prozent vom Einsatz bringt die Quote im Schnitt mehr als der faire Preis. Keine Garantie – auch Wetten mit Wert gehen oft verloren.</p></section>` : '';
+    return `${aura('scan')}<h1 class="ptitle">${n === 1 ? '1 Spiel erkannt' : `${n} Spiele erkannt`}</h1><p class="psub">${esc([agoText(sc.at), sc.bookie ? `Quoten von ${sc.bookie}` : ''].filter(Boolean).join(' · '))} · Team falsch? Einfach antippen.</p>
+      ${sc.note ? `<div class="notice sc-note"><b>Hinweis der KI</b><p>${esc(sc.note)}</p></div>` : ''}${sum}
+      <div class="scl">${cards}</div>
+      <div class="scan-more"><label class="btn soft">${I.scan}<span>Noch ein Screenshot</span><input type="file" accept="image/*" data-act="scanpic" aria-label="Noch einen Screenshot wählen"></label></div>
+      <p class="foot">Die KI liest das Bild nur ab, die Prozente rechnet Result AI selbst – ohne KI, am selben Tag immer gleich. Quoten vom Screenshot stehen nur zum Vergleich da.<br>${RG_TEXT}</p>`;
+  }
+  // Scan-Bereich (Tab): Knöpfe, was der Scan kann, zuletzt gescannt
+  function vScan() {
+    const recent = store.get('scans', []);
+    const ipad = ipadWide();
+    const feats = [[I.layers, 'Mehrere Spiele', 'Ein Screenshot vom ganzen Spieltag: bis zu 12 Spiele auf einmal.'],
+      [I.pulse, 'Auch live', 'Läuft das Spiel schon, rechnet Result AI mit Spielstand, Minute und roten Karten.'],
+      [I.target, 'Quoten-Check', 'Stehen Quoten auf dem Bild, siehst du, ob sie besser sind als der faire Preis.'],
+      [I.pen, 'Antippen zum Ändern', 'Team falsch erkannt? Antippen und das richtige wählen.']];
+    const row = (sc) => {
+      const g = sc.games[0] || {};
+      regTeams(g);
+      const h = g.hn || g.home || '?';
+      const a = g.an || g.away || '?';
+      const more = sc.games.length - 1;
+      return `<a class="row" href="#/scan/res/${esc(sc.id)}"><span class="duo">${crest(h, 30, true)}${crest(a, 30, true)}</span><span class="grow"><div class="t">${esc(h)} – ${esc(a)}${more > 0 ? ` <span class="muted">+${more}</span>` : ''}</div><div class="s">${esc(`${sc.games.length} ${sc.games.length === 1 ? 'Spiel' : 'Spiele'} · ${agoText(sc.at)}`)}</div></span><span class="chev">›</span></a>`;
+    };
+    return `${aura('scan')}<h1 class="ptitle">Spiel scannen</h1><p class="psub">Screenshot von einem Spiel rein – Result AI erkennt die Teams und rechnet die Chancen.</p>
+      <section class="scan-card sc-hero">${decoRing}${scPhone}
+        <div class="sc-text"><span class="sc-eb">${I.scan}Screenshot scannen</span><h2>Bild rein.<br><span>Prozente raus.</span></h2><p>Aus kicker, FotMob, Google, deiner Wett-App oder vom Fernseher.</p></div>
+        ${scanBtns(true)}${ipad ? '<p class="sc-drop">Oder ein Bild hierher ziehen – oder mit ⌘V einfügen.</p>' : ''}</section>
+      <section class="sec"><div class="sec-h"><h2>Das kann der Scan</h2></div><div class="feat-grid">${feats.map(([ic, t, s]) => `<div class="feat"><span class="fi">${ic}</span><b>${t}</b><span>${s}</span></div>`).join('')}</div></section>
+      ${recent.length ? `<section class="sec"><div class="sec-h"><h2>Zuletzt gescannt</h2></div><div class="group">${recent.map(row).join('')}</div></section>` : ''}
+      <p class="foot">Die KI liest das Bild nur ab, die Prozente rechnet Result AI selbst – ohne KI, am selben Tag immer gleich.<br>${RG_TEXT}</p>`;
+  }
+  const kickAbs = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : `${['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'][d.getDay()]}, ${d.getDate()}.${d.getMonth() + 1}., ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`; };
+  // „Ganze Analyse“: Spiel der Tipp-Suche → dessen Seite (mit Tipico-Quoten), sonst eine eigene Seite im Verlauf
+  function scanOpen(id, i) {
+    const sc = scanById(id);
+    const g = sc && sc.games[+i];
+    if (!g || !R.data || !T.data) return;
+    const c = scanCalc(g);
+    if (!c.m) return;
+    const live = !!c.m.score;
+    if (!live && c.src !== 'shot' && g.gid && T.data.games[g.gid]) { location.hash = '#/r/t_' + encodeURIComponent(g.gid); return; }
+    const now = new Date();
+    const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const key = String(g.gid || `${g.hid}-${g.aid}`);
+    const hid = ['sc', key, live ? `${c.m.minute}-${c.m.half}-${c.m.score.join('-')}-${c.m.reds.join('-')}` : c.src, day].join('_').replace(/[^a-zA-Z0-9_.-]/g, '');
+    const m = Object.assign({ id: hid, kind: live ? 'live' : c.src === 'shot' ? 'odds' : 'pre', src: 'scan', base: c.src, day, at: Date.now(),
+      comp: g.comp || 'Gescannt', when: live ? '' : g.kick ? kickAbs(g.kick) : '', home: g.hn || g.home, away: g.an || g.away, teams: g.teams || {} }, c.m);
+    if (c.src === 'shot') Object.assign(m, { odds: g.odds, oddsBy: 'Screenshot', model: c.model });
+    if (c.src === 'model') m.mo = true;
+    const hist = store.get('history', []).filter((x) => x.id !== hid);
+    hist.unshift(m);
+    store.set('history', hist.slice(0, 50));
+    location.hash = '#/r/' + encodeURIComponent(hid);
+  }
+  // falsch erkanntes Team antippen → Suche → richtiges Team; danach wird das Spiel neu zugeordnet
+  function scanFixOpen(id, i, side) {
+    if (!R.data) { toast('Die Team-Stärken werden noch geladen.'); return; }
+    SC.fix = { id, i: +i, side };
+    openSearch(side);
+  }
+  function scanFix(teamId) {
+    const f = SC.fix;
+    SC.fix = null;
+    const t = R.byId[teamId];
+    if (!f || !t) { closeSheet(); return; }
+    rememberTeam(teamId);
+    const all = store.get('scans', []);
+    const sc = all.find((s) => s.id === f.id);
+    const g = sc && sc.games[f.i];
+    if (!g) { closeSheet(); return; }
+    if (f.side === 'home') { g.hid = teamId; g.home = tName(t); } else { g.aid = teamId; g.away = tName(t); }
+    g.fixed = true;
+    linkGame(g);
+    store.set('scans', all);
+    closeSheet();
+    redrawTop();
+  }
+  // iPad: Bild hineinziehen oder mit ⌘V einfügen, solange der Scan-Bereich offen ist
+  const onScanTab = () => { const p = curPath(); return p === '/scan' || p.startsWith('/scan/res/'); };
+  const imageOf = (list) => [...(list || [])].find((x) => /^image\//.test(x.type || ''));
+  document.addEventListener('paste', (e) => {
+    if (!onScanTab() || $('.sheet')) return;
+    const f = imageOf(e.clipboardData && e.clipboardData.files);
+    if (f) { e.preventDefault(); startScan(f); }
+  });
+  document.addEventListener('dragover', (e) => {
+    if (!onScanTab() || !e.dataTransfer || ![...(e.dataTransfer.types || [])].includes('Files')) return;
+    e.preventDefault();
+    document.documentElement.classList.add('dropping');
+  });
+  document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.documentElement.classList.remove('dropping'); });
+  document.addEventListener('drop', (e) => {
+    document.documentElement.classList.remove('dropping');
+    if (!onScanTab()) return;
+    const f = imageOf(e.dataTransfer && e.dataTransfer.files);
+    if (f) { e.preventDefault(); startScan(f); }
+  });
 
   // ------------------------------------------------------------------ Ergebnis
   // Zahl als Zählwerk: jede Ziffer ist eine Rolle 0–9 0–9, die auf ihre Ziffer im zweiten Durchlauf rollt (nur transform)
@@ -515,7 +666,7 @@
   // Sprung-Leiste: Abschnitte der Ergebnis-Seite (klebt oben, zeigt beim Scrollen, wo man ist)
   function secNav(m, a) {
     const hasTips = m.src === 'tips' && T.data && T.data.safe.concat(T.data.top).some((t) => t.g === m.gid);
-    const secs = [['ov', 'Übersicht'], hasTips ? ['tp', 'Tipps'] : null, ['er', 'Ergebnisse'], m.kind === 'odds' ? ['mk', 'Tipico'] : null,
+    const secs = [['ov', 'Übersicht'], hasTips ? ['tp', 'Tipps'] : null, ['er', 'Ergebnisse'], m.kind === 'odds' ? ['mk', m.oddsBy || 'Tipico'] : null,
       ['to', 'Tore'], ['hz', a.ht ? 'Halbzeit' : 'Doppelchance'], ['nt', 'Nächstes Tor'], ['ex', 'Erklärung']].filter(Boolean);
     return `<nav class="snav" aria-label="Abschnitte">${secs.map(([k, l], i) => `<button class="${i ? '' : 'on'}" data-act="sec" data-sec="${k}">${l}</button>`).join('')}</nav>`;
   }
@@ -539,7 +690,7 @@
     const ac = teamColor(m.away);
     const fcol = favHome ? hc : ac;
     let out = `<div class="res" style="--hgl:${rgba(hc, 0.3)};--agl:${rgba(ac, 0.3)};--hgd:${rgba(hc, 0.55)};--agd:${rgba(ac, 0.55)};--fvl:${rgba(fcol, 0.1)};--fvd:${rgba(fcol, 0.24)}"><div class="glow" aria-hidden="true"></div><div class="res-l"><section class="match teamcard" style="background:${teamBg(m)}">${wm(m.home, 'l')}${wm(m.away, 'r')}
-      <div class="match-top">${live ? `<span class="chip live">LIVE ${m.minute}'</span>` : `<span class="chip glass">${m.kind === 'odds' ? 'Tipico-Quoten' : 'Vor dem Spiel'}</span>`}<span class="chip glass">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
+      <div class="match-top">${live ? `<span class="chip live">${m.half === 'ht' ? 'HALBZEIT' : `LIVE ${m.minute}'`}</span>` : `<span class="chip glass">${m.kind === 'odds' ? (m.oddsBy ? 'Quoten vom Screenshot' : 'Tipico-Quoten') : 'Vor dem Spiel'}</span>`}<span class="chip glass">${esc(m.comp)}</span><span class="when">${esc(live ? (m.half === 'ht' ? 'Halbzeitpause' : m.half === 2 ? '2. Halbzeit' : '1. Halbzeit') : m.when || '')}</span></div>
       <div class="versus"><div class="side">${plate(m.home, 80, redCards(m, 0))}<span class="nm">${esc(m.home)}</span></div>
         <div class="mid">${live ? `<div class="sc">${m.score[0]}:${m.score[1]}</div><div class="sub">${m.minute}. Minute</div>` : '<div class="vs">VS</div>'}</div>
         <div class="side">${plate(m.away, 80, redCards(m, 1))}<span class="nm">${esc(m.away)}</span></div></div></section>`;
@@ -591,7 +742,7 @@
 
     // 8) Erklärung
     out += `<section class="card explain" data-sec="ex" style="--i:7"><div class="card-h"><h3>So kommt die Zahl zustande</h3></div>${explain(m, a)}</section>`;
-    out += `</div><p class="foot">${m.src === 'tips' ? `${m.mo ? 'Für dieses Spiel gibt es keine Marktpreise, die Chancen kommen allein aus den Team-Stärken.' : 'Chancen aus den Marktpreisen ohne die Marge der Buchmacher, Tore zusätzlich mit Result AI.'} Angezeigte Quoten nur von Tipico.<br>` : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (${Object.keys(R.leagues).length || 'viele'} Ligen + Europapokal).<br>` : ''}${m.kind === 'live' ? 'Tormodell Minute für Minute: Spielstand, rote Karten und Restzeit' : 'Poisson-Tormodell mit Dixon-Coles'} · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
+    out += `</div><p class="foot">${m.src === 'tips' ? `${m.mo ? 'Für dieses Spiel gibt es keine Marktpreise, die Chancen kommen allein aus den Team-Stärken.' : 'Chancen aus den Marktpreisen ohne die Marge der Buchmacher, Tore zusätzlich mit Result AI.'} Angezeigte Quoten nur von Tipico.<br>` : ''}${m.src === 'scan' ? `Aus deinem Screenshot erkannt. ${m.base === 'market' ? 'Chancen aus den Marktpreisen ohne die Marge der Buchmacher.' : m.base === 'shot' ? 'Chancen aus den Quoten auf deinem Screenshot, ohne die Marge.' : `Chancen aus den Team-Stärken vom ${esc(fmtDay(m.day))}.`}<br>` : ''}${m.src === 'ratings' ? `Mit den Team-Stärken vom ${esc(fmtDay(m.day))} (${Object.keys(R.leagues).length || 'viele'} Ligen + Europapokal).<br>` : ''}${m.kind === 'live' ? 'Tormodell Minute für Minute: Spielstand, rote Karten und Restzeit' : 'Poisson-Tormodell mit Dixon-Coles'} · exakt, ohne Zufall.<br>Gleiches Spiel am selben Tag = gleiche Zahlen.</p></div>`;
     return out;
   }
   function heatmap(a, m, c) {
@@ -650,15 +801,16 @@
     const q = RE.fromOdds(m.odds);
     const mk = RE.analyze({ lh: q.lh, la: q.la });
     // Result AI = eigene Rechnung aus den Team-Stärken; bei Top-Tipps steht die Ergebnis-Seite selbst auf den Quoten
-    const own = m.model ? RE.analyze({ lh: m.model.lh, la: m.model.la }) : m.src === 'tips' ? null : a;
+    const own = m.model ? RE.analyze({ lh: m.model.lh, la: m.model.la }) : m.src === 'tips' || m.oddsBy ? null : a;
+    const by = m.oddsBy || 'Tipico';
     const v = (x) => (x == null ? '–' : pct0(x));
     const ov = (r) => { const o = r && r.over.find((x) => x.line === 2.5); return o ? o.over : null; };
     const row = (l, x, y) => `<div class="cmp-row"><span>${l}</span><span class="v">${v(x)}</span><span class="v">${v(y)}</span></div>`;
-    return `<section class="card" data-sec="mk" style="--i:${i}"><div class="card-h"><h3>Tipico vs. Result AI</h3><span class="note">${nf2.format(m.odds.home)} · ${nf2.format(m.odds.draw)} · ${nf2.format(m.odds.away)}</span></div>
-      <div class="cmp-row h"><span>Ausgang</span><span class="v">Tipico</span><span class="v">Result AI</span></div>
+    return `<section class="card" data-sec="mk" style="--i:${i}"><div class="card-h"><h3>${by} vs. Result AI</h3><span class="note">${nf2.format(m.odds.home)} · ${nf2.format(m.odds.draw)} · ${nf2.format(m.odds.away)}</span></div>
+      <div class="cmp-row h"><span>Ausgang</span><span class="v">${by}</span><span class="v">Result AI</span></div>
       ${row(`Sieg ${esc(m.home)}`, q.market.home, own && own.probs.home)}${row('Remis', q.market.draw, own && own.probs.draw)}${row(`Sieg ${esc(m.away)}`, q.market.away, own && own.probs.away)}
       ${row('Über 2,5 Tore', ov(mk), ov(own))}
-      <p class="muted" style="font-size:13px;margin-top:10px">Tipico = aus den Tipico-Quoten, ohne die Marge (${nf1.format(q.market.margin * 100)} %). Result AI = eigene Rechnung aus den Team-Stärken${own ? '' : ' – für dieses Spiel zu wenig Daten'}.</p></section>`;
+      <p class="muted" style="font-size:13px;margin-top:10px">${by} = aus den ${m.oddsBy ? 'Quoten auf deinem Screenshot' : 'Tipico-Quoten'}, ohne die Marge (${nf1.format(q.market.margin * 100)} %). Result AI = eigene Rechnung aus den Team-Stärken${own ? '' : ' – für dieses Spiel zu wenig Daten'}.</p></section>`;
   }
   function explain(m, a) {
     const xg = (v) => nf1.format(v);
@@ -755,38 +907,8 @@
   // zuletzt gewählte Teams (oben in der Suche, z. B. der eigene Verein)
   const rememberTeam = (id) => store.set('recentTeams', [id].concat(store.get('recentTeams', []).filter((x) => x !== id)).slice(0, 6));
 
-  // ------------------------------------------------------------------ Spiel selbst auswählen (ohne Screenshot)
-  const P = { home: null, away: null, neutral: false, live: false, minute: 60, score: [0, 0], reds: [0, 0], msg: '' };
+  // ------------------------------------------------------------------ Team suchen (Scan: falsch erkanntes Team korrigieren)
   const fmtDay = (iso) => { const d = new Date(iso); return isNaN(d) ? 'heute' : d.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' }); };
-  function vPick() {
-    const d = R.data;
-    if (!d) return '<h1 class="ptitle">Spiel auswählen</h1><div class="empty" style="margin-top:18px">Die Team-Stärken werden geladen …</div>';
-    const slot = (side, label) => {
-      const t = P[side] && R.byId[P[side]];
-      return `<button class="slot ${t ? 'set' : ''}" data-act="slot" data-side="${side}"${t ? ` style="--sg:${rgba(teamColor(reg(t)), 0.16)};--sgd:${rgba(teamColor(reg(t)), 0.32)}"` : ''}>${t ? crest(reg(t), 46) : `<span class="slot-ph">${I.search}</span>`}
-        <span class="grow"><span class="slot-l">${label}</span><span class="slot-n">${t ? esc(tName(t)) : 'Team suchen'}</span>${t ? `<span class="slot-s">${esc(lgName(t.lg))}</span>` : ''}</span><span class="chev">›</span></button>`;
-    };
-    return `${aura('pick')}<h1 class="ptitle">Spiel auswählen</h1><p class="psub">Zwei Vereine oder zwei Länder wählen.</p>
-      <div class="card pick" style="margin-top:18px">${slot('home', 'Heim')}<div class="pick-vs"><span>gegen</span>${P.home || P.away ? `<button class="swap" data-act="swap" aria-label="Heim und Gast tauschen">${I.swap}</button>` : ''}</div>${slot('away', 'Gast')}</div>
-      ${matchPreview()}
-      <div class="card opts" style="margin-top:14px">
-        <label class="tgl"><span class="grow"><b>Neutraler Platz</b><small>z. B. ein Finale – ohne Heimvorteil</small></span><input type="checkbox" data-act="opt" data-k="neutral" ${P.neutral ? 'checked' : ''}><i></i></label>
-        <label class="tgl"><span class="grow"><b>Spiel läuft schon</b><small>Spielstand, Minute und rote Karten eingeben</small></span><input type="checkbox" data-act="opt" data-k="live" ${P.live ? 'checked' : ''}><i></i></label>
-        ${P.live ? liveInputs() : ''}</div>
-      ${P.msg ? `<div class="notice"><b>Das rechnet Result AI so nicht</b><p>${P.msg}</p></div>` : ''}
-      <div class="calc-w" style="margin-top:16px"><button class="btn" data-act="calc" ${P.home && P.away ? '' : 'disabled'}>Prognose berechnen</button></div>
-      <p class="foot">Stärken vom ${esc(fmtDay(d.updatedAt))} · ${d.teams.length} Teams aus ${d.leagues.length} Ligen + Europapokal und Länderspielen<br>Jeden Morgen neu gerechnet – am selben Tag immer dieselben Zahlen.</p>`;
-  }
-  const stepper = (k, i, v) => `<span class="stepper"><button data-act="step" data-k="${k}" data-i="${i}" data-d="-1" aria-label="weniger">−</button><b>${v}</b><button data-act="step" data-k="${k}" data-i="${i}" data-d="1" aria-label="mehr">+</button></span>`;
-  function liveInputs() {
-    const h = P.home && R.byId[P.home];
-    const a = P.away && R.byId[P.away];
-    return `<div class="live-in"><div class="li-row"><span>Minute</span><b class="li-min">${P.minute}'</b></div>
-      <input type="range" min="1" max="90" value="${P.minute}" data-act="minute" aria-label="Spielminute">
-      <div class="li-grid"><span></span><span class="li-h">${h ? esc(tName(h)) : 'Heim'}</span><span class="li-h">${a ? esc(tName(a)) : 'Gast'}</span>
-        <span>Tore</span>${stepper('score', 0, P.score[0])}${stepper('score', 1, P.score[1])}
-        <span>Rote Karten</span>${stepper('reds', 0, P.reds[0])}${stepper('reds', 1, P.reds[1])}</div></div>`;
-  }
   function openSearch(side) {
     if ($('.sheet')) return;
     const sh = document.createElement('div');
@@ -828,30 +950,6 @@
   function lamOf(h, a, neutral) {
     const md = h.nat ? R.data.natModel : R.data.model;
     return { lh: Math.exp(md.mu + (neutral ? 0 : md.h) + h.att - a.def), la: Math.exp(md.mu + a.att - h.def) };
-  }
-  function calcPick() {
-    const h = R.byId[P.home];
-    const a = R.byId[P.away];
-    if (!h || !a) return;
-    if (h.id === a.id) { P.msg = 'Bitte zwei verschiedene Teams wählen.'; redrawTop(); return; }
-    if (h.grp !== a.grp) {
-      P.msg = !!h.nat !== !!a.nat ? 'Ein Nationalteam und ein Verein spielen nicht gegeneinander. Bitte zwei Vereine oder zwei Länder wählen.' : `${esc(tName(h))} und ${esc(tName(a))} spielen in Ligen, die nie über gemeinsame Gegner verbunden waren (z. B. Europa und Südamerika). Die Zahlen wären geraten, deshalb rechnet Result AI das nicht.`;
-      redrawTop();
-      return;
-    }
-    P.msg = '';
-    const day = String(R.data.updatedAt).slice(0, 10);
-    const id = ['p', h.id, a.id, P.neutral ? 'n' : 'h', P.live ? `${P.minute}-${P.score.join('-')}-${P.reds.join('-')}` : 'vor', day].join('_');
-    const sameLg = h.lg && h.lg === a.lg;
-    const m = { id, kind: P.live ? 'live' : 'pre', src: 'ratings', day, at: Date.now(),
-      comp: h.nat ? 'Länderspiel' : sameLg ? R.leagues[h.lg].name : 'Selbst ausgewählt', when: P.neutral ? 'neutraler Platz' : sameLg ? 'selbst ausgewählt' : '',
-      home: reg(h), away: reg(a), teams: { [tName(h)]: { logo: h.logo, color: h.color }, [tName(a)]: { logo: a.logo, color: a.color } },
-      ...lamOf(h, a, P.neutral) };
-    if (P.live) Object.assign(m, { minute: P.minute, half: P.minute > 45 ? 2 : 1, score: P.score.slice(), reds: P.reds.slice() });
-    const hist = store.get('history', []).filter((x) => x.id !== id);
-    hist.unshift(m);
-    store.set('history', hist.slice(0, 50));
-    location.hash = '#/r/' + encodeURIComponent(id);
   }
   // oberste Seite neu zeichnen (z. B. nach einer Eingabe), Scrollstand bleibt
   const pageKey = (path) => (path === '/' ? 'home' : path.split('/')[1] || 'home'); // z. B. /r/abc -> r
@@ -928,7 +1026,7 @@
     return m;
   }
   // „Tipps zu diesem Spiel“ auf der Ergebnis-Seite – jeder Tipp lässt sich als Wette speichern
-  const LISTS = [['safe', 'Sicher'], ['rec', 'Empfohlen'], ['top', 'Top-Quote']];
+  const LISTS = [['safe', 'Sicher'], ['top', 'Top-Quote']];
   function tipsForGame(m, i) {
     if (!T.data) return '';
     const seen = new Set();
@@ -980,29 +1078,34 @@
     return '<p class="tl-note">Kombi = mehrere Tipps auf einem Schein: Die Quoten werden malgenommen – aber jeder einzelne Tipp muss aufgehen.</p>'
       + (cards || '<div class="empty" style="margin-top:14px">Gerade keine Kombi – die nächste Suche läuft in spätestens einer Stunde.</div>');
   }
-  // Filter der Tipp-Listen: nur der Zeitraum (3 Wochen voraus) – die Wettbewerbs-Leiste hat Niklas am 06.11.2026 rausgenommen
-  const PERIODS = [['all', 'Alle Tage'], ['0', 'Heute'], ['1', 'Morgen'], ['week', 'Diese Woche'], ['later', 'Später']];
-  const inPeriod = (iso, k) => { const dd = dayDiff(iso); return k === 'all' || (k === 'week' ? dd <= 6 : k === 'later' ? dd > 6 : String(dd) === k); };
+  // Filter der Tipp-Listen: Zeitraum (3 Wochen voraus) und „Mit Quote“ (Niklas, 10.11.2026: „eine Kategorie ‚mit Quote‘, alle Spiele mit
+  // Quote kommen da rein, und eine, die ‚Heute und Morgen‘ heißt“). Die Wettbewerbs-Leiste hat Niklas am 06.11.2026 rausgenommen.
+  const PERIODS = [['all', 'Alle Tage'], ['q', 'Mit Quote'], ['01', 'Heute & Morgen'], ['0', 'Heute'], ['1', 'Morgen'], ['week', 'Diese Woche'], ['later', 'Später']];
+  const inPeriod = (iso, k) => { const dd = dayDiff(iso); return k === 'all' || (k === 'week' ? dd <= 6 : k === 'later' ? dd > 6 : k === '01' ? dd <= 1 : String(dd) === k); };
+  const inChip = (t, k) => (k === 'q' ? t.q != null : inPeriod(T.data.games[t.g].t, k));
   const NOTES = {
     safe: 'Chance ab 70 %. Oben steht, worin sich Markt und Result AI am einigsten sind.',
-    rec: 'Von Result AI empfohlen: mindestens 55 % Chance bei guter Quote, und Result AI sieht die Wette mindestens so gut wie der Markt.',
     top: 'Höhere Quote bei über 50 % Chance. Hier zählt vor allem die Quote.',
   };
   function tipsBody() {
     const d = T.data;
     B.keys = savedKeys();
     if (T.list === 'kombi') return kombisHtml(d);
-    if (!d[T.list]) return '<div class="empty" style="margin-top:14px">„Empfohlen“ kommt mit der nächsten Tipp-Suche – spätestens in einer Stunde.</div>';
+    if (!d[T.list]) T.list = 'safe';
     const all = d[T.list].filter(upcoming);
-    const per = PERIODS.filter(([k]) => k === 'all' || all.some((t) => inPeriod(d.games[t.g].t, k)));
+    const per = PERIODS.filter(([k]) => k === 'all' || k === 'q' || all.some((t) => inChip(t, k)));
     if (!per.some(([k]) => k === T.day)) T.day = 'all';
-    const shown = all.filter((t) => inPeriod(d.games[t.g].t, T.day));
-    return `<div class="chips">${per.map(([k, l]) => `<button class="${T.day === k ? 'on' : ''}" data-act="tday" data-val="${esc(k)}">${esc(l)}</button>`).join('')}</div>`
-      + `<p class="tl-note">${NOTES[T.list]}</p>` + (shown.length ? `<div class="tlist">${shown.slice(0, 40).map((t, i) => tipCard(t, i, T.list)).join('')}</div>`
-      : '<div class="empty" style="margin-top:14px">Gerade keine passenden Tipps – die nächste Suche läuft in spätestens einer Stunde.</div>');
+    const shown = all.filter((t) => inChip(t, T.day));
+    const nq = all.filter((t) => t.q != null).length;
+    const empty = T.day === 'q'
+      ? 'Gerade hat kein Tipp hier eine Tipico-Quote. Tipico bietet einen Spieltag meist erst ein paar Tage vorher an, Result AI holt die Quoten dann von selbst.'
+      : 'Gerade keine passenden Tipps – die nächste Suche läuft in spätestens einer Stunde.';
+    return `<div class="chips">${per.map(([k, l]) => `<button class="${T.day === k ? 'on' : ''}" data-act="tday" data-val="${esc(k)}">${esc(l)}${k === 'q' ? ` · ${nq}` : ''}</button>`).join('')}</div>`
+      + `<p class="tl-note">${NOTES[T.list]}${T.day === 'q' ? ' Hier nur Tipps mit echter Tipico-Quote.' : ''}</p>` + (shown.length ? `<div class="tlist">${shown.slice(0, 40).map((t, i) => tipCard(t, i, T.list)).join('')}</div>`
+      : `<div class="empty" style="margin-top:14px">${empty}</div>`);
   }
   // Bilanz der letzten 30 Tage: alle angezeigten Tipps, nach dem Abpfiff ausgewertet (eigene Abteilung auf dem Start, Niklas 08.11.2026)
-  const REC_LISTS = [['safe', 'Sicher'], ['rec', 'Empfohlen'], ['top', 'Top-Quote']];
+  const REC_LISTS = [['safe', 'Sicher'], ['top', 'Top-Quote']]; // „Empfohlen“ gab es bis 10.11.2026, seine Tipps zählen noch bei „alle zusammen“
   // Abstand zur eigenen Vorhersage in Prozentpunkten: im Plus grün, im Minus rot
   const recDiff = (x) => {
     if (!x || !x.n) return '';
@@ -1047,7 +1150,7 @@
       const a = tipTeam({ id: e.aid, name: e.away });
       return `<div class="rec-it ${e.res.won ? 'won' : 'lost'}"><span class="mk">${e.res.won ? '✓' : '✗'}</span><span class="grow"><b>${esc(tipLabel(e.m, h, a))}</b><span>${esc(h)} ${e.res.hs}:${e.res.as} ${esc(a)}</span></span><span class="rp2">${pct0(e.p)}</span></div>`;
     }).join('');
-    return head + `<div class="card rec" style="margin-top:16px">${t.n ? `<div class="rec-hero">${ring(t.won / t.n)}<div class="grow"><b>${t.won} von ${t.n}</b><span>Tipps aufgegangen · erwartet ${pct0(t.exp / t.n)}${recDiff(t)}${recVerdict(t)}</span></div></div>` : ''}${REC_LISTS.filter(([k]) => r[k] || k !== 'rec').map(([k, l]) => recRow(l, (r[k] || {})['30'])).join('')}</div>
+    return head + `<div class="card rec" style="margin-top:16px">${t.n ? `<div class="rec-hero">${ring(t.won / t.n)}<div class="grow"><b>${t.won} von ${t.n}</b><span>Tipps aufgegangen · erwartet ${pct0(t.exp / t.n)}${recDiff(t)}${recVerdict(t)}</span></div></div>` : ''}${REC_LISTS.map(([k, l]) => recRow(l, (r[k] || {})['30'])).join('')}</div>
       ${recent ? `<section class="sec"><div class="sec-h"><h2>Zuletzt ausgewertet</h2></div><div class="card rec"><div class="rec-list" style="border-top:0">${recent}</div></div></section>` : ''}
       ${roiLine(t)}<p class="foot">Gezählt werden die letzten 30 Tage, jeder Tipp einmal, gewertet nach 90 Minuten wie beim Buchmacher. „Erwartet“ ist die Quote an Treffern, die Result AI vorher selbst genannt hat. „Passt“ heißt: Der Unterschied liegt im Rahmen des Zufalls.</p>`;
   }
@@ -1055,12 +1158,12 @@
     const head = aura('tips') + '<h1 class="ptitle">Top-Tipps</h1>';
     const d = T.data;
     if (!d) return head + `<div class="empty" style="margin-top:18px">${T.err ? 'Die Tipps konnten gerade nicht geladen werden. Prüf die Verbindung.' : 'Die Tipps werden geladen …'}</div>`;
-    const tabs = [['safe', 'Sicher'], ['rec', 'Empfohlen'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
+    const tabs = [['safe', 'Sicher'], ['top', 'Top-Quote'], ['kombi', 'Kombis']];
     const k = Math.max(0, tabs.findIndex((x) => x[0] === T.list));
     const upd = new Date(d.updatedAt);
     const hint = d.tipico && d.tipico.connected ? '' : '<div class="hint">Tipico ist noch nicht verbunden, deshalb steht bei den Quoten „k. A.“. Die Chancen stimmen trotzdem.</div>';
     return head + `<p class="psub"><i class="fresh ${freshness(d.updatedAt)}"></i>Gesucht ${esc(ago(d.updatedAt))} · jede Stunde neu · 3 Wochen voraus</p>${hint}
-      <div class="seg s4" style="--k:${k};margin-top:14px"><span class="ind"></span>${tabs.map(([v, l]) => `<button class="${T.list === v ? 'on' : ''}" data-act="tlist" data-val="${v}">${l}</button>`).join('')}</div>
+      <div class="seg s3" style="--k:${k};margin-top:14px"><span class="ind"></span>${tabs.map(([v, l]) => `<button class="${T.list === v ? 'on' : ''}" data-act="tlist" data-val="${v}">${l}</button>`).join('')}</div>
       <div class="tips-body">${tipsBody()}</div>
       <p class="foot">Gesucht ${esc(isNaN(upd) ? '' : (dayDiff(d.updatedAt) === 0 ? 'heute' : 'am ' + upd.toLocaleDateString('de-DE')) + ' um ' + upd.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }))} · ${esc(d.source)}<br>
       Chance aus den Marktpreisen ohne die Marge der Buchmacher, Tore zusätzlich mit Result AI. Angezeigte Quoten nur von Tipico, unbekannt = „k. A.“.<br>
@@ -1187,7 +1290,7 @@
       sts[k] = st;
       const txt = { ok: 'läuft', warn: 'verspätet', bad: 'hängt', idle: 'wartet auf ersten Lauf' }[st];
       return `<div class="ks-row"><span class="ks-ic">${I[j.icon]}</span><span class="grow"><b>${j.name}</b><span>${j.every} · ${t ? `zuletzt ${ago(t)}` : 'noch kein Lauf protokolliert'}</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>`;
-    }).join('') + tipicoRow() + serverRow(sts.tips);
+    }).join('') + tipicoRow() + serverRow(sts.tips) + accountsRow();
     const startToday = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
     const today = runs.filter((r) => new Date(r.t).getTime() >= startToday);
     const sum = (list, f) => list.reduce((x, r) => x + (f(r) || 0), 0);
@@ -1221,7 +1324,7 @@
       ${tipicoCard()}
       <section class="sec"><div class="sec-h"><h2>Letzte 7 Tage</h2><span class="note">neue Tipps</span></div><div class="card">${chart}<p class="kc-cap">Balken = neue Tipps · darunter, wie oft gesucht wurde</p></div></section>
       <section class="sec"><div class="sec-h"><h2>Protokoll</h2><span class="note">antippen für Einzelheiten</span></div>${log || '<div class="empty">Noch keine Läufe protokolliert.</div>'}</section>
-      <p class="foot">Die Rechner arbeiten ohne Sprach-KI: Mathe aus Ergebnissen, Toren und Marktpreisen, bei Zahlen genauer und ohne Erfundenes.<br>Gemini liest auf dem Cloudflare-Server deine Wettschein-Screenshots. Der Server startet auch die Tipp-Suche, wenn GitHub sie auslässt.</p>`;
+      <p class="foot">Die Rechner arbeiten ohne Sprach-KI: Mathe aus Ergebnissen, Toren und Marktpreisen, bei Zahlen genauer und ohne Erfundenes.<br>Gemini liest auf dem Cloudflare-Server deine Spiel-Screenshots. Der Server startet auch die Tipp-Suche, wenn GitHub sie auslässt.</p>`;
   }
   const VIA = { zeitgeber: 'vom Zeitgeber', github: 'von GitHub', hand: 'von Hand' };
   // Cloudflare-Server: erreichbar? Zeitgeber eingerichtet? (nur Ja/Nein – die Schlüssel selbst sieht die App nie)
@@ -1230,7 +1333,7 @@
     if (!API) return Promise.resolve(null);
     if (Z.st && Date.now() - Z.at < 60e3) return Promise.resolve(Z.st);
     if (!Z.loading) {
-      Z.loading = fetch(API + '/', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ ok: false }))
+      Z.loading = fetch(api() + '/', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ ok: false }))
         .then((d) => { Z.st = d; Z.at = Date.now(); return d; }).finally(() => { Z.loading = null; });
     }
     return Z.loading;
@@ -1253,10 +1356,11 @@
     if (!t) return '';
     const when = (x) => `${dayDiff(x) === 0 ? 'heute' : dayDiff(x) === -1 ? 'gestern' : dayDiff(x) === 1 ? 'morgen' : new Date(x).toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'numeric' })}, ${hm(x)}`;
     const rules = `<div class="tp-h">So werden die Credits eingeteilt</div><ul class="tp-rules">
-      <li>Jede Liga wird einmal abgerufen, sobald ihr Spieltag in 36 Stunden beginnt. Ein Abruf kostet 2 Credits und bringt alle Spiele der Liga.</li>
-      <li>Bundesliga, Champions League, die anderen Top-Ligen und die Nations League werden kurz vor Anpfiff noch einmal aufgefrischt.</li>
-      <li>Ligen mit aktuellen Top-Tipps kommen zuerst dran. Ruhige Tage sparen Credits für volle Spieltage.</li>
-      <li>Bei kleineren Ligen kann eine Quote beim Anpfiff ein paar Tage alt sein. Ligen, die der Anbieter nicht führt, bleiben bei „k. A.“.</li></ul>`;
+      <li>Ein Abruf kostet 2 Credits und bringt alle Spiele einer Liga mit, die Tipico gerade anbietet, auch die in zwei Wochen.</li>
+      <li>Jede Liga kommt dran, sobald ihr Spieltag näher rückt: wichtige Ligen und Ligen mit vielen Top-Tipps 10 Tage vorher, die anderen 7. Fehlt 36 Stunden vor Anpfiff noch eine Quote, gibt es einen zweiten Abruf.</li>
+      <li>Bundesliga, Champions League, die anderen Top-Ligen und die Nations League werden kurz vor Anpfiff aufgefrischt.</li>
+      <li>Result AI merkt sich je Liga, wie weit voraus Tipico Quoten hat, und fragt nicht zu früh. Ligen, in denen Tipico nichts anbietet, werden seltener geprüft und bleiben bei „k. A.“.</li>
+      <li>Die Credits werden auf die Tage bis Monatsende verteilt (am 1. gibt es 500 neue), Ligen mit Top-Tipps zuerst. So reichen sie den ganzen Monat.</li></ul>`;
     if (!t.connected) return `<section class="sec"><div class="sec-h"><h2>Tipico</h2></div><div class="card tp"><div class="tp-top"><span class="tp-l">Noch kein Schlüssel eingetragen</span><span class="ks-st ${st}"><i></i>${txt}</span></div>${rules}</div></section>`;
     const left = t.remaining;
     const limit = left != null && t.used != null ? left + t.used : null;
@@ -1281,11 +1385,19 @@
       ? '<button class="btn soft ks-kick" data-act="kick">Tipp-Suche jetzt starten</button>' : '';
     return `<div class="ks-row"><span class="ks-ic">${I.clock}</span><span class="grow"><b>Zeitgeber</b><span>Cloudflare · startet die Tipp-Suche, wenn sie älter als 50 Min. ist</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>${kick}`;
   }
+  // Konten: Datenbank bei Cloudflare angelegt? (Status vom Server, nur Ja/Nein)
+  function accountsRow() {
+    const s = Z.st;
+    const st = !s ? 'idle' : !s.ok ? 'bad' : s.konten ? 'ok' : 'warn';
+    const txt = !s ? 'wird geprüft …' : !s.ok ? 'nicht erreichbar' : s.konten ? 'eingerichtet' : 'Datenbank fehlt';
+    const a = authOf();
+    return `<div class="ks-row"><span class="ks-ic">${I.user}</span><span class="grow"><b>Konten</b><span>${a ? `angemeldet als ${esc(a.user)} · Handy und iPad gleich` : 'Benutzername + Passwort, Daten auf Handy und iPad gleich'}</span></span><span class="ks-st ${st}"><i></i>${txt}</span></div>`;
+  }
   function kickNow() {
     const code = store.get('invite', '');
     if (!API || !code) return;
     toast('Zeitgeber wird angestoßen …');
-    fetch(API + '/kick', { headers: { 'X-Invite': code } }).then((r) => r.json()).then((d) => toast(d.ok ? d.info : d.error || 'Das hat nicht geklappt.'))
+    fetch(api() + '/kick', { headers: { 'X-Invite': code } }).then((r) => r.json()).then((d) => toast(d.ok ? d.info : d.error || 'Das hat nicht geklappt.'))
       .catch(() => toast('Der Server ist gerade nicht erreichbar.'));
   }
   // Knopf oben rechts auf der Startseite: Punkt grün/orange/rot je nach Alter der letzten Tipp-Suche + neue Tipps heute
@@ -1338,25 +1450,6 @@
         <div class="tmc-bet">${esc(tipLabel(t.m, h, a))}</div>
         <div class="tmc-foot">${ring(t.p)}<span class="tmc-q"><span>Quote</span><b>${qTxt(t)}</b></span></div></a>`;
     }).join('')}</div>`;
-  }
-  // Auswählen: sobald beide Teams stehen, sofort eine Spiel-Karte mit Vorschau-Prozenten
-  function matchPreview() {
-    const h = P.home && R.byId[P.home];
-    const a = P.away && R.byId[P.away];
-    if (!h || !a || h.id === a.id) return '';
-    const hn = reg(h);
-    const an = reg(a);
-    const head = `<div class="mp-top"><span class="chip glass">${P.live ? `LIVE ${P.minute}'` : 'Vorschau'}</span><span class="chip glass">${esc(h.nat && a.nat ? 'Länderspiel' : h.lg && h.lg === a.lg && R.leagues[h.lg] ? R.leagues[h.lg].name : 'Ligen-Duell')}</span>${P.neutral ? '<span class="mp-n">neutraler Platz</span>' : ''}</div>`;
-    let probs = '';
-    if (h.grp === a.grp) {
-      const m = lamOf(h, a, P.neutral);
-      if (P.live) Object.assign(m, { minute: P.minute, half: P.minute > 45 ? 2 : 1, score: P.score.slice(), reds: P.reds.slice() });
-      const an2 = analyze(m);
-      const r = round100([an2.probs.home, an2.probs.draw, an2.probs.away]);
-      probs = `<div class="mp-pr"><div><b>${r[0]} %</b><span>${esc(hn)}</span></div><div><b>${r[1]} %</b><span>Remis</span></div><div><b>${r[2]} %</b><span>${esc(an)}</span></div></div>`;
-    } else probs = `<div class="mp-pr mp-x">${!!h.nat !== !!a.nat ? 'Nationalteam gegen Verein rechnet Result AI nicht.' : 'Ligen ohne gemeinsame Gegner, hier rechnet Result AI nicht.'}</div>`;
-    return `<div class="mp teamcard" style="background:${teamBg({ home: hn, away: an })};--gl:${rgba(teamColor(hn), 0.6)};--gr:${rgba(teamColor(an), 0.6)}">${wm(hn, 'l')}${wm(an, 'r')}${head}
-      <div class="mp-mid"><div class="sp-side">${plate(hn, 62)}<b>${esc(hn)}</b></div><div class="mp-sc">${P.live ? `${P.score[0]}:${P.score[1]}` : 'VS'}</div><div class="sp-side">${plate(an, 62)}<b>${esc(an)}</b></div></div>${probs}</div>`;
   }
   // Verlauf: nach Tagen gruppiert, jede Zeile mit der Prognose (Favorit in Vereinsfarbe)
   function histGrouped(hist) {
@@ -2171,7 +2264,7 @@
     pg.el._geo = null;
   }
   // Inhalt je Reiter
-  const betActs = () => `<div class="bet-acts"><button class="bact" data-act="newbet">${I.pen}<span>Wette eintragen</span></button><label class="bact">${I.scan}<span>Wettschein scannen</span><input type="file" accept="image/*" data-act="scanbet" aria-label="Wettschein-Screenshot wählen"></label></div>`;
+  const betActs = () => `<div class="bet-acts one"><button class="bact" data-act="newbet">${I.pen}<span>Wette eintragen</span></button></div>`;
   const openSort = (x, y) => (firstKick(x) - firstKick(y)) || (y.at - x.at);
   function doneList(done) {
     const book = dayBook();
@@ -2350,7 +2443,6 @@
     haptic();
     toast(b.auto || b.track ? 'Gespeichert · Result AI prüft nach dem Abpfiff' : 'Wette gespeichert');
     refreshBets();
-    if (curPath() === '/slip') { B.tab = b.status === 'open' ? 'open' : 'done'; location.replace('#/bets'); }
   }
   function settleManual(id, st) {
     const all = betsAll();
@@ -2528,13 +2620,13 @@
   const BET_PAGES = /^\/(|tips|bets|hist|acc|r\/t_.+)$/;
   function refreshBets(live) { redrawAll((p) => (live ? p === '/bets' || p === '/hist' : BET_PAGES.test(p))); }
 
-  // Wettschein-Screenshot → KI (Gemini auf dem Cloudflare-Server) → Wette vorausgefüllt zum Prüfen
+  // Screenshot verkleinern, bevor er zur KI geht (Gemini auf dem Cloudflare-Server)
   function shrink(file) {
     return new Promise((res, rej) => {
       const url = URL.createObjectURL(file);
       const im = new Image();
       im.onload = () => {
-        const k = Math.min(1, 1280 / im.naturalWidth, 3600 / im.naturalHeight); // lange Wettscheine bleiben lesbar
+        const k = Math.min(1, 1280 / im.naturalWidth, 3600 / im.naturalHeight); // lange Spiel-Listen bleiben lesbar
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(im.naturalWidth * k));
         c.height = Math.max(1, Math.round(im.naturalHeight * k));
@@ -2569,6 +2661,235 @@
     toastT = setTimeout(() => t.classList.remove('show'), 2800);
   }
 
+  // ------------------------------------------------------------------ Konto (Niklas, 10.11.2026): nur Benutzername + Passwort – Handy und iPad 1 zu 1 gleich
+  // Das Passwort verlässt das Gerät nie: die App streckt es (PBKDF2, 150.000 Runden) und schickt nur das Ergebnis. Zusammengeführt wird in sync.js.
+  const ACC = { busy: false, again: false, err: '', mode: 'login', timer: 0, first: null, show: false };
+  const authOf = () => { const a = store.get('auth', null); return a && a.user && a.token ? a : null; };
+  const RSX = window.RS || null; // sync.js (fehlt nur, wenn ein alter Zwischenspeicher hängt)
+  async function acall(method, path, body, token) {
+    const tk = token || (authOf() || {}).token;
+    const headers = {};
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (tk) headers.Authorization = 'Bearer ' + tk;
+    let r;
+    try { r = await fetch(api() + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' }); } catch (e) { return { ok: false, status: 0, error: 'Keine Verbindung zum Server.' }; }
+    const d = await r.json().catch(() => null);
+    return Object.assign({ status: r.status }, d && typeof d === 'object' ? d : { ok: false, error: `Der Server hat nicht geantwortet (${r.status}).` });
+  }
+  async function stretch(user, pass) {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('result-ai|' + user), iterations: 150000 }, key, 256);
+    return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  const syncIO = {
+    read: (k) => store.get(k, null),
+    write: (k, v) => { try { if (v == null) localStorage.removeItem('ra_' + k); else localStorage.setItem('ra_' + k, JSON.stringify(v)); } catch (e) { /* voll */ } },
+    meta: () => store.get('sync', null),
+    setMeta: (m) => { try { localStorage.setItem('ra_sync', JSON.stringify(m)); } catch (e) { /* voll */ } },
+    req: (method, path, body) => acall(method, path, body),
+    now: () => Date.now(),
+  };
+  // jede Änderung an Wetten, Guthaben, Verlauf … bekommt einen Zeitstempel; mit Konto wird kurz danach abgeglichen
+  store.onSet = (k, oldRaw, v) => {
+    if (!RSX || !RSX.isSynced(k)) return;
+    let old = null;
+    try { old = oldRaw == null ? null : JSON.parse(oldRaw); } catch (e) { old = null; }
+    const m = RSX.stamp(store.get('sync', null), k, old, v, Date.now());
+    m.dirty = (m.dirty || 0) + 1;
+    syncIO.setMeta(m);
+    if (authOf()) syncSoon();
+  };
+  const accBtn = () => { const a = authOf(); return `<button class="round acc-b${a ? ' on' : ''}${a && ACC.err ? ' warn' : ''}" data-act="account" aria-label="${a ? `Konto ${esc(a.user)}` : 'Anmelden'}">${I.user}</button>`; };
+  function refreshAccBtns() {
+    $$('.acc-b').forEach((b) => { b.outerHTML = accBtn(); });
+    const st = $('.acc-st');
+    if (st) st.textContent = accStatus();
+  }
+  function accStatus() {
+    if (ACC.busy) return 'Wird abgeglichen …';
+    if (ACC.err) return '⚠ ' + ACC.err;
+    const last = (store.get('sync', null) || {}).last;
+    return last ? `Abgeglichen ${agoText(last)}` : 'Noch nicht abgeglichen';
+  }
+  const accRow = () => { const a = authOf(); return `<div class="group"><button class="row acc-row" data-act="account2"><span class="round">${I.user}</span><span class="grow"><div class="t">${a ? esc(a.user) : 'Anmelden oder Konto erstellen'}</div><div class="s">${a ? 'Handy und iPad werden abgeglichen' : 'Wetten und Guthaben auf Handy und iPad gleich'}</div></span><span class="chev">›</span></button></div>`; };
+  function syncSoon(ms) { clearTimeout(ACC.timer); ACC.timer = setTimeout(() => { syncNow(); }, ms == null ? 1500 : ms); }
+  async function syncNow(mode, first) {
+    if (!RSX || !authOf()) return null;
+    if (ACC.busy) { ACC.again = true; return null; }
+    ACC.busy = true;
+    refreshAccBtns();
+    let res;
+    try { res = await RSX.run(syncIO, mode, first); } catch (e) { res = { ok: false, res: { error: String((e && e.message) || e) }, changed: new Set() }; }
+    ACC.busy = false;
+    const r = res.res || {};
+    if (!res.ok && r.status === 401 && /anmeld/i.test(r.error || '')) { signedOut('Du wurdest abgemeldet – bitte neu anmelden.'); return res; }
+    ACC.err = res.ok ? '' : r.error || 'Der Abgleich hat nicht geklappt.';
+    refreshAccBtns();
+    if (res.changed && res.changed.size) onSynced(res.changed);
+    if (ACC.again || res.again) { ACC.again = false; syncSoon(1200); }
+    return res;
+  }
+  // vom anderen Gerät kam etwas: Darstellung übernehmen, Seiten neu zeichnen
+  function onSynced(changed) {
+    if (changed.has('theme')) applyTheme(store.get('theme', 'light'));
+    if (changed.has('bets')) B.keys = savedKeys();
+    redrawAll();
+    refreshAccBtns();
+  }
+  function signedOut(msg) {
+    store.set('auth', null);
+    const m = RSX ? RSX.fixMeta(store.get('sync', null)) : {};
+    m.v = 0;
+    m.last = 0;
+    delete m.user;
+    syncIO.setMeta(m);
+    ACC.err = '';
+    refreshAccBtns();
+    redrawAll((p) => p === '/ki');
+    if (msg) toast(msg);
+  }
+  function openAccount() {
+    if ($('.sheet')) return;
+    const sh = document.createElement('div');
+    sh.className = 'sheet';
+    sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel" role="dialog" aria-label="Konto">${accPanel()}</div>`;
+    document.body.appendChild(sh);
+  }
+  function accPanel() {
+    const a = authOf();
+    if (a) {
+      return `<div class="grip" data-grip></div><h2>Konto</h2>
+        <div class="acc-card"><span class="acc-av">${esc(a.user.slice(0, 1).toUpperCase())}</span><span class="grow"><b>${esc(a.user)}</b><span class="acc-st">${esc(accStatus())}</span></span></div>
+        <div class="acc-what"><b>Auf Handy und iPad gleich</b><span>Wetten und Guthaben · Verlauf · Scans · Name, Darstellung und Einladungscode</span>
+          <b>Nur auf diesem Gerät</b><span>Handy- oder iPad-Ansicht</span></div>
+        <button class="btn" data-act="accsync">Jetzt abgleichen</button>
+        <button class="btn soft" data-act="acclogout" style="margin-top:8px">Abmelden</button>
+        <button class="acc-del" data-act="accdel">Konto löschen</button>`;
+    }
+    const up = ACC.mode === 'signup';
+    return `<div class="grip" data-grip></div><h2>Konto</h2>
+      <p class="bf-note" style="margin-top:-6px">Mit einem Konto hast du auf Handy und iPad dieselben Wetten, dasselbe Guthaben und denselben Verlauf. Nur Benutzername und Passwort – keine E-Mail, keine Handynummer.</p>
+      <div class="seg s2" style="--k:${up ? 1 : 0}"><span class="ind"></span><button class="${up ? '' : 'on'}" data-act="accmode" data-val="login">Anmelden</button><button class="${up ? 'on' : ''}" data-act="accmode" data-val="signup">Konto erstellen</button></div>
+      <form class="acc-f" data-form="acc" autocomplete="on" novalidate>
+        <div class="lab">BENUTZERNAME</div>
+        <input class="search" type="text" name="username" data-act="accuser" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="20" placeholder="${up ? 'z. B. niklas09' : 'dein Benutzername'}" enterkeyhint="next">
+        <div class="lab" style="margin-top:14px">PASSWORT</div>
+        <div class="pw"><input class="search" type="password" name="password" data-act="accpass" autocomplete="${up ? 'new-password' : 'current-password'}" maxlength="100" placeholder="${up ? 'mindestens 6 Zeichen' : 'dein Passwort'}" enterkeyhint="${up ? 'next' : 'go'}"><button type="button" class="eye" data-act="acceye" aria-label="Passwort zeigen">${I.eye}</button></div>
+        ${up ? '<div class="pw" style="margin-top:8px"><input class="search" type="password" name="password2" data-act="accpass2" autocomplete="new-password" maxlength="100" placeholder="Passwort wiederholen" enterkeyhint="go"></div>' : ''}
+        <p class="acc-err" role="alert"></p>
+        <button class="btn" type="submit">${up ? 'Konto erstellen' : 'Anmelden'}</button>
+      </form>
+      <p class="acc-hint">${up ? 'Passwort gut merken: Ohne E-Mail lässt es sich nicht zurücksetzen. Am besten vom iPhone im Schlüsselbund sichern lassen – dann kennt es auch dein iPad.' : 'Noch kein Konto? Oben auf „Konto erstellen“ tippen.'}</p>`;
+  }
+  function accRedraw() {
+    const p = $('.sheet .panel');
+    if (p) p.innerHTML = accPanel();
+  }
+  async function accGo() {
+    const sh = $('.sheet');
+    if (!sh || ACC.show) return;
+    const val = (k) => { const x = $(`[data-act="${k}"]`, sh); return x ? x.value : null; };
+    const err = (t) => { const e = $('.acc-err', sh); if (e) e.textContent = t; };
+    const user = String(val('accuser') || '').trim().toLowerCase();
+    const pass = val('accpass') || '';
+    const up = ACC.mode === 'signup';
+    if (!/^[a-z0-9._-]{3,20}$/.test(user)) { err('Benutzername: 3 bis 20 Zeichen – Buchstaben, Zahlen, Punkt, Bindestrich oder Unterstrich.'); return; }
+    if (pass.length < 6) { err('Das Passwort braucht mindestens 6 Zeichen.'); return; }
+    if (up && val('accpass2') !== pass) { err('Die beiden Passwörter sind nicht gleich.'); return; }
+    if (!(window.crypto && crypto.subtle) || !RSX) { err('Anmelden geht nur in der App über ihre sichere Adresse (https).'); return; }
+    const btn = $('button[type="submit"]', sh);
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = up ? 'Konto wird erstellt …' : 'Wird angemeldet …';
+    err('');
+    ACC.show = true;
+    const stop = (t) => { ACC.show = false; err(t); btn.disabled = false; btn.textContent = label; };
+    const st = await acall('GET', '/');
+    if (!st.ok) { stop(st.status ? 'Der Server hat einen Fehler gemeldet.' : 'Der Server ist gerade nicht erreichbar.'); return; }
+    if (!st.konten) { stop('Konten sind auf dem Server noch nicht eingerichtet – die Datenbank bei Cloudflare fehlt noch.'); return; }
+    let hash;
+    try { hash = await stretch(user, pass); } catch (e) { stop('Das Passwort konnte nicht verschlüsselt werden.'); return; }
+    const r = await acall('POST', up ? '/auth/signup' : '/auth/login', { user, pass: hash });
+    if (!r.ok || !r.token) { stop(r.error || 'Das hat nicht geklappt.'); return; }
+    const g = await acall('GET', '/sync', undefined, r.token);
+    if (!g.ok) { stop(g.error || 'Die Daten konnten nicht geladen werden.'); return; }
+    ACC.show = false;
+    // Daten auf beiden Seiten → fragen: Konto-Daten nehmen oder zusammenführen
+    if (g.data && RSX.hasData(syncIO.read)) { ACC.first = { user: r.user, token: r.token, res: g }; accChoice(); return; }
+    accStart(r.user, r.token, g.data ? 'replace' : undefined, g, up ? 'Konto erstellt – Handy und iPad sind jetzt verbunden' : 'Angemeldet');
+  }
+  function accChoice() {
+    const p = $('.sheet .panel');
+    if (!p) return;
+    p.innerHTML = `<div class="grip" data-grip></div><h2>Daten auf diesem Gerät</h2>
+      <p class="bf-note" style="margin-top:-6px;font-size:15px">Auf diesem Gerät sind schon Wetten, Verlauf oder Guthaben gespeichert – in deinem Konto auch. Was soll passieren?</p>
+      <button class="btn" data-act="accfirst" data-val="replace">Daten vom Konto nehmen</button>
+      <p class="acc-sub">Empfohlen: Danach ist alles wie auf deinem anderen Gerät. Was nur hier gespeichert war, ist dann weg.</p>
+      <button class="btn soft" data-act="accfirst" data-val="merge">Beides zusammenführen</button>
+      <p class="acc-sub">Wetten, Verlauf und Scans von hier kommen dazu. Guthaben, Name und Einstellungen kommen vom Konto.</p>`;
+  }
+  function accStart(user, token, mode, first, msg) {
+    const m = RSX.fixMeta(store.get('sync', null));
+    m.v = 0;
+    m.user = user;
+    syncIO.setMeta(m);
+    store.set('auth', { user, token });
+    closeSheet();
+    toast(msg);
+    syncNow(mode, first).then(() => redrawAll((p) => p === '/ki'));
+  }
+  function accFirst(mode) {
+    const f = ACC.first;
+    ACC.first = null;
+    if (!f) { closeSheet(); return; }
+    accStart(f.user, f.token, mode === 'merge' ? 'merge' : 'replace', f.res, mode === 'merge' ? 'Angemeldet – Daten zusammengeführt' : 'Angemeldet – Daten vom Konto geladen');
+  }
+  async function accLogout() {
+    const a = authOf();
+    if (!a) { closeSheet(); return; }
+    const m = store.get('sync', null) || {};
+    if (m.dirty) await Promise.race([syncNow(), new Promise((r) => setTimeout(r, 4000))]); // noch nicht Hochgeladenes zuerst hochladen
+    acall('POST', '/auth/logout', undefined, a.token);
+    closeSheet();
+    signedOut('Abgemeldet – deine Daten bleiben auf diesem Gerät');
+  }
+  function accDelAsk() {
+    const p = $('.sheet .panel');
+    const a = authOf();
+    if (!p || !a) return;
+    p.innerHTML = `<div class="grip" data-grip></div><h2>Konto löschen?</h2>
+      <p class="bf-note" style="font-size:15px;margin-top:-6px">Das Konto „${esc(a.user)}“ und alle Daten darin werden auf dem Server gelöscht. Auf diesem Gerät bleibt alles gespeichert. Das lässt sich nicht rückgängig machen.</p>
+      <form class="acc-f" data-form="accdel" novalidate><div class="lab">ZUR SICHERHEIT: DEIN PASSWORT</div>
+        <div class="pw"><input class="search" type="password" name="password" data-act="accpass" autocomplete="current-password" maxlength="100" placeholder="Passwort" enterkeyhint="go"><button type="button" class="eye" data-act="acceye" aria-label="Passwort zeigen">${I.eye}</button></div>
+        <p class="acc-err" role="alert"></p>
+        <button class="btn danger" type="submit">Konto endgültig löschen</button></form>
+      <button class="btn soft" data-act="close" style="margin-top:8px">Abbrechen</button>`;
+  }
+  async function accDelGo() {
+    const sh = $('.sheet');
+    const a = authOf();
+    if (!sh || !a || ACC.show) return;
+    const inp = $('[data-act="accpass"]', sh);
+    const err = (t) => { const e = $('.acc-err', sh); if (e) e.textContent = t; };
+    if (!inp || inp.value.length < 6) { err('Bitte dein Passwort eingeben.'); return; }
+    const btn = $('button[type="submit"]', sh);
+    btn.disabled = true;
+    ACC.show = true;
+    const r = await acall('POST', '/auth/delete', { user: a.user, pass: await stretch(a.user, inp.value) });
+    ACC.show = false;
+    btn.disabled = false;
+    if (!r.ok) { err(r.error || 'Das hat nicht geklappt.'); return; }
+    closeSheet();
+    signedOut('Konto gelöscht – auf diesem Gerät ist noch alles da');
+  }
+  document.addEventListener('submit', (e) => {
+    const f = e.target;
+    if (!f || !f.dataset || !f.dataset.form) return;
+    e.preventDefault();
+    if (f.dataset.form === 'acc') accGo(); else if (f.dataset.form === 'accdel') accDelGo();
+  });
+
   // ------------------------------------------------------------------ Seiten-Stapel: neue Seite schiebt sich von rechts herein
   document.body.insertAdjacentHTML('beforeend', '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>'
     + '<linearGradient id="rg-safe" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34C759"/><stop offset="1" stop-color="#00B39B"/></linearGradient>'
@@ -2581,7 +2902,7 @@
   tabbar.className = 'tabbar';
   tabbar.setAttribute('aria-label', 'Bereiche');
   tabbar.innerHTML = `<span class="tab-ind" aria-hidden="true"></span><span class="side-brand" aria-hidden="true">${logo()}</span>` + TABS.map(([p, label, ic]) => `<button data-act="tab" data-tab="${p}"><span class="ti"><span class="o">${I[ic]}</span><span class="f">${I[ic + 'F'] || I[ic]}</span></span><span class="tl">${label}</span></button>`).join('')
-    + `<span class="side-foot"><button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button><button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span>`;
+    + `<span class="side-foot"><button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button>${accBtn()}<button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span>`;
   document.body.appendChild(tabbar);
   function syncTabs() {
     const root = S.stack[0] ? S.stack[0].path : '/';
@@ -2662,8 +2983,8 @@
   function afterShow(p, first) {
     if (p.shown) return;
     p.shown = true;
-    if (p.path === '/scan') runScan(p.el);
-    if (p.path === '/pick' && !R.data) loadRatings().then(() => { if (S.stack[S.stack.length - 1] === p) redrawTop(); }).catch(() => {});
+    if (p.path === '/scan/run') runScan(p.el);
+    if (p.path.startsWith('/scan/res/') && (!R.data || !T.data)) Promise.all([loadTips().catch(() => {}), loadRatings().catch(() => {})]).then(() => { if (p.el.isConnected) redrawPage(p); });
     if (p.path === '/' || p.path === '/tips' || p.path === '/bilanz' || p.path.startsWith('/r/t_')) freshTips(p);
     if (p.path === '/bets' || p.path === '/hist' || p.path === '/acc') checkBets();
     if (p.path === '/ki') {
@@ -2823,9 +3144,16 @@
     S.busy = false;
     stackEl.classList.remove('busy');
   }
+  // alte Adressen (bis 10.11.2026: Wettschein und „Spiel auswählen“) führen zum Scan; ein Scan ohne Bild auch
+  function fixPath() {
+    const p = curPath();
+    const to = p === '/pick' || p === '/slip' || (p === '/scan/run' && !SC.file) ? '/scan' : null;
+    if (to) history.replaceState(null, '', '#' + to);
+    return to || p;
+  }
   async function route() {
     if (S.busy) { S.pending = true; return; }
-    const path = curPath();
+    const path = fixPath();
     const top = S.stack[S.stack.length - 1];
     if (isTab(path) && S.stack[0] && S.stack[0].path !== path) switchTab(path);
     else if (!top || top.path !== path) {
@@ -2840,7 +3168,7 @@
   // Darstellung gewechselt (oder Wetten geändert): offene Seiten neu zeichnen, ohne Auftritt und ohne Scrollsprung; only = nur diese Pfade
   function redrawAll(only) {
     S.stack.forEach((p) => {
-      if (p.path === '/scan' || (only && !only(p.path))) return;
+      if (p.path === '/scan/run' || (only && !only(p.path))) return;
       const y = p.el.scrollTop;
       p.el.classList.add('still');
       p.el.innerHTML = barHtml(p.path) + `<div class="wrap" data-p="${pageKey(p.path)}">${viewHtml(p.path)}</div>`;
@@ -3018,7 +3346,8 @@
     const sh = document.createElement('div');
     sh.className = 'sheet';
     sh.innerHTML = `<div class="bg" data-act="close"></div><div class="panel" role="dialog" aria-label="Einstellungen"><div class="grip" data-grip></div>
-      <h2>Einstellungen</h2><div class="lab">DEIN NAME</div>
+      <h2>Einstellungen</h2><div class="lab">KONTO</div>${accRow()}
+      <div class="lab" style="margin-top:20px">DEIN NAME</div>
       <input class="search name-in" type="text" placeholder="für die Begrüßung, z. B. Niklas" value="${esc(store.get('name', ''))}" data-act="name" maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
       <div class="lab" style="margin-top:20px">DARSTELLUNG</div>
       <div class="seg s3" data-v="${th}" style="--k:${k}"><span class="ind"></span>${[['light', 'Hell'], ['dark', 'Dunkel'], ['auto', 'Automatisch']].map(([v, l]) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-val="${v}">${l}</button>`).join('')}</div>
@@ -3026,7 +3355,7 @@
       <div class="seg s2" style="--k:${dv === 'ipad' ? 1 : 0}"><span class="ind"></span>${[['phone', 'Handy'], ['ipad', 'iPad']].map(([v, l]) => `<button class="${dv === v ? 'on' : ''}" data-act="device" data-val="${v}">${l}</button>`).join('')}</div>
       <p class="dev-note">${deviceNote(dv)}</p>
       <div class="lab" style="margin-top:20px">EINLADUNGSCODE</div>
-      <input class="search" type="text" placeholder="für die KI, z. B. den Wettschein-Scan" value="${esc(store.get('invite', ''))}" data-act="invite" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
+      <input class="search" type="text" placeholder="für die KI, z. B. den Spiel-Scan" value="${esc(store.get('invite', ''))}" data-act="invite" maxlength="40" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
       <p class="inv-st"></p>
       <p class="foot" style="margin-top:18px">Result AI</p></div>`;
     document.body.appendChild(sh);
@@ -3040,11 +3369,11 @@
     if (!el) return;
     const code = String(store.get('invite', '') || '').trim();
     const set = (txt, cls) => { el.textContent = txt; el.className = 'inv-st' + (cls ? ' ' + cls : ''); };
-    if (!code) { set('Den Code bekommst du von Niklas. Ohne Code geht alles außer dem Wettschein-Scan.'); return; }
+    if (!code) { set('Den Code bekommst du von Niklas. Ohne Code geht alles außer dem Spiel-Scan.'); return; }
     if (!API) { set('Der KI-Server ist noch nicht verbunden – der Code wird geprüft, sobald er läuft.'); return; }
     set('Wird geprüft …');
-    fetch(API + '/check', { headers: { 'X-Invite': code } })
-      .then((r) => { if (String(store.get('invite', '')).trim() === code) set(r.ok ? '✓ Code passt – der Wettschein-Scan ist frei.' : '✗ Dieser Code passt nicht.', r.ok ? 'ok' : 'bad'); })
+    fetch(api() + '/check', { headers: { 'X-Invite': code } })
+      .then((r) => { if (String(store.get('invite', '')).trim() === code) set(r.ok ? '✓ Code passt – der Spiel-Scan ist frei.' : '✗ Dieser Code passt nicht.', r.ok ? 'ok' : 'bad'); })
       .catch(() => set('Der Server ist gerade nicht erreichbar.'));
   }
   function closeSheet() {
@@ -3092,23 +3421,31 @@
     if (act === 'back') goBack();
     else if (act === 'home') goHome();
     else if (act === 'settings') openSettings();
-    else if (act === 'close') closeSheet();
-    else if (act === 'slot') openSearch(a.dataset.side);
-    else if (act === 'choose') { P[a.dataset.side] = a.dataset.id; P.msg = ''; rememberTeam(a.dataset.id); closeSheet(); redrawTop(); }
-    else if (act === 'step') {
-      const k = a.dataset.k;
-      const i = +a.dataset.i;
-      P[k][i] = Math.max(0, Math.min(k === 'reds' ? 3 : 15, P[k][i] + +a.dataset.d));
-      redrawTop();
+    else if (act === 'account') openAccount();
+    else if (act === 'account2') { closeSheet(); setTimeout(openAccount, reduce ? 0 : 300); }
+    else if (act === 'accmode') { if (ACC.mode !== a.dataset.val) { ACC.mode = a.dataset.val; accRedraw(); } }
+    else if (act === 'acceye') {
+      const sh = a.closest('.panel');
+      const show = $('[data-act="accpass"]', sh).type === 'password';
+      $$('input[type="password"], input[data-pw]', sh).forEach((x) => { x.type = show ? 'text' : 'password'; x.dataset.pw = '1'; });
+      a.innerHTML = show ? I.eyeOff : I.eye;
+      a.setAttribute('aria-label', show ? 'Passwort verbergen' : 'Passwort zeigen');
     }
-    else if (act === 'calc') calcPick();
+    else if (act === 'accfirst') accFirst(a.dataset.val);
+    else if (act === 'accsync') { syncNow().then((r) => { if (r && r.ok) toast(r.changed.size ? 'Abgeglichen – Neues vom anderen Gerät geholt' : 'Abgeglichen – alles aktuell'); else if (r) toast(ACC.err || 'Der Abgleich hat nicht geklappt.'); }); refreshAccBtns(); }
+    else if (act === 'acclogout') accLogout();
+    else if (act === 'accdel') accDelAsk();
+    else if (act === 'close') closeSheet();
+    else if (act === 'scfix') scanFixOpen(a.dataset.id, a.dataset.i, a.dataset.side);
+    else if (act === 'choose') scanFix(a.dataset.id);
+    else if (act === 'scopen') scanOpen(a.dataset.id, a.dataset.i);
+    else if (act === 'scanpaste') scanPaste();
     else if (act === 'lgopen' || act === 'lgback') {
       const sh = a.closest('.sheet');
       if (act === 'lgopen') sh.dataset.lg = a.dataset.lg; else delete sh.dataset.lg;
       renderResults(sh, '');
       $('.results', sh).scrollTop = 0;
     }
-    else if (act === 'slipsave') saveSlip();
     else if (act === 'invgo') inviteGo();
     else if (act === 'savetip' || act === 'savekombi') {
       e.preventDefault(); // Knopf liegt in der Tipp-Karte (ein Link) – nicht ins Spiel springen
@@ -3184,13 +3521,11 @@
         const seg = a.closest('.seg');
         seg.style.setProperty('--k', $$('button', seg).indexOf(a));
         $$('button', seg).forEach((b) => b.classList.toggle('on', b === a));
-        T.list = a.dataset.val;
-        T.day = 'all';
+        T.list = a.dataset.val; // der Tages-Filter bleibt (z. B. „Mit Quote“ bei Sicher und Top-Quote)
       } else T.day = a.dataset.val;
       const body = $('.tips-body', a.closest('.page'));
       if (body) body.innerHTML = tipsBody();
     }
-    else if (act === 'swap') { [P.home, P.away] = [P.away, P.home]; P.score.reverse(); P.reds.reverse(); P.msg = ''; redrawTop(); }
     else if (act === 'theme') {
       const seg = a.closest('.seg');
       if (seg.dataset.v === a.dataset.val) return;
@@ -3212,9 +3547,7 @@
   });
   document.addEventListener('change', (e) => {
     const t = e.target;
-    if (t.dataset && t.dataset.act === 'opt') { P[t.dataset.k] = t.checked; P.msg = ''; redrawTop(); return; }
-    if (t.dataset && t.dataset.act === 'minute') { P.minute = +t.value; redrawTop(); return; }
-    if (t.dataset && t.dataset.act === 'scanbet') { const f = t.files && t.files[0]; t.value = ''; if (f) startScan(f); return; }
+    if (t.dataset && t.dataset.act === 'scanpic') { const f = t.files && t.files[0]; t.value = ''; if (f) startScan(f); return; }
   });
 
   document.addEventListener('input', (e) => {
@@ -3222,7 +3555,6 @@
     if (!t.dataset) return;
     if (t.dataset.act === 'search') renderResults(t.closest('.sheet'), t.value);
     else if (t.dataset.act === 'name') { store.set('name', t.value.trim()); $$('.hello h1').forEach((x) => { x.textContent = greet(); }); }
-    else if (t.dataset.act === 'minute') { const b = $('.li-min', t.closest('.live-in')); if (b) b.textContent = t.value + "'"; }
     else if (t.dataset.act === 'bq' || t.dataset.act === 'bstake') updateWin();
     else if (t.dataset.act === 'invite') {
       store.set('invite', t.value.trim());
@@ -3278,7 +3610,7 @@
     clearTimeout(packT);
     packT = setTimeout(() => {
       if (!ipadWide()) return;
-      $$('.cards, .ovw, .ovg, .wrap[data-p="bilanz"], .wrap[data-p="acc"], .wrap[data-p="ki"], .wrap[data-p="pick"]').forEach((box) => {
+      $$('.cards, .ovw, .ovg, .wrap[data-p="bilanz"], .wrap[data-p="acc"], .wrap[data-p="ki"]').forEach((box) => {
         [...box.children].forEach((c) => {
           if (getComputedStyle(c).position === 'absolute') return;
           c.style.gridRowEnd = `span ${Math.max(1, c.offsetHeight + 18)}`;
@@ -3295,7 +3627,7 @@
     clearTimeout(rzT);
     rzT = setTimeout(() => { if (document.documentElement.dataset.device === 'ipad') redrawAll(); ipadPack(); }, 180);
   });
-  const start = curPath();
+  const start = fixPath();
   const home = makePage(isTab(start) ? start : '/');
   stackEl.appendChild(home.el);
   S.stack.push(home);
@@ -3321,9 +3653,14 @@
       setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), reduce ? 0 : 400); }, reduce ? 0 : Math.max(60, 700 - (performance.now() - t0)));
     });
   })();
+  // Konto: beim Start, alle 3 Minuten (solange die App offen ist) und wenn das Netz zurückkommt abgleichen
+  if (authOf()) syncSoon(600);
+  setInterval(() => { if (authOf() && !document.hidden) syncNow(); }, 180e3);
+  addEventListener('online', () => { if (authOf()) syncSoon(300); });
   // zurück aus dem Hintergrund: neueste Tipp-Suche holen (läuft jede Stunde)
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
+    if (authOf()) syncSoon(150); // Neues vom anderen Gerät holen
     checkBets(); // nach dem Abpfiff sofort auswerten, sobald die App wieder offen ist
     const root = S.stack[0];
     if (root && S.stack.length === 1 && (root.path === '/' || root.path === '/tips')) freshTips(root, 5 * 60e3);

@@ -1,7 +1,7 @@
 {
   "name": "Result AI",
   "short_name": "Result AI",
-  "description": "Fußball-Prognosen, Top-Tipps, Wettschein-Scan und dein Wett-Tracker.",
+  "description": "Fußball-Prognosen, Top-Tipps, Spiel-Scan und dein Wett-Tracker.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

@@ -4,13 +4,20 @@ Tipico selbst schützt seine Seite gegen Programme; das wird nicht umgangen. The
 „tipico_de“. Den Schlüssel legt Niklas selbst an (kostenloses Konto) und trägt ihn als GitHub-Secret ODDS_API_KEY ein – er steht nie
 im Code, im Chat oder in einem Protokoll. Ohne Schlüssel wird nichts abgerufen, die App zeigt dann „Tipico: k. A.“
 
-Der kostenlose Tarif hat 500 Credits im Monat. Ein Abruf kostet 2 Credits und liefert alle Spiele einer Liga, ein leerer Abruf kostet
-nichts. Deshalb wird je Spieltag statt je Tag abgerufen (Niklas, 09.11.2026, die Einteilung steht auch in der KI-Zentrale):
+Der kostenlose Tarif hat 500 Credits im Monat, sie werden am 1. jedes Monats zurückgesetzt. Ein Abruf kostet 2 Credits und liefert alle
+Spiele einer Liga, die der Anbieter gerade führt, ein leerer Abruf kostet nichts. Deshalb wird je Spieltag statt je Tag abgerufen
+(Niklas, 09.11.2026, die Einteilung steht auch in der KI-Zentrale):
   1. Jede Liga einmal, sobald ein Spiel ohne Quote in 36 Stunden beginnt.
   2. Wichtige Ligen und Ligen mit mehreren Top-Tipps kurz vor Anpfiff noch einmal, aber nur mit Credits, die für Punkt 1 nicht gebraucht werden.
-  3. Spiele, die noch weiter weg sind, ebenfalls nur mit solchen Credits.
+  3. Spiele ohne Quote bis 7 Tage voraus (wichtige Ligen und Ligen mit mehreren Top-Tipps: 10 Tage) mit dem Tagesanteil. Je Liga merkt
+     sich die App, wie weit voraus Tipico zuletzt Quoten hatte (`lead`), und ruft nicht früher ab – ein Abruf, bei dem Tipico den
+     Spieltag noch nicht anbietet, kostet trotzdem 2 Credits.
+Jeder Abruf trägt die Quoten für alle Spiele der Liga ein, auch für die weiter entfernten (Niklas, 10.11.2026: „es gibt gefühlt keine Spiele
+mit Quoten“ – vorher zählten nur die nächsten 6 Tage, in der Länderspielpause lag der nächste Spieltag aber 10–13 Tage weg). Bietet Tipico in
+einer Liga gar nichts an, wird sie seltener geprüft, nach zwei leeren Abrufen nur noch einmal pro Woche.
 Ligen mit aktuellen Top-Tipps kommen zuerst dran. An vollen Spieltagen darf ein Tag bis zum Dreifachen seines Anteils verbrauchen, ruhige
 Tage sparen dafür. Letzte Quoten bleiben stehen (mit Uhrzeit), bis es neue gibt – sie stehen in der veröffentlichten Tipp-Datei.
+Die Rechnung über einen ganzen Monat (auch wenn Tipico nur 3 Tage vorher anbietet) prüft tests/tipico.test.py.
 """
 import calendar
 import json
@@ -18,7 +25,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import ratings as rt
 
@@ -30,7 +37,10 @@ RETRY_H = 20          # fehlt danach noch etwas: frühestens nach 20 Stunden wie
 SECOND_H = 12         # Auffrischung, wenn ein Spiel in 12 Stunden beginnt …
 SECOND_AGE = 10       # … und seine Quote mindestens 10 Stunden alt ist
 FAR_RETRY_H = 48      # Spiele, die noch weiter weg sind: höchstens alle 2 Tage
-LOOK_DAYS = 6         # weiter als 6 Tage voraus wird nie abgerufen
+FAR_DAYS = 7          # ein Spiel ohne Quote löst bis 7 Tage vorher einen Abruf aus (so weit voraus bietet Tipico einen Spieltag meist an) …
+FAR_DAYS_TOP = 10     # … in wichtigen Ligen und Ligen mit mehreren Top-Tipps bis 10 Tage (nach einer Länderspielpause liegt der Spieltag so weit weg)
+DRY_WEEK_H = 168      # zweimal hintereinander gar kein Tipico-Angebot in einer Liga: nur noch einmal pro Woche nachsehen
+LEAD_PLUS = 1.0       # gelernter Vorlauf: höchstens 1 Tag weiter voraus abrufen, als Tipico zuletzt Quoten hatte
 DAY_BURST = 3.0       # ein voller Spieltag darf bis zum Dreifachen seines Tagesanteils verbrauchen
 ROUND_DAYS = 7.0      # zurückgelegt wird für einen Abruf je Liga und Woche …
 ROUND_MARGIN = 1.1    # … plus 10 % Puffer für englische Wochen
@@ -64,7 +74,9 @@ IMPORTANT = {'ger.1', 'ger.2', 'ger.dfb_pokal', 'uefa.champions', 'uefa.europa',
 ALIAS = [('köln', 'cologne'), ('koln', 'cologne'), ('münchen', 'munich'), ('munchen', 'munich'), ('nürnberg', 'nuremberg'), ('nurnberg', 'nuremberg'),
          ('gladbach', 'monchengladbach'), ('mönchengladbach', 'monchengladbach'), ('hamburger sv', 'hamburg'), ('hamburg sv', 'hamburg'),
          ('turkiye', 'turkey'), ('türkiye', 'turkey'), ('czechia', 'czech republic'), ('korea republic', 'south korea'), ('united states', 'usa'),
-         ('ir iran', 'iran'), ('cote d ivoire', 'ivory coast'), ("côte d'ivoire", 'ivory coast'), ('bosnia and herzegovina', 'bosnia-herzegovina')]
+         ('ir iran', 'iran'), ('cote d ivoire', 'ivory coast'), ("côte d'ivoire", 'ivory coast'), ("cote d'ivoire", 'ivory coast'),
+         ('bosnia and herzegovina', 'bosnia-herzegovina'), ('bosnia & herzegovina', 'bosnia-herzegovina'), ('china pr', 'china'),
+         ('internazionale', 'inter'), ('inter milan', 'inter'), ('sporting cp', 'sporting lisbon'), ('crvena zvezda', 'red star belgrade')]
 
 
 def norm(name):
@@ -106,25 +118,48 @@ def parse_event(e):
     return q or None
 
 
-def match(events, games, when):
-    """Spiele von The Odds API unseren Spielen zuordnen: gleiche Anstoßzeit (±3 Std.), Namen ähnlich, je Spiel nur eine Zuordnung.
-    -> {Spiel-ID: Quoten}"""
-    best = {}
-    for e in events:
-        q = parse_event(e)
-        t = when(e.get('commence_time'))
+def swap(q):
+    """Quoten mit vertauschtem Heim und Gast (die Torlinien bleiben gleich)."""
+    other = {'H': 'A', 'A': 'H'}
+    return {other.get(k, k): v for k, v in q.items()}
+
+
+def match(events, games, when, hit=None):
+    """Spiele von The Odds API unseren Spielen zuordnen -> {Spiel-ID: Quoten}. hit (Menge): bekommt die Nummern der zugeordneten Spiele.
+    Sicher: Anstoß höchstens 3 Std. auseinander und beide Namen ähnlich (jeder mindestens 0,5, zusammen 1,2). Sonst nur, wenn in der Liga
+    zur selben Zeit (±10 Min.) genau ein Spiel bei uns und genau eines beim Anbieter beginnt und ein Name klar passt (z. B. ein Spitzname).
+    Heim und Gast vertauscht (neutraler Platz) zählt auch, die Quoten werden dann mitgetauscht. Jedes Spiel wird nur einmal vergeben, die
+    beste Zuordnung zuerst – so landet „Manchester City“ nicht bei „Manchester United“, wenn beide zur selben Zeit spielen."""
+    times = [when(e.get('commence_time')) for e in events]
+    pairs = []
+    for i, e in enumerate(events):
+        q, t = parse_event(e), times[i]
         if not q or not t:
             continue
         for g in games:
-            if abs((g['t'] - t).total_seconds()) > 3 * 3600:
+            dt = abs((g['t'] - t).total_seconds())
+            if dt > 3 * 3600:
                 continue
             h, a = similar(g['home']['name'], e.get('home_team')), similar(g['away']['name'], e.get('away_team'))
-            if min(h, a) < 0.34:  # ein Name muss wenigstens entfernt passen
+            near = 0.01 * dt / 3600  # bei Gleichstand gewinnt die nähere Anstoßzeit
+            if min(h, a) >= 0.5 and h + a >= 1.2:
+                pairs.append(((h + a) / 2 - near, g['id'], i, q))
                 continue
-            s = (h + a) / 2
-            if s >= 0.6 and (g['id'] not in best or s > best[g['id']][0]):
-                best[g['id']] = (s, q)
-    return {gid: q for gid, (_s, q) in best.items()}
+            hx, ax = similar(g['home']['name'], e.get('away_team')), similar(g['away']['name'], e.get('home_team'))
+            if min(hx, ax) >= 0.5 and hx + ax >= 1.2:
+                pairs.append(((hx + ax) / 2 - near - 0.05, g['id'], i, swap(q)))
+            elif dt <= 600 and max(h, a) >= 0.75 and sum(1 for x in games if abs((x['t'] - t).total_seconds()) <= 600) == 1 \
+                    and sum(1 for u in times if u and abs((g['t'] - u).total_seconds()) <= 600) == 1:
+                pairs.append((0.3 * max(h, a), g['id'], i, q))
+    pairs.sort(key=lambda p: -p[0])
+    out, used = {}, set()
+    for _s, gid, i, q in pairs:
+        if gid not in out and i not in used:
+            out[gid] = q
+            used.add(i)
+    if hit is not None:
+        hit.update(used)
+    return out
 
 
 def call(path, key, **params):
@@ -166,10 +201,10 @@ def hours(a, b):
 
 
 def top_counts(prev):
-    """Wie viele Top-Tipps stehen gerade je Liga in der App?"""
+    """Wie viele Top-Tipps stehen gerade je Liga in der App? („rec“ gab es bis 10.11.2026, ältere Tipp-Dateien haben es noch)"""
     games = (prev or {}).get('games') or {}
     out = {}
-    for lst in ('safe', 'rec', 'top'):
+    for lst in ('safe', 'top', 'rec'):
         for t in (prev or {}).get(lst) or []:
             slug = (games.get(t.get('g')) or {}).get('slug')
             if slug:
@@ -185,27 +220,47 @@ def by_league(raw, now):
     return out
 
 
-def plan_calls(league, tq, at, now, when, tops, active):
+def window(slug, tops, lead=None):
+    """So viele Tage vorher löst ein Spiel ohne Quote einen Abruf aus. lead: so weit voraus (Tage) hatte Tipico in dieser Liga zuletzt
+    Quoten – weiter vorher abzurufen kostet nur Credits."""
+    base = FAR_DAYS_TOP if slug in IMPORTANT or tops.get(slug, 0) >= 3 else FAR_DAYS
+    return base if lead is None else max(NEAR_H / 24.0, min(base, lead + LEAD_PLUS))
+
+
+def min_age(cls, dry):
+    """Mindestabstand in Stunden zum letzten Abruf derselben Liga (Klasse 0 oder 2). dry = so viele Abrufe hintereinander ohne ein
+    einziges Tipico-Angebot in der Liga."""
+    if dry >= 2:
+        return DRY_WEEK_H  # Tipico führt die Liga gerade offenbar nicht
+    if cls == 0:
+        return FAR_RETRY_H if dry else RETRY_H
+    return 2 * FAR_RETRY_H if dry else FAR_RETRY_H
+
+
+def plan_calls(league, tq, at, now, when, tops, active, dry=None, lead=None):
     """Welche Ligen sind jetzt dran? Klasse 0 = Spieltag steht an und eine Quote fehlt, 1 = Auffrischung kurz vor Anpfiff,
-    2 = Spiele, die noch weiter weg sind. Innerhalb der Klasse: mehr Top-Tipps zuerst, dann das nächste Spiel, dann Wichtigkeit."""
+    2 = Spiele bis 7 (10) Tage voraus ohne Quote. Innerhalb der Klasse: mehr Top-Tipps zuerst, dann das nächste Spiel, dann Wichtigkeit.
+    dry: {Sport-Schlüssel: Abrufe hintereinander ohne Tipico-Angebot} · lead: {Sport-Schlüssel: gelernter Vorlauf in Tagen}"""
+    dry, lead = dry or {}, lead or {}
     out = []
-    limit = now + timedelta(days=LOOK_DAYS)
 
     def quote_age(g):
         x = tq.get(g['id']) or {}
         return hours(now, when(x['at'])) if x.get('at') else 1e9
 
     for order, (slug, sport) in enumerate(SPORTS.items()):
+        limit = now + timedelta(days=window(slug, tops, lead.get(sport)))
         gs = [g for g in league.get(slug, ()) if g['t'] < limit]
         if sport not in active or not gs:
             continue
         last = when(at[sport]) if at.get(sport) else None
         age = hours(now, last) if last else 1e9
-        if age >= RETRY_H and any(g['id'] not in tq and hours(g['t'], now) <= NEAR_H for g in gs):
+        dr = dry.get(sport, 0)
+        if age >= min_age(0, dr) and any(g['id'] not in tq and hours(g['t'], now) <= NEAR_H for g in gs):
             cls = 0
-        elif (slug in IMPORTANT or tops.get(slug, 0) >= 2) and age >= SECOND_AGE and any(hours(g['t'], now) <= SECOND_H and quote_age(g) >= SECOND_AGE for g in gs):
+        elif not dr and (slug in IMPORTANT or tops.get(slug, 0) >= 2) and age >= SECOND_AGE and any(hours(g['t'], now) <= SECOND_H and quote_age(g) >= SECOND_AGE for g in gs):
             cls = 1
-        elif age >= FAR_RETRY_H and any(g['id'] not in tq for g in gs):
+        elif age >= min_age(2, dr) and any(g['id'] not in tq for g in gs):
             cls = 2
         else:
             continue
@@ -214,16 +269,28 @@ def plan_calls(league, tq, at, now, when, tops, active):
     return out
 
 
-def next_up(league, tq, now, active, iso):
-    """Welche Ligen sind als Nächstes dran? (für die KI-Zentrale)"""
+def next_up(league, tq, at, now, when, active, iso, tops=None, dry=None, lead=None):
+    """Welche Ligen sind als Nächstes dran? (für die KI-Zentrale; schon fällige warten auf den Tagesanteil von morgen)"""
+    tops, dry, lead = tops or {}, dry or {}, lead or {}
+    tomorrow = datetime(now.year, now.month, now.day, tzinfo=now.tzinfo) + timedelta(days=1, minutes=30)
     out = []
     for slug, sport in SPORTS.items():
         miss = [g for g in league.get(slug, ()) if g['id'] not in tq]
-        if sport in active and miss:
-            first = min(miss, key=lambda g: g['t'])
-            due = first['t'] - timedelta(hours=NEAR_H)
-            if due > now:
-                out.append((due, first.get('comp') or slug))
+        if sport not in active or not miss:
+            continue
+        first = min(miss, key=lambda g: g['t'])
+        last = when(at[sport]) if at.get(sport) else None
+        dr = dry.get(sport, 0)
+        due0 = first['t'] - timedelta(hours=NEAR_H)
+        due2 = first['t'] - timedelta(days=window(slug, tops, lead.get(sport)))
+        if last:
+            due0 = max(due0, last + timedelta(hours=min_age(0, dr)))
+            due2 = max(due2, last + timedelta(hours=min_age(2, dr)))
+        due = min(due0, due2)
+        if due <= now:
+            due = tomorrow
+        if due < first['t']:
+            out.append((due, first.get('comp') or slug))
     out.sort(key=lambda x: x[0])
     return [{'at': iso(d), 'comp': c} for d, c in out[:4]]
 
@@ -241,7 +308,8 @@ def refresh(raw, prev, now, when, log):
     old = (prev or {}).get('tipico') or {}
     st = {'connected': True, 'at': dict(old.get('at') or {}), 'day': now.strftime('%Y-%m-%d'), 'spent': old.get('spent', 0) if old.get('day') == now.strftime('%Y-%m-%d') else 0,
           'remaining': old.get('remaining'), 'used': old.get('used'), 'updatedAt': old.get('updatedAt'), 'lastFetch': old.get('lastFetch'), 'err': None, 'fetched': [],
-          'log': list(old.get('log') or [])[-LOG_KEEP:], 'total': len(raw), 'offered': sum(1 for g in raw if g['slug'] in SPORTS), 'covered': len(tq), 'next': old.get('next') or []}
+          'log': list(old.get('log') or [])[-LOG_KEEP:], 'total': len(raw), 'offered': sum(1 for g in raw if g['slug'] in SPORTS), 'covered': len(tq), 'next': old.get('next') or [],
+          'dry': dict(old.get('dry') or {}), 'lead': dict(old.get('lead') or {})}
     if prev is None:  # ohne die letzte Suche ist unklar, was heute schon verbraucht wurde – lieber nichts ausgeben
         st['err'] = 'Letzte Suche nicht lesbar, diesmal kein Abruf'
         log('Tipico:', st['err'])
@@ -265,7 +333,8 @@ def refresh(raw, prev, now, when, log):
     # zuerst zurücklegen, was die ersten Abrufe aller Ligen bis Monatsende brauchen; nur der Rest geht in Auffrischungen
     running = sum(1 for slug, sport in SPORTS.items() if sport in active and league.get(slug))
     spare = remaining - COST * running * days_left / ROUND_DAYS * ROUND_MARGIN
-    for cls, _top, _soon, _order, slug, sport, gs in plan_calls(league, tq, st['at'], now, when, top_counts(prev), active):
+    tops = top_counts(prev)
+    for cls, _top, _soon, _order, slug, sport, gs in plan_calls(league, tq, st['at'], now, when, tops, active, st['dry'], st['lead']):
         if st['spent'] + COST > cap or remaining < COST:
             break
         if cls and (spare < COST or (cls == 2 and st['spent'] + COST > share)):
@@ -286,11 +355,22 @@ def refresh(raw, prev, now, when, log):
         if us is not None:
             st['used'] = us
         st['at'][sport] = iso(now)
-        found = match(events, gs, when)
+        everyone = league.get(slug) or gs  # ein Abruf bringt alle Spiele der Liga mit, auch die weiter entfernten
+        hit = set()
+        found = match(events, everyone, when, hit)
         for gid, q in found.items():
             tq[gid] = {'q': q, 'at': iso(now)}
         offers = sum(1 for e in events if parse_event(e))  # 0 = Tipico bietet dort gerade nichts an (kein Zuordnungs-Problem)
+        st['dry'][sport] = 0 if offers else st['dry'].get(sport, 0) + 1
+        ahead = [hours(t, now) / 24.0 for t in (when(e.get('commence_time')) for e in events if parse_event(e)) if t]
+        if ahead:  # so weit voraus hat Tipico in dieser Liga gerade Quoten
+            st['lead'][sport] = round(max(ahead), 1)
         row = {'t': iso(now), 'comp': gs[0].get('comp') or slug, 'events': len(events), 'offers': offers, 'matched': len(found), 'cost': cost, 'why': cls}
+        end = max(g['t'] for g in everyone) + timedelta(hours=3)
+        miss = ['%s – %s' % (e.get('home_team'), e.get('away_team')) for i, e in enumerate(events)
+                if i not in hit and parse_event(e) and (when(e.get('commence_time')) or end) < end]
+        if miss:  # mit Tipico-Quote, aber keinem unserer Spiele zugeordnet (zum Nachsehen, falls ein Name nicht passt)
+            row['miss'] = miss[:4]
         st['fetched'].append(dict(row, slug=slug))
         st['log'].append(row)
         st['lastFetch'] = iso(now)
@@ -299,5 +379,5 @@ def refresh(raw, prev, now, when, log):
     st['remaining'] = remaining
     st['updatedAt'] = iso(now)
     st['covered'] = len(tq)
-    st['next'] = next_up(league, tq, now, active, iso)
+    st['next'] = next_up(league, tq, st['at'], now, when, active, iso, tops, st['dry'], st['lead'])
     return tq, st

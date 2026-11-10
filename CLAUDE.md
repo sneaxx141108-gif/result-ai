@@ -110,7 +110,43 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
   am Ende kurz berichten.
 - Unter Windows: größere Änderungen per kleinem Python-Skript statt Bash-Heredoc (Backslashes/Backticks gingen dort kaputt).
 
-## HIER WEITERMACHEN – Stand 09.11.2026, abends
+## HIER WEITERMACHEN – Stand 10.11.2026
+
+**Niklas' Liste vom 10.11.2026** (App-Stand `ra-shell-v23`):
+1. **Tipico-Quoten** („gefühlt keine Spiele mit Quote“): In der Länderspielpause lag der nächste Spieltag 10–13 Tage weg, abgerufen wurde aber nur bis
+   6 Tage voraus. Jetzt (`scripts/tipico.py`): ein Spiel ohne Quote löst bis 7 Tage vorher einen Abruf aus (wichtige Ligen und Ligen mit ≥ 3 Top-Tipps:
+   10 Tage). Je Liga lernt die App, wie weit voraus Tipico zuletzt Quoten hatte (`tipico.lead`, Tage), und ruft höchstens 1 Tag früher ab; Ligen ganz
+   ohne Tipico-Angebot (`tipico.dry`) nach zwei leeren Abrufen nur noch einmal pro Woche. Jeder Abruf trägt die Quoten aller Spiele der Liga ein, auch
+   der weiter entfernten. Zuordnung: beste zuerst, jedes Spiel nur einmal, Heim/Gast vertauscht (neutraler Platz) zählt mit getauschten Quoten, mehr
+   Namens-Aliasse. Monats-Simulation in `tests/tipico.test.py`: der Gratis-Plan (500 Credits, Reset am 1.) reicht. Mehr Credits nur über einen
+   bezahlten Plan, den Niklas selbst abschließt – nie mehrere Gratis-Konten.
+2. **Konto** (nur Benutzername + Passwort): Knopf neben der KI-Zentrale (Kopf der Startseite, iPad quer unten in der Leiste links) und
+   Einstellungen → Konto. Server: `worker/worker.js` mit Cloudflare-D1 (Bindung `DB`), Routen `/auth/signup|login|logout|delete` und `GET/PUT /sync`.
+   Das Passwort streckt die App (PBKDF2, 150.000 Runden, Salz `result-ai|<name>`), nur das Ergebnis geht zum Server. Abgleich in `web/sync.js`
+   (`window.RS`): ein JSON-Dokument je Konto mit Version, bei 409 neu zusammenführen (höchstens 4×). Listen (Wetten 500, Verlauf 50, Scans 10) je
+   Eintrag: neueste Änderung gewinnt, gelöschte Wetten bleiben 180 Tage als gelöscht vermerkt, dieselbe Top-Tipp-Wette auf zwei Geräten → einmal.
+   Einzelwerte (Guthaben, Name, Darstellung, Karten-Look, Einladungscode, letzte Teams): neueste gewinnt. Nur auf dem Gerät: Handy-/iPad-Ansicht,
+   `ra_auth`, `ra_sync`, `ra_api`. Jede Änderung stempelt `store.onSet`; angemeldet wird 1,5 s später abgeglichen, sonst beim Öffnen, alle 3 Min. und
+   wenn das Netz zurückkommt. Erste Anmeldung mit Daten auf beiden Seiten → „Daten vom Konto nehmen“ (empfohlen) oder „Beides zusammenführen“.
+   Tests: `node tests/sync.test.js` und `node tests/worker.test.mjs` (Node ≥ 22.13, SQLite statt D1, feste Uhr) – beide laufen in `pages.yml`.
+   Im Browser getestet mit einem lokalen Test-Server (`worker.js` + SQLite, Port 8787; nur auf localhost schaltet `ra_api` die Adresse um).
+3. **Top-Tipps:** Liste „Empfohlen“ entfernt (ihre alten Tipps zählen in der Bilanz weiter bei „alle zusammen“). Tage-Leiste: Alle Tage · Mit Quote
+   (mit Anzahl) · Heute & Morgen · Heute · Morgen · Diese Woche · Später – angezeigt wird nur, was gerade Tipps hat, „Alle“ und „Mit Quote“ immer.
+4. **Spiel scannen statt Wettschein-Scan** und 5. **statt „Spiel selbst auswählen“**: Bereich „Scannen“ in der Leiste (`#/scan`, `vScan`). Ein Screenshot
+   (Fotos, Kamera, Einfügen, am iPad auch hineinziehen) → Server `POST /match` (Gemini liest nur ab: bis 12 Spiele mit Teams, Anstoß, Status, Minute,
+   Halbzeit, Stand, Roten Karten, 1X2-Quoten) → gerechnet wird in der App ohne KI. Quelle je Spiel: Tipp-Suche (Marktpreise) > Quoten vom Screenshot
+   (nur vor Anpfiff, `RE.fromOdds`) > Team-Stärken (`lamOf`). Live mit Minute, Stand und Roten Karten (`RE.analyze`). Extras: mehrere Spiele auf einmal,
+   Quoten-Check (Quote vom Screenshot gegen den fairen Preis), Antippen zum Ändern (Team falsch erkannt), vertauschte Heim/Gast wird erkannt,
+   „Ganze Analyse“ öffnet die Spielseite, die letzten 10 Scans (`ra_scans`). Alte Links `#/pick` und `#/slip` führen zu `#/scan`; `/bet` bleibt auf dem
+   Server für alte App-Stände.
+6. **Rechnen** – in Arbeit.
+7. **Extra-Bereich** – in Arbeit.
+
+**Einmal bei Cloudflare (macht Niklas, Claude erklärt):** D1-Datenbank anlegen (Storage & Databases → D1 → Create, Name z. B. `result-ai`), im Worker
+`result-ai` unter Bindings eine D1-Bindung mit dem Variablennamen **`DB`** auf diese Datenbank anlegen, dann den neuen `worker/worker.js` einfügen und
+Deploy. `GET /` zeigt danach `konten: true`. Bis dahin sagt der Scan „Server noch nicht aktualisiert“ und das Konto „noch nicht eingerichtet“.
+
+### Stand 09.11.2026, abends
 
 **So geht's am Laptop los:** Claude öffnen → Repository `result-ai` (Ordner klonen: `git clone
 https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browser **claude.ai/code** → GitHub verbinden →
@@ -147,7 +183,7 @@ https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browse
 8. **Genauigkeit** (112.610 Spiele, Test ab 01.07.2025): Marge per Power-Methode raus (`devig`), Tor-Erwartung aus der Remis-Quote, wenn keine Über/Unter-Quote da ist,
    Korrektur nur für Beide treffen und „Team trifft“ (`CAL`). Sicher-Tipps vorher 73,3 % erwartet gegen 75,8 % echt, jetzt 74,5 gegen 75,3. Schlussquoten sind kaum zu schlagen,
    der Gewinn ist klein und liegt bei den Favoriten. Änderungen nur nach neuem Backtest.
-9. **Wettschein-Scan** (`#/scan` → `#/slip`, Server `POST /bet`): `resolveTeam` ist absichtlich streng (lieber „k. A.“ als das falsche Team). Ohne Marktpreise wird nur innerhalb einer Liga gerechnet,
+9. **Wettschein-Scan** (bis 10.11.2026, ersetzt durch „Spiel scannen“; damals `#/scan` → `#/slip`, Server `POST /bet`): `resolveTeam` ist absichtlich streng (lieber „k. A.“ als das falsche Team). Ohne Marktpreise wird nur innerhalb einer Liga gerechnet,
    „Wert“ gibt es nur gegen Marktpreise. Sind alle Spiele erkannt, prüft die App die Wette selbst (`track:true`); Scans zählen nur fürs Guthaben, nicht für die Erfolgsquote.
 
 **Guthaben zurücksetzen** (Wetten → Ändern, mit Rückfrage): löscht Betrag, Ein-/Auszahlungen und Guthaben-Kurve; Wetten und Erfolgsquote bleiben.

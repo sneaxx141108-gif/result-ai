@@ -23,12 +23,19 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24   # der Server-Test braucht die eingebaute SQLite (ab Node 22.13)
       - name: Rechen-Kern testen
         run: node tests/engine.test.js
       - name: Stärken-Datei prüfen
         run: node tests/ratings.test.js
       - name: Tipp-Datei prüfen
         run: node tests/tips.test.js
+      - name: Abgleich Handy/iPad prüfen
+        run: node tests/sync.test.js
+      - name: Server prüfen (Konten, Spiel-Scan)
+        run: node tests/worker.test.mjs
       - name: Frische Tipps behalten (die veröffentlichte Tipp-Datei ist neuer als die im Repository)
         run: |
           if curl -sf -o /tmp/tips.json "https://sneaxx141108-gif.github.io/result-ai/data/tips.json?nc=$(date +%s)" && python3 -c "import json; json.load(open('/tmp/tips.json'))"; then
