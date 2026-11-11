@@ -1,6 +1,6 @@
 name: App veröffentlichen
 
-# Legt die App (Ordner web/) bei jeder Änderung auf GitHub Pages. Vorher laufen die Tests des Rechen-Kerns.
+# Legt die App (Ordner web/) bei jeder Änderung auf GitHub Pages. Vorher laufen die Tests (Wett-Codes, Abgleich, Server, Spielplan).
 on:
   push:
     branches: [main]
@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages   # alle Veröffentlichungen nacheinander: GitHub Pages erlaubt nur eine gleichzeitig (App, Stärken, Tipps)
+  group: pages   # alle Veröffentlichungen nacheinander: GitHub Pages erlaubt nur eine gleichzeitig (App und Spielplan)
   cancel-in-progress: false
 
 jobs:
@@ -26,21 +26,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24   # der Server-Test braucht die eingebaute SQLite (ab Node 22.13)
-      - name: Rechen-Kern testen
-        run: node tests/engine.test.js
-      - name: Stärken-Datei prüfen
-        run: node tests/ratings.test.js
-      - name: Tipp-Datei prüfen
-        run: node tests/tips.test.js
+      - name: Wett-Codes prüfen (Wettschein-Tipps erkennen und abrechnen)
+        run: node tests/pick.test.mjs
       - name: Abgleich Handy/iPad prüfen
         run: node tests/sync.test.js
-      - name: Server prüfen (Konten, Spiel-Scan)
+      - name: Server prüfen (Konten, Wettschein-Leser, Zeitgeber)
         run: node tests/worker.test.mjs
-      - name: Frische Tipps behalten (die veröffentlichte Tipp-Datei ist neuer als die im Repository)
+      - name: Frischen Spielplan behalten (der veröffentlichte ist neuer als der im Repository)
         run: |
-          if curl -sf -o /tmp/tips.json "https://sneaxx141108-gif.github.io/result-ai/data/tips.json?nc=$(date +%s)" && python3 -c "import json; json.load(open('/tmp/tips.json'))"; then
-            cp /tmp/tips.json web/data/tips.json
+          if curl -sf -o /tmp/games.json "https://sneaxx141108-gif.github.io/result-ai/data/games.json?nc=$(date +%s)" && python3 -c "import json; json.load(open('/tmp/games.json'))"; then
+            cp /tmp/games.json web/data/games.json
           fi
+      - name: Spielplan prüfen
+        run: node tests/games.test.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -142,6 +142,23 @@ const bet = (extra) => Object.assign({ id: 'b' + (++n), at: clock.tick(), src: '
   const tips = phone.bets().filter((b) => b.key === '401|H');
   ok(tips.length === 1 && tips[0].title === 'Tipp Handy' && pad.view() === phone.view(), 'gleicher Top-Tipp doppelt gespeichert: bleibt einmal (der zuerst gespeicherte)');
 
+  // ---- derselbe Wettschein auf Handy und iPad gescannt → nur einmal; bewusst zweimal gespielt (eigener Schlüssel) → beide bleiben
+  phone.set('bets', [bet({ src: 'scan', key: 'T-77', title: 'Schein Handy' })].concat(phone.bets()));
+  pad.set('bets', [bet({ src: 'scan', key: 'T-77', title: 'Schein iPad' }), bet({ src: 'scan', key: 'T-77#2', title: 'nochmal gespielt' })].concat(pad.bets()));
+  await phone.sync();
+  await pad.sync();
+  await phone.sync();
+  const sl = phone.bets().filter((b) => /^T-77/.test(b.key || ''));
+  ok(sl.length === 2 && sl.some((b) => b.title === 'Schein Handy') && sl.some((b) => b.title === 'nochmal gespielt') && pad.view() === phone.view(),
+    `gleicher Wettschein doppelt gescannt: bleibt einmal (${sl.map((b) => b.title).join(', ')})`);
+
+  // ---- Limits und KI-Protokoll werden mit abgeglichen
+  pad.set('limits', { week: 50, month: 100 });
+  pad.set('kilog', [{ id: 'k1', at: clock.tick(), kind: 'scan', text: 'Schein gelesen' }]);
+  await pad.sync();
+  await phone.sync();
+  ok(phone.get('limits').week === 50 && phone.get('kilog').length === 1 && pad.view() === phone.view(), 'Limits und KI-Protokoll auf beiden Geräten');
+
   // ---- Verlauf: höchstens 50, die neuesten
   phone.set('history', Array.from({ length: 40 }, (_, i) => ({ id: 'p' + i, at: clock.tick() })));
   pad.set('history', Array.from({ length: 40 }, (_, i) => ({ id: 'q' + i, at: clock.tick() })));

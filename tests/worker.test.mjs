@@ -1,6 +1,6 @@
-// Prüft den Server (worker/worker.js) auf dem PC: Konten, Daten-Abgleich, Spiel-Scan, Wettschein, Status.
+// Prüft den Server (worker/worker.js) auf dem PC: Konten, Daten-Abgleich, Wettschein-Scan, Zeitgeber, Status.
 // Aufruf: node tests/worker.test.mjs – braucht Node 22.13 oder neuer (eingebaute SQLite als Ersatz für die Cloudflare-Datenbank D1).
-// Gemini wird nicht gefragt: eine Attrappe antwortet mit festem JSON.
+// Gemini, GitHub und der veröffentlichte Spielplan werden nicht gefragt: Attrappen antworten mit festen Daten.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,11 +59,20 @@ function d1(db) {
 const raw = new sqlite.DatabaseSync(':memory:');
 const env = { DB: d1(raw), GEMINI_API_KEY: 'attrappe', INVITE_CODES: 'probe, zweiter' };
 
-// ---- Gemini-Attrappe
+// ---- Attrappen: Gemini, veröffentlichter Spielplan, GitHub
 let geminiAnswer = null;
 let geminiCalls = 0;
+let gamesAt = null; // updatedAt des Spielplans; null = Seite nicht erreichbar
+const dispatches = [];
+const ghStatus = []; // vorgegebene Antworten von GitHub (sonst 204)
 globalThis.fetch = async (url, opt) => {
   const u = String(url);
+  if (u.includes('/data/games.json')) return gamesAt ? new Response(JSON.stringify({ updatedAt: gamesAt, games: [] }), { status: 200 }) : new Response('weg', { status: 404 });
+  if (u.startsWith('https://api.github.com/')) {
+    dispatches.push({ url: u, head: (opt && opt.headers) || {}, body: JSON.parse((opt && opt.body) || '{}') });
+    const st = ghStatus.length ? ghStatus.shift() : 204;
+    return new Response(st === 204 ? null : 'Unexpected inputs provided', { status: st });
+  }
   if (u.includes('/models?')) return new Response(JSON.stringify({ models: [{ name: 'models/gemini-9.9-flash', supportedGenerationMethods: ['generateContent'] }] }), { status: 200 });
   if (u.includes(':generateContent')) {
     geminiCalls++;
@@ -94,7 +103,7 @@ const pw = (s) => Array.from({ length: 64 }, (_, i) => '0123456789abcdef'[(s.cha
 
 // ---- Status, CORS
 let r = await call('GET', '/', { e: { INVITE_CODES: 'x' } });
-ok(r.status === 200 && r.json.konten === false && r.json.version >= '2026-11-10', 'Status ohne Datenbank: konten = false');
+ok(r.status === 200 && r.json.konten === false && r.json.version >= '2026-11-11' && r.json.app === 'Wettbuch', 'Status ohne Datenbank: konten = false, App heißt Wettbuch');
 r = await call('GET', '/');
 ok(r.status === 200 && r.json.konten === true && r.json.ki === true && r.json.einladung === true, 'Status mit Datenbank: konten = true');
 ok(!JSON.stringify(r.json).includes('attrappe'), 'Status verrät keine Schlüssel');
@@ -213,46 +222,97 @@ ok(r.status === 401, 'Anmelden geht danach nicht mehr');
 r = await call('POST', '/auth/signup', { body: { user: 'niklas', pass: pw('neu') } });
 ok(r.status === 200, 'Name ist wieder frei');
 
-// ---- Spiel-Scan
+// ---- Wettschein-Scan (/slip: ein Schein oder die ganze Liste „Meine Wetten“)
 const img = 'data:image/png;base64,' + Buffer.from('bild').toString('base64');
-r = await call('POST', '/match', { body: { image: img } });
+r = await call('POST', '/slip', { body: { image: img } });
 ok(r.status === 401, 'Scan ohne Einladungscode: 401');
-r = await call('POST', '/match', { invite: 'probe', body: { image: '' } });
+r = await call('POST', '/slip', { invite: 'probe', body: { image: '' } });
 ok(r.status === 400 && /Kein gültiges Bild/.test(r.json.error), 'Scan ohne Bild: verständliche Meldung');
-r = await call('POST', '/match', { invite: 'probe', body: { image: 'data:application/pdf;base64,QUJD' } });
+r = await call('POST', '/slip', { invite: 'probe', body: { image: 'data:application/pdf;base64,QUJD' } });
 ok(r.status === 400, 'nur Bilder');
 geminiAnswer = (prompt) => {
-  ok(/Heute ist/.test(prompt) && /Spiel-Leser/.test(prompt), 'Gemini bekommt Datum und Spiel-Anleitung');
+  ok(/Heute ist/.test(prompt) && /Wettschein-Leser der App „Wettbuch“/.test(prompt) && /Cashout/.test(prompt), 'Gemini bekommt Datum und Wettschein-Anleitung');
   return JSON.stringify({
-    isFootball: true, bookmaker: 'Tipico', note: null,
-    games: [
-      { home: 'Borussia Dortmund', away: 'FC Bayern', competition: 'Bundesliga', kickoff: '2026-11-14 18:30', status: 'upcoming', oddsHome: '2,90', oddsDraw: 3.8, oddsAway: 2.25, line: 2.5, oddsOver: 1.6, oddsUnder: 0.5 },
-      { home: 'Real Madrid', away: 'Liverpool', status: 'live', minute: '67', half: 2, scoreHome: 1, scoreAway: 1, redHome: 0, redAway: 1 },
-      { home: '', away: 'Niemand', status: 'upcoming' },
-      { home: 'Inter', away: 'Milan', status: 'abgesagt', minute: 999, half: 3, oddsHome: 1 },
+    isBetSlip: true, bookmaker: 'Tipico', note: null,
+    slips: [
+      { type: 'combi', status: 'open', stake: '10,00', totalOdds: null, potentialWin: 59.4, placedAt: '2026-11-10 19:02', betId: 'T-123', freebet: false,
+        legs: [
+          { home: 'Borussia Dortmund', away: 'FC Bayern', market: 'Endergebnis', pick: '1', odds: '2,70', competition: 'Bundesliga', kickoff: '2026-11-14 18:30', result: 'open' },
+          { home: 'Real Madrid', away: 'Liverpool', market: 'Über/Unter', pick: 'Über 2,5', odds: 2.2, scoreHome: 2, scoreAway: 1, result: 'won' },
+        ] },
+      { type: 'single', status: 'cashout', stake: 5, totalOdds: 1.8, cashout: '7,20', freebet: 'ja', legs: [{ home: 'Inter', away: 'Milan', pick: 'X', odds: 3.1, result: 'banane' }] },
+      { type: 'system', system: '2/3', status: 'won', stake: 6, potentialWin: 30, legs: [{ event: 'Bundesliga – Meister', pick: 'Bayern', odds: 1.2 }, { home: 'A', away: 'B', pick: '2', odds: 2 }] },
+      { type: 'quatsch', status: 'irgendwas', stake: null, legs: [] },
+      { status: 'lost', freebet: true, legs: [{ home: 'C', away: 'D', pick: '2', odds: 0.5, scoreHome: 99 }] },
     ],
   });
 };
-r = await call('POST', '/match', { invite: ' PROBE ', body: { image: img } });
+r = await call('POST', '/slip', { invite: ' PROBE ', body: { image: img } });
 const sc = r.json && r.json.scan;
-ok(r.status === 200 && r.json.model === 'gemini-9.9-flash' && sc && sc.isFootball, 'Scan liest den Screenshot (Code ohne Groß-/Kleinschreibung)');
-ok(sc && sc.games.length === 3, 'Spiel ohne Heim-Mannschaft fällt weg');
-const g0 = sc && sc.games[0];
-ok(g0 && g0.oddsHome === 2.9 && g0.oddsDraw === 3.8 && g0.oddsAway === 2.25 && g0.line === 2.5 && g0.oddsOver === 1.6 && g0.oddsUnder === null && g0.kickoff === '2026-11-14 18:30', 'Quoten mit Komma gelesen, unmögliche Quote → null');
-const g1 = sc && sc.games[1];
-ok(g1 && g1.status === 'live' && g1.minute === 67 && g1.half === 2 && g1.scoreHome === 1 && g1.redAway === 1, 'Live-Spiel: Minute, Halbzeit, Stand, Rote Karten');
-const g2 = sc && sc.games[2];
-ok(g2 && g2.status === 'unknown' && g2.minute === null && g2.half === null && g2.oddsHome === null, 'Unsinn wird zu „unbekannt“ bzw. null');
-geminiAnswer = { isFootball: false, games: [] };
-r = await call('POST', '/match', { invite: 'zweiter', body: { image: img } });
-ok(r.status === 200 && r.json.scan.isFootball === false && r.json.scan.games.length === 0, 'Bild ohne Fußballspiel: isFootball = false');
-geminiAnswer = () => 'Hier ist das Ergebnis: ' + JSON.stringify({ isFootball: true, games: [{ home: 'A', away: 'B', status: 'upcoming' }] }) + ' Viel Erfolg!';
+ok(r.status === 200 && r.json.model === 'gemini-9.9-flash' && sc && sc.isBetSlip && sc.bookmaker === 'Tipico', 'Scan liest den Screenshot (Code ohne Groß-/Kleinschreibung)');
+ok(sc && sc.slips.length === 4, 'leerer Schein ohne Tipps und Einsatz fällt weg');
+const s0 = sc && sc.slips[0];
+ok(s0 && s0.type === 'combi' && s0.stake === 10 && s0.totalOdds === 5.94 && s0.potentialWin === 59.4 && s0.placedAt === '2026-11-10 19:02' && s0.betId === 'T-123',
+  'Kombi: Einsatz mit Komma gelesen, fehlende Gesamtquote aus den Einzelquoten');
+ok(s0 && s0.legs[0].odds === 2.7 && s0.legs[0].market === 'Endergebnis' && s0.legs[1].result === 'won' && s0.legs[1].scoreHome === 2 && s0.legs[1].scoreAway === 1,
+  'Tipps: Quote, Wettart, Ergebnis und Spielstand');
+const s1 = sc && sc.slips[1];
+ok(s1 && s1.status === 'cashout' && s1.cashout === 7.2 && s1.freebet === false && s1.legs[0].result === 'unknown', 'Cashout-Betrag gelesen, Unsinn wird „unbekannt“');
+const s2 = sc && sc.slips[2];
+ok(s2 && s2.type === 'system' && s2.system === '2/3' && s2.totalOdds === null && s2.legs[0].event === 'Bundesliga – Meister', 'Systemwette: keine ausgedachte Gesamtquote');
+const s3 = sc && sc.slips[3];
+ok(s3 && s3.type === 'single' && s3.status === 'lost' && s3.freebet === true && s3.legs[0].odds === null && s3.legs[0].scoreHome === null && s3.system === null,
+  'ohne Wett-Art: Einzelwette, unmögliche Quote und Tore → null');
+geminiAnswer = { isBetSlip: false, slips: [] };
+r = await call('POST', '/slip', { invite: 'zweiter', body: { image: img } });
+ok(r.status === 200 && r.json.scan.isBetSlip === false && r.json.scan.slips.length === 0, 'Bild ohne Wette: isBetSlip = false');
+geminiAnswer = () => 'Hier ist das Ergebnis: ' + JSON.stringify({ isBetSlip: true, slips: [{ status: 'open', stake: 2, legs: [{ home: 'A', away: 'B', pick: '1', odds: 1.5 }] }] }) + ' Viel Erfolg!';
+r = await call('POST', '/slip', { invite: 'probe', body: { image: img } });
+ok(r.status === 200 && r.json.scan.slips.length === 1 && r.json.scan.slips[0].totalOdds === 1.5, 'Antwort mit Text drumherum wird trotzdem gelesen');
+geminiAnswer = { isBetSlip: true, slips: Array.from({ length: 14 }, (_, k) => ({ status: 'won', stake: k + 1, legs: [{ pick: '1', odds: 1.5 }] })) };
+r = await call('POST', '/slip', { invite: 'probe', body: { image: img } });
+ok(r.status === 200 && r.json.scan.slips.length === 10 && r.json.scan.slips[9].stake === 10, 'höchstens 10 Scheine je Bild');
 r = await call('POST', '/match', { invite: 'probe', body: { image: img } });
-ok(r.status === 200 && r.json.scan.games.length === 1, 'Antwort mit Text drumherum wird trotzdem gelesen');
+ok(r.status === 404, 'alter Spiel-Scan (/match) ist weg');
 const before = geminiCalls;
 let scanBlocked = 0;
-for (let i = 0; i < 12; i++) if ((await call('POST', '/match', { invite: 'zweiter', body: { image: img } })).status === 429) scanBlocked++;
+for (let i = 0; i < 12; i++) if ((await call('POST', '/slip', { invite: 'zweiter', body: { image: img } })).status === 429) scanBlocked++;
 ok(scanBlocked >= 1 && geminiCalls - before <= 11, `Scan-Bremse je Einladungscode (${scanBlocked} abgewiesen)`);
+
+// ---- Zeitgeber: Spielplan-Lauf auf GitHub anstoßen, wenn der veröffentlichte zu alt ist
+const ghEnv = Object.assign({}, env, { GITHUB_TOKEN: 'gh-attrappe' });
+const minAgo = (m) => new Date(Date.now() - m * 60e3).toISOString();
+r = await call('GET', '/kick', { invite: 'probe' });
+ok(r.status === 200 && /Kein GITHUB_TOKEN/.test(r.json.info) && dispatches.length === 0, 'ohne GitHub-Schlüssel: Zeitgeber aus');
+r = await call('GET', '/kick');
+ok(r.status === 401, '/kick nur mit Einladungscode');
+gamesAt = minAgo(45);
+r = await call('GET', '/kick', { invite: 'probe', e: ghEnv });
+ok(r.status === 200 && /nichts zu tun/.test(r.json.info) && dispatches.length === 0, `frischer Spielplan: nichts starten (${r.json.info})`);
+gamesAt = minAgo(200);
+r = await call('GET', '/kick', { invite: 'probe', e: ghEnv });
+const d0 = dispatches[0];
+ok(r.status === 200 && /Spielplan-Lauf gestartet/.test(r.json.info) && dispatches.length === 1, `alter Spielplan: Lauf gestartet (${r.json.info})`);
+ok(d0 && /\/repos\/sneaxx141108-gif\/result-ai\/actions\/workflows\/games\.yml\/dispatches$/.test(d0.url) && d0.body.ref === 'main' && d0.body.inputs.via === 'zeitgeber',
+  'startet games.yml auf main mit via = zeitgeber');
+ok(d0 && d0.head.Authorization === 'Bearer gh-attrappe' && /^Wettbuch-Server\//.test(d0.head['User-Agent']), 'ehrliche Kennung, Schlüssel nur an GitHub');
+ok(!JSON.stringify(r.json).includes('gh-attrappe'), 'Antwort verrät den GitHub-Schlüssel nicht');
+gamesAt = null;
+ghStatus.push(422);
+r = await call('GET', '/kick', { invite: 'probe', e: ghEnv });
+ok(dispatches.length === 3 && dispatches[2].body.inputs === undefined && /nicht lesbar/.test(r.json.info), 'Spielplan nicht erreichbar: Lauf trotzdem; GitHub kennt „via“ nicht → zweiter Versuch ohne');
+ghStatus.push(403);
+r = await call('GET', '/kick', { invite: 'probe', e: ghEnv });
+ok(r.status === 200 && /GitHub hat abgelehnt: 403/.test(r.json.info), 'GitHub lehnt ab: verständliche Meldung statt Absturz');
+let waited = null;
+gamesAt = minAgo(181);
+const logs = [];
+const oldLog = console.log;
+console.log = (...a) => logs.push(a.join(' '));
+await W.scheduled({ cron: '*/30 * * * *' }, ghEnv, { waitUntil: (pr) => { waited = pr; } });
+await waited;
+console.log = oldLog;
+ok(dispatches.length === 5 && logs.some((l) => /Zeitgeber: Spielplan-Lauf gestartet/.test(l)), 'Cron-Zeitgeber startet den Lauf selbst');
 
 // ---- Wettschein (ältere App) und Unbekanntes
 geminiAnswer = { isBetSlip: true, status: 'open', stake: 10, legs: [{ home: 'BVB', away: 'S04', pick: 'BVB', odds: 1.5, result: 'open' }, { home: 'A', away: 'B', pick: 'Über 2,5', odds: 2, result: 'open' }] };

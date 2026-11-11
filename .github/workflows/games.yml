@@ -1,0 +1,48 @@
+name: Spielplan aktualisieren
+
+# Alle 2 Stunden: Spiele von 5 Tagen zurück bis 16 Tage voraus aus rund 70 Wettbewerben holen (ESPN, ohne KI, ohne Quoten) und als
+# web/data/games.json veröffentlichen. Die App ordnet damit gescannte Wettscheine den richtigen Spielen zu – nur dann kann sie die
+# Wetten nach dem Abpfiff selbst abrechnen.
+# Absicherung, weil GitHub geplante Läufe manchmal verschluckt: Der Cloudflare-Server (worker/worker.js, Zeitgeber alle 30 Minuten)
+# startet diesen Workflow über die GitHub-API, sobald der veröffentlichte Spielplan älter als 3 Stunden ist.
+# Der Spielplan wird nur veröffentlicht, nicht gespeichert (hält das Repository klein); „App veröffentlichen“ übernimmt ihn.
+on:
+  schedule:
+    - cron: '23 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      via:
+        description: 'Wer startet? (zeitgeber = Cloudflare-Server, hand = von Hand)'
+        required: false
+        default: 'hand'
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages   # alle Veröffentlichungen nacheinander: GitHub Pages erlaubt nur eine gleichzeitig (App und Spielplan)
+  cancel-in-progress: false
+
+jobs:
+  games:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Spielplan holen
+        env:
+          RA_VIA: ${{ github.event_name == 'schedule' && 'github' || inputs.via || 'hand' }}  # für die KI-Zentrale
+        run: python3 scripts/games.py
+      - name: Prüfen (bei Fehlern bleibt der alte Spielplan online)
+        run: node tests/games.test.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

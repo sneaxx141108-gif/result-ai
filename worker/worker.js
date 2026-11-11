@@ -1,4 +1,4 @@
-/* Result AI – Server (Cloudflare Worker, Gratis-Tarif). Hält die KI-Schlüssel geheim und übernimmt, was die App allein nicht kann.
+/* Wettbuch – Server (Cloudflare Worker, Gratis-Tarif). Hält die KI-Schlüssel geheim und übernimmt, was die App allein nicht kann.
      GET  /             Status: welche Geheimnisse und Bindungen eingetragen sind (nie die Werte)
      POST /auth/signup  Konto erstellen: nur Benutzername + Passwort (Niklas, 10.11.2026: „einfach einen User und Passwort, mehr nicht“)
      POST /auth/login   Anmelden → Sitzungs-Schlüssel für dieses Gerät
@@ -7,10 +7,11 @@
      GET  /sync         Daten des Kontos holen (?v=<bekannte Version> → nur „same“, wenn sich nichts geändert hat)          – mit Sitzung
      PUT  /sync         Daten speichern ({ base, data }: base = Version, auf der die App aufbaut; passt sie nicht → 409 mit dem Stand)
      GET  /check        Einladungscode prüfen (Kopfzeile X-Invite)
-     POST /match        Screenshot von einem Spiel lesen (Gemini) → erkannte Spiele als JSON                              – nur mit Einladungscode
-     POST /bet          Wettschein lesen (nur noch für ältere App-Stände)                                                  – nur mit Einladungscode
-     GET  /kick         Tipp-Suche anstoßen, falls die veröffentlichte älter als 50 Minuten ist                            – nur mit Einladungscode
-     Zeitgeber          Cron Trigger (alle 30 Minuten): wie /kick. GitHub verschluckt geplante Läufe (06.11.2026: 9 Stunden keine Suche).
+     POST /slip         Screenshot aus der Wett-App lesen (Gemini) → alle Wettscheine darauf als JSON (Einsatz, Quote, Tipps,
+                        Status, Cashout, Datum)                                                                             – nur mit Einladungscode
+     POST /bet          einen Wettschein lesen (für alte App-Stände)                                                       – nur mit Einladungscode
+     GET  /kick         Spielplan-Lauf anstoßen, falls der veröffentlichte älter als 3 Stunden ist                         – nur mit Einladungscode
+     Zeitgeber          Cron Trigger (alle 30 Minuten): wie /kick. GitHub verschluckt geplante Läufe manchmal stundenlang.
    Geheimnisse trägt Niklas selbst ein (Cloudflare → Workers & Pages → result-ai → Settings → Variables and Secrets), nie in den Code:
      GEMINI_API_KEY (Google AI Studio) · GITHUB_TOKEN (fine-grained, nur result-ai, Actions: Read and write) · INVITE_CODES (mit Komma getrennt)
    Konten: Cloudflare-Datenbank D1 mit der Bindung „DB“ (Settings → Bindings → D1 database). Die Tabellen legt der Server selbst an.
@@ -18,13 +19,13 @@
      nur SHA-256 mit eigenem Zufalls-Salz – das Passwort selbst kommt hier nie an. Sitzungen: Zufallsschlüssel, gespeichert wird nur sein SHA-256.
      Die Daten eines Kontos (Wetten, Guthaben, Verlauf, Einstellungen) liegen als ein JSON-Dokument mit Versionsnummer; zusammengeführt wird in der App.
    Aktualisieren: diese Datei komplett kopieren → Cloudflare → result-ai → Edit code → alles ersetzen → Deploy. */
-const VERSION = '2026-11-10';
+const VERSION = '2026-11-11';
 const REPO = 'sneaxx141108-gif/result-ai';
-const TIPS = 'https://sneaxx141108-gif.github.io/result-ai/data/tips.json';
+const GAMES = 'https://sneaxx141108-gif.github.io/result-ai/data/games.json';
 const ORIGINS = ['https://sneaxx141108-gif.github.io', 'http://localhost:8098', 'http://127.0.0.1:8098'];
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
-const UA = 'ResultAI-Server/1.0 (+https://github.com/sneaxx141108-gif/result-ai)';
-const STALE_MIN = 50; // so alt darf die veröffentlichte Tipp-Suche werden, dann startet der Zeitgeber eine neue
+const UA = 'Wettbuch-Server/1.0 (+https://github.com/sneaxx141108-gif/result-ai)';
+const STALE_MIN = 180; // so alt darf der veröffentlichte Spielplan werden, dann startet der Zeitgeber einen neuen Lauf
 const MAX_USERS = 300; // Bremse gegen Massen-Anmeldungen (Gratis-Datenbank)
 const MAX_DOC = 900000; // höchstens etwa 0,9 MB Daten je Konto
 const LOCK_FAILS = 8; // so viele falsche Passwörter hintereinander …
@@ -47,13 +48,13 @@ export default {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     const path = new URL(req.url).pathname.replace(/\/+$/, '') || '/';
     try {
-      if (path === '/') return send({ ok: true, app: 'Result AI', version: VERSION, ki: !!env.GEMINI_API_KEY, zeitgeber: !!env.GITHUB_TOKEN, einladung: codes(env).length > 0, konten: !!env.DB });
+      if (path === '/') return send({ ok: true, app: 'Wettbuch', version: VERSION, ki: !!env.GEMINI_API_KEY, zeitgeber: !!env.GITHUB_TOKEN, einladung: codes(env).length > 0, konten: !!env.DB });
       if (path.startsWith('/auth/') || path === '/sync') return send(await account(req, env, path)); // Konten brauchen keinen Einladungscode
       if (!codes(env).length) return send({ ok: false, error: 'Auf dem Server ist noch kein Einladungscode eingetragen.' }, 401);
       if (!codes(env).includes(inviteOf(req))) return send({ ok: false, error: 'Einladungscode fehlt oder ist falsch.' }, 401);
       if (path === '/check') return send({ ok: true });
-      if (path === '/kick') return send({ ok: true, info: await kickTips(env) });
-      if (path === '/match' && req.method === 'POST') return send(await readMatch(req, env));
+      if (path === '/kick') return send({ ok: true, info: await kickGames(env) });
+      if (path === '/slip' && req.method === 'POST') return send(await readSlips(req, env));
       if (path === '/bet' && req.method === 'POST') return send(await readBet(req, env));
       return send({ ok: false, error: 'Unbekannte Adresse.' }, 404);
     } catch (e) {
@@ -61,7 +62,7 @@ export default {
     }
   },
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(kickTips(env).then((info) => console.log('Zeitgeber:', info)).catch((e) => console.log('Zeitgeber-Fehler:', e && e.message)));
+    ctx.waitUntil(kickGames(env).then((info) => console.log('Zeitgeber:', info)).catch((e) => console.log('Zeitgeber-Fehler:', e && e.message)));
   },
 };
 
@@ -215,21 +216,21 @@ async function account(req, env, path) {
   throw httpErr('Unbekannte Adresse.', 404);
 }
 
-// ------------------------------------------------------------------ Zeitgeber: Tipp-Suche auf GitHub anstoßen
-async function kickTips(env) {
+// ------------------------------------------------------------------ Zeitgeber: Spielplan auf GitHub anstoßen
+async function kickGames(env) {
   if (!env.GITHUB_TOKEN) return 'Kein GITHUB_TOKEN eingetragen – Zeitgeber aus.';
   let age = Infinity;
   try {
-    const r = await fetch(TIPS + '?nc=' + Date.now(), { headers: { 'User-Agent': UA } });
+    const r = await fetch(GAMES + '?nc=' + Date.now(), { headers: { 'User-Agent': UA } });
     age = (Date.now() - Date.parse((await r.json()).updatedAt)) / 60e3;
-  } catch (e) { /* Seite nicht erreichbar oder kaputt → neu suchen */ }
-  if (age < STALE_MIN) return `Tipps sind ${Math.round(age)} Min. alt – nichts zu tun.`;
-  const url = `https://api.github.com/repos/${REPO}/actions/workflows/tips.yml/dispatches`;
+  } catch (e) { /* Seite nicht erreichbar oder kaputt → neu holen */ }
+  if (age < STALE_MIN) return `Spielplan ist ${Math.round(age)} Min. alt – nichts zu tun.`;
+  const url = `https://api.github.com/repos/${REPO}/actions/workflows/games.yml/dispatches`;
   const head = { Authorization: 'Bearer ' + env.GITHUB_TOKEN, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': UA, 'Content-Type': 'application/json' };
   let r = await fetch(url, { method: 'POST', headers: head, body: JSON.stringify({ ref: 'main', inputs: { via: 'zeitgeber' } }) });
-  if (r.status === 422) r = await fetch(url, { method: 'POST', headers: head, body: JSON.stringify({ ref: 'main' }) }); // tips.yml noch ohne Eingabe „via“
-  const why = Number.isFinite(age) ? `Tipps waren ${Math.round(age)} Min. alt` : 'Tipps nicht lesbar';
-  return r.status === 204 ? `Tipp-Suche gestartet (${why}).` : `GitHub hat abgelehnt: ${r.status} ${(await r.text()).slice(0, 160)}`;
+  if (r.status === 422) r = await fetch(url, { method: 'POST', headers: head, body: JSON.stringify({ ref: 'main' }) }); // falls games.yml die Eingabe „via“ (noch) nicht kennt
+  const why = Number.isFinite(age) ? `Spielplan war ${Math.round(age)} Min. alt` : 'Spielplan nicht lesbar';
+  return r.status === 204 ? `Spielplan-Lauf gestartet (${why}).` : `GitHub hat abgelehnt: ${r.status} ${(await r.text()).slice(0, 160)}`;
 }
 
 // ------------------------------------------------------------------ Bilder lesen (Gemini liest nur ab – gerechnet wird in der App)
@@ -261,61 +262,90 @@ const num = (x, lo, hi) => {
 const int = (x, lo, hi) => { const v = num(x, lo, hi); return v == null ? null : Math.round(v); };
 const str = (x, n = 80) => (typeof x === 'string' && x.trim() ? x.trim().slice(0, n) : null);
 
-// Screenshot von einem oder mehreren Spielen (Niklas, 10.11.2026: „kein Wettschein, einfach ein Screenshot von einem Spiel, das bald kommt“)
-const matchPrompt = () => `Du bist der Spiel-Leser der App „Result AI“. Heute ist ${today()}, es ist ${nowBerlin()} Uhr deutscher Zeit.
-Auf dem Bild ist ein Screenshot mit einem oder mehreren Fußballspielen – zum Beispiel aus einer Sport-App (kicker, FotMob, OneFootball,
-Sky, DAZN, Sportschau), einer Wett-App, Google, Instagram oder einem Fernsehbild.
+// Wettscheine (Niklas, 11.11.2026: „reine Tracking-App für Tipico mit Scan-Funktion“): ein Schein oder die ganze Liste „Meine Wetten“
+const slipPrompt = () => `Du bist der Wettschein-Leser der App „Wettbuch“. Heute ist ${today()}, es ist ${nowBerlin()} Uhr deutscher Zeit.
+Auf dem Bild ist ein Screenshot aus einer Wett-App, meistens Tipico: ein einzelner Wettschein (z. B. direkt nach dem Platzieren oder in
+„Meine Wetten“ aufgeklappt) oder eine Liste mit mehreren Wetten („Meine Wetten“, „Offen“, „Abgerechnet“).
 Lies NUR ab, was wirklich zu sehen ist. Nichts erfinden, nichts schätzen – was nicht zu sehen ist, ist null.
-- isFootball: true, wenn mindestens ein Fußballspiel mit zwei Mannschaften zu sehen ist, sonst false (dann games leer lassen).
-- games: jedes Spiel, höchstens 12, von oben nach unten. home = Heim-Mannschaft (steht meist zuerst bzw. links), away = Gast-Mannschaft,
-  so geschrieben wie zu sehen (Abkürzungen wie „BVB“ oder „FCB“ so lassen). competition = Wettbewerb, falls zu sehen
-  (z. B. „Bundesliga“, „Champions League“, „Nations League“).
-  kickoff = Anstoß als JJJJ-MM-TT HH:MM in deutscher Zeit; steht nur „heute“, „morgen“ oder ein Wochentag da, rechne das Datum von heute aus;
-  ohne Uhrzeit nur JJJJ-MM-TT; nichts zu sehen = null.
-  status = „upcoming“ (noch nicht angepfiffen), „live“ (läuft gerade, z. B. Minute oder „LIVE“ zu sehen), „halftime“ (Halbzeitpause),
-  „finished“ (beendet, z. B. „Ende“, „FT“, „Abpfiff“), sonst „unknown“.
-  minute = laufende Spielminute als ganze Zahl, nur wenn live („45+2“ → 45, „90+3“ → 90). half = 1 oder 2, wenn erkennbar, sonst null.
-  scoreHome/scoreAway = Spielstand, nur bei live, Halbzeit oder beendet. redHome/redAway = rote Karten, nur wenn zu sehen.
-  oddsHome/oddsDraw/oddsAway = Quoten auf Sieg Heim / Unentschieden / Sieg Gast (1X2), nur wenn zu sehen, als Zahl mit Punkt (1,85 → 1.85).
-  line, oddsOver, oddsUnder = Über/Unter-Tore-Wette, nur wenn zu sehen (z. B. 2.5, 1.90, 1.95).
-- bookmaker = Anbieter der Quoten, falls erkennbar. note = kurzer Hinweis auf Deutsch, falls etwas unklar oder abgeschnitten ist, sonst null.`;
-const GST = ['upcoming', 'live', 'halftime', 'finished', 'unknown'];
-const NUMN = () => S('NUMBER', { nullable: true });
-const INTN = () => S('INTEGER', { nullable: true });
-const MATCH_SCHEMA = S('OBJECT', {
+- isBetSlip: true, wenn mindestens eine Wette zu sehen ist, sonst false (dann slips leer lassen).
+- slips: jede Wette auf dem Bild, von oben nach unten, höchstens 10. Eine Kombi ist EINE Wette mit mehreren Tipps.
+  Ist eine Wette nur zugeklappt zu sehen, lies, was da ist (z. B. Einsatz, Quote, Status und den ersten Tipp).
+- Je Wette:
+  type: „single“ (Einzelwette), „combi“ (Kombi), „system“ (Systemwette, z. B. „System 2 aus 3“), sonst „unknown“. system = z. B. „2/3“, sonst null.
+  stake = Gesamteinsatz, totalOdds = Gesamtquote, potentialWin = möglicher Gewinn bzw. Auszahlung (bei Tipico „Möglicher Gewinn“, nach der
+  Abrechnung „Gewinn“ oder „Auszahlung“) – alles als Zahl mit Punkt (1,85 → 1.85; „10,00 €“ → 10).
+  status: „open“ (offen/läuft), „won“ (gewonnen), „lost“ (verloren), „void“ (storniert/erstattet), „cashout“ (per Cashout ausgezahlt), sonst „unknown“.
+  cashout = per Cashout ausgezahlter Betrag, sonst null. freebet = true bei Gratiswette/Freebet, sonst false.
+  placedAt = wann die Wette platziert wurde, als JJJJ-MM-TT HH:MM, falls zu sehen, sonst null. betId = Wett-ID bzw. Schein-Nummer, falls zu sehen.
+  legs: jeder einzelne Tipp. home/away = die Teams so geschrieben wie zu sehen; event = Bezeichnung, wenn keine zwei Teams erkennbar sind
+  (z. B. „Bundesliga – Meister“); market = Wettart, so wie zu sehen (z. B. „Endergebnis“, „Doppelte Chance“, „Über/Unter“, „Beide Teams treffen“,
+  „Halbzeit“, „Handicap“, „Genaues Ergebnis“); pick = worauf gewettet wurde, so wie zu sehen (z. B. „1“, „X“, „2“, „1X“, „Bayern München“,
+  „Über 2,5“, „Ja“, „2:1“); odds = Quote dieses Tipps; competition = Wettbewerb; kickoff = Anstoß als JJJJ-MM-TT HH:MM in deutscher Zeit
+  (fehlt das Jahr: das passende von heute aus; „heute“, „morgen“ oder ein Wochentag: Datum von heute aus; ohne Uhrzeit nur JJJJ-MM-TT);
+  scoreHome/scoreAway = Spielstand bzw. Endstand, falls zu sehen; result = „won“/„lost“/„void“, wenn dieser Tipp schon sichtbar entschieden
+  ist (Haken, Kreuz, grün/rot markiert), „open“, wenn er noch offen ist, sonst „unknown“.
+- bookmaker = Anbieter, falls erkennbar. note = kurzer Hinweis auf Deutsch, falls etwas unklar oder abgeschnitten ist, sonst null.`;
+const SLIP_ST = ['open', 'won', 'lost', 'void', 'cashout', 'unknown'];
+const LEG_ST = ['open', 'won', 'lost', 'void', 'unknown'];
+const STRN = () => S('STRING', { nullable: true });
+const SLIP_SCHEMA = S('OBJECT', {
   properties: {
-    isFootball: S('BOOLEAN'),
-    games: S('ARRAY', { items: S('OBJECT', {
-      properties: {
-        home: S('STRING'), away: S('STRING'), competition: S('STRING', { nullable: true }), kickoff: S('STRING', { nullable: true }),
-        status: S('STRING', { format: 'enum', enum: GST }), minute: INTN(), half: INTN(), scoreHome: INTN(), scoreAway: INTN(), redHome: INTN(), redAway: INTN(),
-        oddsHome: NUMN(), oddsDraw: NUMN(), oddsAway: NUMN(), line: NUMN(), oddsOver: NUMN(), oddsUnder: NUMN(),
-      },
-      required: ['home', 'away', 'status'],
-    }) }),
+    isBetSlip: S('BOOLEAN'),
     bookmaker: S('STRING', { nullable: true }),
     note: S('STRING', { nullable: true }),
+    slips: S('ARRAY', { items: S('OBJECT', {
+      properties: {
+        type: S('STRING', { format: 'enum', enum: ['single', 'combi', 'system', 'unknown'] }), system: STRN(),
+        status: S('STRING', { format: 'enum', enum: SLIP_ST }), stake: S('NUMBER', { nullable: true }), totalOdds: S('NUMBER', { nullable: true }),
+        potentialWin: S('NUMBER', { nullable: true }), cashout: S('NUMBER', { nullable: true }), freebet: S('BOOLEAN', { nullable: true }),
+        placedAt: STRN(), betId: STRN(),
+        legs: S('ARRAY', { items: S('OBJECT', {
+          properties: {
+            home: S('STRING', { nullable: true }), away: S('STRING', { nullable: true }), event: S('STRING', { nullable: true }),
+            competition: S('STRING', { nullable: true }), kickoff: S('STRING', { nullable: true }), market: S('STRING', { nullable: true }),
+            pick: S('STRING'), odds: S('NUMBER', { nullable: true }), scoreHome: S('INTEGER', { nullable: true }), scoreAway: S('INTEGER', { nullable: true }),
+            result: S('STRING', { format: 'enum', enum: LEG_ST }),
+          },
+          required: ['pick'],
+        }) }),
+      },
+      required: ['status', 'legs'],
+    }) }),
   },
-  required: ['isFootball', 'games'],
+  required: ['isBetSlip', 'slips'],
 });
-function cleanMatch(d) {
-  d = d && typeof d === 'object' ? d : {};
-  const games = (Array.isArray(d.games) ? d.games : []).slice(0, 12).map((g) => (g && typeof g === 'object' ? {
-    home: str(g.home), away: str(g.away), competition: str(g.competition), kickoff: str(g.kickoff, 25), status: GST.includes(g.status) ? g.status : 'unknown',
-    minute: int(g.minute, 0, 130), half: [1, 2].includes(g.half) ? g.half : null, scoreHome: int(g.scoreHome, 0, 30), scoreAway: int(g.scoreAway, 0, 30),
-    redHome: int(g.redHome, 0, 5), redAway: int(g.redAway, 0, 5), oddsHome: num(g.oddsHome, 1.01, 1000), oddsDraw: num(g.oddsDraw, 1.01, 1000),
-    oddsAway: num(g.oddsAway, 1.01, 1000), line: num(g.line, 0.5, 9.5), oddsOver: num(g.oddsOver, 1.01, 1000), oddsUnder: num(g.oddsUnder, 1.01, 1000),
-  } : null)).filter((g) => g && g.home && g.away);
-  return { isFootball: games.length > 0, games, bookmaker: str(d.bookmaker, 40), note: str(d.note, 200) };
+function cleanLeg(l) {
+  l = l && typeof l === 'object' ? l : {};
+  return {
+    home: str(l.home), away: str(l.away), event: str(l.event, 120), competition: str(l.competition), kickoff: str(l.kickoff, 25),
+    market: str(l.market), pick: str(l.pick, 120) || '?', odds: num(l.odds, 1.01, 1000), scoreHome: int(l.scoreHome, 0, 30),
+    scoreAway: int(l.scoreAway, 0, 30), result: LEG_ST.includes(l.result) ? l.result : 'unknown',
+  };
 }
-async function readMatch(req, env) {
+function cleanSlip(d) {
+  d = d && typeof d === 'object' ? d : {};
+  const legs = (Array.isArray(d.legs) ? d.legs : []).slice(0, 30).map(cleanLeg);
+  const prod = legs.length && legs.every((l) => l.odds) ? Math.round(legs.reduce((q, l) => q * l.odds, 1) * 100) / 100 : null;
+  const type = ['single', 'combi', 'system'].includes(d.type) ? d.type : legs.length > 1 ? 'combi' : legs.length ? 'single' : 'unknown';
+  return {
+    type, system: type === 'system' ? str(d.system, 12) : null, status: SLIP_ST.includes(d.status) ? d.status : 'unknown',
+    stake: num(d.stake, 0.01, 1e6), totalOdds: num(d.totalOdds, 1.01, 1e6) || (type === 'system' ? null : prod), potentialWin: num(d.potentialWin, 0.01, 1e9),
+    cashout: num(d.cashout, 0, 1e9), freebet: d.freebet === true, placedAt: str(d.placedAt, 25), betId: str(d.betId, 40), legs,
+  };
+}
+function cleanSlips(d) {
+  d = d && typeof d === 'object' ? d : {};
+  const slips = (Array.isArray(d.slips) ? d.slips : []).slice(0, 10).map(cleanSlip).filter((x) => x.legs.length || x.stake);
+  return { isBetSlip: d.isBetSlip !== false && slips.length > 0, bookmaker: str(d.bookmaker, 40), note: str(d.note, 200), slips };
+}
+async function readSlips(req, env) {
   const image = await imageOf(req, env);
-  const { data, model } = await gemini(env, [{ text: matchPrompt() }, image], MATCH_SCHEMA);
-  return { ok: true, model, scan: cleanMatch(data) };
+  const { data, model } = await gemini(env, [{ text: slipPrompt() }, image], SLIP_SCHEMA);
+  return { ok: true, model, scan: cleanSlips(data) };
 }
 
-// Wettschein (ältere App-Stände bis ra-shell-v22)
-const betPrompt = () => `Du bist der Wettschein-Leser der App „Result AI“. Heute ist ${today()}.
+// ein einzelner Wettschein (ältere App-Stände bis ra-shell-v24)
+const betPrompt = () => `Du bist der Wettschein-Leser der App „Wettbuch“. Heute ist ${today()}.
 Auf dem Bild ist ein Wettschein bzw. eine Wette aus einer Wett-App oder Website (z. B. Tipico, bet365, Bwin, Interwetten, Betano, Merkur Bets).
 Lies NUR ab, was wirklich zu sehen ist. Nichts erfinden, nichts schätzen – was nicht zu sehen ist, ist null.
 - isBetSlip: true, wenn eine Wette zu sehen ist, sonst false (dann legs leer lassen).

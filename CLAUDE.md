@@ -1,641 +1,160 @@
-# Result AI – Projektwissen für Claude
+# Wettbuch – Projektwissen für Claude
 
-Diese Datei liest Claude in jeder neuen Sitzung automatisch. **Wer hier weitermacht: komplett lesen, dann bei
-„HIER WEITERMACHEN“ (unter „Arbeitsweise“) anfangen.** Ohne Installation (z. B. fremder Laptop): im Browser **claude.ai/code** → GitHub verbinden → Repository
-`result-ai` wählen. Alternativ Claude-App + Git installieren und das Repository klonen.
+Diese Datei liest Claude in jeder neuen Sitzung automatisch. **Wer hier weitermacht: komplett lesen, dann bei „HIER WEITERMACHEN“
+anfangen.** Ohne Installation (z. B. fremder Laptop): im Browser **claude.ai/code** → GitHub verbinden → Repository `result-ai`
+wählen. Alternativ Claude-App + Git installieren und das Repository klonen (Ordner direkt im Benutzerordner, nicht in „Dokumente“ –
+der geht per OneDrive in die Cloud; in sehr langen Pfaden scheitert `git clone` mit „'$GIT_DIR' too big“).
 
 ## Was das ist
 
-- **Result AI:** Man wirft einen **Screenshot eines Fußballspiels** in die App. Sie rechnet aus, **zu wie viel Prozent wer
-  gewinnt** und **welche Ergebnisse mit wie viel Prozent am wahrscheinlichsten sind** – und noch viel mehr (siehe Extras).
-- Sehr hochwertig, mit Animationen und „Wow-Effekt“, gebaut für Niklas' **iPhone 12** (Web-App/PWA auf GitHub Pages).
-  Adresse: **https://sneaxx141108-gif.github.io/result-ai/** (Pages-Quelle „GitHub Actions“, seit 03.11.2026).
-  Niklas teilt sie **mit Freunden per Link**.
-- Besitzer: **Niklas** (GitHub `sneaxx141108-gif`) – Fan, kein Entwickler. Antworten auf **Deutsch**, locker, verständlich,
-  ohne Fachchinesisch. Fragen stellen, wenn etwas unklar ist (Niklas: „frag mich wenn nötig zu allem noch mehr“).
-- Vorgänger-Projekt: die BVB-App (Repository `bvb09`, wird abgeschaltet und privat archiviert). Daraus stammen der
-  Prognose-Rechner und die iPhone-Lehren – Kopien in `vorlage-bvb/` (nur Vorlage, nicht aktiver Code).
+- **Wettbuch** (bis 11.11.2026 „Result AI“): eine reine **Tracking-App für Sportwetten**. Man scannt einen Screenshot aus der
+  Wett-App (Niklas wettet bei Tipico) oder trägt die Wette selbst ein. Wettbuch rechnet die Wette nach dem Abpfiff selbst ab und
+  führt Kasse, Statistik und Limits. **Keine Prognosen, keine Tipps, keine Prozente.**
+- Web-App (PWA) für Niklas' **iPhone 12** und iPad, auf GitHub Pages: **https://sneaxx141108-gif.github.io/result-ai/**
+  (Pages-Quelle „GitHub Actions“). Repository und Adresse heißen weiter `result-ai`, nur der angezeigte Name ist neu.
+  Niklas teilt die App mit Freunden per Link.
+- Besitzer: **Niklas** (GitHub `sneaxx141108-gif`) – Fan, kein Entwickler. Antworten auf **Deutsch**, locker, verständlich, ohne
+  Fachchinesisch. Fragen, wenn etwas unklar ist.
 
-## Entscheidungen von Niklas (03.11.2026) – nicht ändern ohne Rückfrage
+## Entscheidungen von Niklas – nicht ändern ohne Rückfrage
 
-- **Screenshots – alle vier Arten:** Live-Spielstand (z. B. FotMob/Sofascore während des Spiels), vor dem Spiel (Paarung),
-  ganzer Spieltag (mehrere Spiele auf einmal), Quoten-Screenshot (Markt-Erwartung neben eigener Rechnung zeigen).
-- **Screenshot rein:** aus der **Fotos-App** und mit der **Kamera** (z. B. Fernseher). („Teilen → Result AI“ erlaubt Apple bei
-  Web-Apps nicht.)
-- **Live-Spiele:** nach dem Scan **automatisch live mitrechnen** (Tor/rote Karte → Prognose aktualisiert sich von selbst,
-  wenn das Spiel in den Live-Daten auftaucht).
-- **Sprache:** **nur Deutsch.**
-- **Ligen:** **alle Fußballspiele.** „Die KI soll sehr, sehr genau alles Mögliche aus dem Internet suchen, um es so sicher und
-  genau wie möglich zu berechnen.“
-- **Nutzer:** Niklas + Freunde per Link → **kostenloser Cloudflare-Server** (Worker) versteckt die KI-Schlüssel.
-  Das Cloudflare-Konto legt **Niklas selbst** an (Claude legt keine Konten an).
-- **Zugang:** nur mit **Einladungscode** (schützt das Gratis-Kontingent vor Fremden).
-- **Extras (alle gewählt):** Mehr Prognosen (Über/Unter Tore, beide Teams treffen, Halbzeitstand, Doppelchance),
-  Nächstes Tor (wer und wann), Erklärung & Formcheck, Verlauf & Treffsicherheit.
-- **Treffsicherheit („wie oft lag die App richtig“) ist Niklas sehr wichtig.** Gezählt werden **nur die eigenen Scans**
-  jedes Nutzers (auf seinem Handy). Anzeige: Favorit gewonnen in X von Y Spielen, exaktes Ergebnis unter den Top 3 in X %,
-  und vor allem die **Ehrlichkeit** (Kalibrierung): Wenn die App 70 % sagt, passiert es auch in etwa 70 % der Fälle?
-  **Seit 06.11.2026 (Niklas):** Verlauf + **Erfolgsquote** zählen die Wetten, die man aus den Top-Tipps speichert – ausgewertet
-  nur automatisch nach dem Abpfiff (siehe „Wetten, Empfohlen, Cloudflare-Server“).
-- **Design:** „schon clean, aber auch nicht langweilig – es soll schon krass mit Wow-Effekt sein.“
-  Erster Entwurf (Neon, Farbverläufe, drei Looks) gefiel Niklas **gar nicht** („sieht billig aus, wie Vorlage, zu bunt“).
-  **Jetzt gilt (03.11.2026):** **weißer Hintergrund** als Standard, **Dunkelmodus** in den Einstellungen; Vorbilder
-  **Apple Sports, FotMob/Sofascore, Revolut**; schwarze SF-Schrift, Farbe **nur von den Teams** (Spiel-Karte in
-  Vereinsfarben), riesige Zahlen, gruppierte Listen wie iOS, schwarzer Haupt-Knopf. Kein Neon, keine Deko-Verläufe.
-- **PFLICHT – gleiches Spiel, gleiches Ergebnis:** Scannt man am selben Tag zweimal dasselbe Spiel, muss **exakt dasselbe**
-  herauskommen. (Ausnahme, gewollt: ein laufendes Spiel zu einer späteren Minute bzw. mit anderem Spielstand.)
-- **KI-Schlüssel:** die **alten Schlüssel der BVB-App weiterverwenden** (Gemini, Groq) – „und so, dass es noch besser ist“
-  (Idee: weitere kostenlose Ersatz-KIs mit Bild-Verständnis, z. B. OpenRouter, Mistral – Konten macht Niklas selbst).
-  Schlüssel trägt **Niklas selbst** als Secret beim Cloudflare-Server ein. **Nie in den Chat, nie in den Code.**
-  Hinweis: GitHub-Secrets lassen sich nicht auslesen – Gemini-Schlüssel steht in Google AI Studio, ein Groq-Schlüssel wird
-  nur beim Erstellen angezeigt (ggf. neu erstellen).
-- **Unbekanntes** wird ehrlich als „k. A.“ gezeigt, nie erfunden.
+**Umbau am 11.11.2026** („reine Tracking-App mit Scan-Funktion … alle Spiele raus … keine Prozente mehr … KI-Zentrale umbauen …
+neuer Name, nichts mit Tipico“):
+- Alles mit Prognosen ist raus: Top-Tipps, Spiel-Scan mit Prozenten, Team-Stärken, Spiel auswählen, Bilanz/Erfolgsquote der Tipps,
+  Tipico-Quoten-Abruf (The Odds API). Diese Teile **nicht wieder einbauen**.
+- **Keine Prozente**, nirgends (auch nicht versteckt in Daten-Dateien – `tests/games.test.js` prüft das). Nur Euro und Anzahlen:
+  „7 von 10 gewonnen“, „pro 10 € Einsatz +5,77 €“.
+- Name **Wettbuch** – kein Anbieter-Name im App-Namen.
+- Bestehende Daten bleiben: Wetten, Kasse und Konto-Abgleich laufen weiter unter dem Speicher-Präfix `ra_`.
 
-## Wie Result AI rechnet (Grundsatz: Mathe rechnet, die KI liest und recherchiert nur)
+**Gilt weiter (seit 03.–10.11.2026):**
+- Nur Deutsch. Design „Clean“: weißer bzw. ganz hellgrauer Hintergrund, weiße Karten, Dunkelmodus in den Einstellungen
+  (Hell · Dunkel · Automatisch), Vorbilder Apple und Revolut. **Plus grün mit +, Minus rot mit −** bei allem, was Geld ist.
+- **Unbekanntes ehrlich als „k. A.“**, nie erfinden. **Nie Beispieldaten ausliefern.** Ein Tipp, den die App nicht sicher
+  versteht, wird nicht automatisch abgerechnet („lieber gar nicht als falsch“).
+- Ehrliche Hinweise zum Glücksspiel (`RG_TEXT`: keine Garantie, ab 18, check-dein-spiel.de, BZgA 0800 1 37 27 00).
+  **Keine Links zu Buchmachern.**
+- Server-Funktionen (Scan) nur mit **Einladungscode** (schützt das Gratis-Kontingent). Konto nur mit **Benutzername + Passwort**.
+- **Tipico selbst auslesen ist abgelehnt** (Bot-Schutz, nicht umgehen). Ehrliche User-Agents, keine Bot-Schutz-Umgehung irgendwo.
 
-Eine KI, die Prozente „schätzt“, gibt bei zweimal Fragen zwei verschiedene Antworten – deshalb:
+## Was die App kann (`web/app.js`, Stand `ra-shell-v24`)
 
-1. **KI liest den Screenshot** (Gemini Vision, Temperatur 0, festes JSON-Format): Art des Screenshots, Teams, Wettbewerb,
-   Datum/Anstoß, Spielstand, Minute, rote Karten, Statistiken (Schüsse, xG, Ballbesitz), Quoten falls sichtbar.
-2. **Team-Stärken aus dem täglichen Rechner** (Vorlage `vorlage-bvb/forecast.py`: Poisson + Dixon-Coles, Ergebnisse, xG,
-   Buchmacher-Quoten; Daten-Abruf in `vorlage-bvb/update.py`: `football_data`, `fd_map_teams`, `espn_standings`, …).
-   Ausbau von 12 auf **30+ Ligen weltweit** (football-data.co.uk Haupt- und „new leagues“-Dateien: 2./3. Ligen, Brasilien,
-   Argentinien, USA, Japan, …) plus ESPN und Europapokal. **Einmal täglich frühmorgens** neu → `ratings.json`, gilt den
-   ganzen Tag (→ gleiche Zahlen am selben Tag). Gewichte per Backtest (`vorlage-bvb/backtest.py`, Log-Loss) prüfen.
-3. **Unbekannte Teams/Spiele** (Länderspiele, kleine Ligen, …): Gemini **mit Google-Suche** recherchiert aktuelle
-   Buchmacher-Quoten (genauester öffentlicher Hinweis, Ausfälle sind eingepreist), Form, Tabelle, Ausfälle → daraus rechnet
-   wieder die Mathe.
-4. **Ergebnis pro Spiel und Tag auf dem Cloudflare-Server speichern** (Cloudflare KV): scannt ein Freund dasselbe Spiel am
-   selben Tag, bekommt er exakt dieselben Zahlen; spart Gratis-Kontingent. Zusätzlich Cache nach Bild-Fingerabdruck.
-5. **Die eigentliche Rechnung läuft in der App** (JavaScript, ohne KI, **exakt statt Zufalls-Simulation** → von Natur aus
-   immer gleich): Tor-Erwartung beider Teams; live mit Restzeit, Spielstand, roten Karten → Ergebnis-Matrix →
-   Sieg/Remis/Niederlage, wahrscheinlichste Ergebnisse, Über/Unter, beide treffen, Halbzeit, Doppelchance,
-   nächstes Tor (wer, wann). Falls irgendwo doch simuliert wird: **fester Zufall** (siehe `SCENARIOS` in der Vorlage).
-6. **Erklärung & Formcheck:** Gemini schreibt kurz und einfach, *warum* (aus den recherchierten Fakten). Die Zahlen kommen
-   immer aus der Mathe.
-7. **Treffsicherheit:** Scans im Handy speichern; nach Spielende echtes Ergebnis holen (ESPN-Spielplan, sonst Recherche
-   über den Server) → Statistik + Kalibrierungs-Diagramm.
+Leiste unten (`TABS`): **Start · Wetten · Scannen · Statistik · Kasse**; dazu die **KI-Zentrale** (`#/ki`, Knopf „KI“ oben) und
+Einstellungen (Zahnrad). Am iPad quer ist die Leiste links.
+- **Start:** Begrüßung, Limit-Hinweis (falls überschritten), Kontostand, Scan-Karte, offene Wetten, Diese Woche / Dieser Monat /
+  Gesamt, zuletzt abgerechnet.
+- **Wetten:** Offen · Erledigt (Filter) · Kalender (Plus/Minus je Tag, Tag antippen). Je Wette: Gewonnen, Verloren, Cashout
+  (Betrag eintragen), Storniert, Bearbeiten, Löschen (zweimal tippen).
+- **Eintragen** (Blatt): Tipps aus dem Spielplan wählen (Teamsuche, Schnellwahl 1 · X · 2 · 1X · X2 · 12 · Über/Unter ·
+  Beide treffen …, „Andere Wette“ als Freitext) oder Spiel selbst eintippen; Kombi mit mehreren Tipps; Quote, Einsatz
+  (2–50 € Schnellwahl), Auszahlung (Einsatz × Quote oder selbst), Gratiswette, Stand, Anbieter, Datum, „Schon im Kontostand“.
+- **Scannen:** Screenshot aus der Wett-App (Fotos, Kamera, Einfügen; am iPad hineinziehen). Ein Bild kann eine ganze Liste
+  „Meine Wetten“ sein (bis zu 10 Wetten). Der Server liest ab (`POST /slip`, Gemini), die App ordnet die Teams dem Spielplan zu
+  (`resolveTeam`, absichtlich streng) und zeigt das Ergebnis: alle speichern oder einzeln ergänzen; schon gespeicherte werden erkannt.
+  Bild vorher verkleinert (Breite ≤ 1280, Höhe ≤ 3600, JPEG). Die letzten 10 Scans in `ra_scans`.
+- **Abrechnung** (`checkBets`/`settleAuto`): Endstand direkt von ESPN (`summary?event=…`, CORS erlaubt) – beim Start, beim
+  Zurückkommen und jede Minute, solange ein Spiel läuft. **Gewertet nach 90 Minuten** wie beim Buchmacher (Verlängerung und
+  Elfmeterschießen zählen nicht). Abgesagt/verschoben und 48 Std. später nicht gespielt → Tipp zählt nicht (Quote 1,0).
+  Verliert ein Tipp einer Kombi, ist die ganze Wette verloren; sonst rechnet die App nur ab, wenn sie alle Tipps versteht.
+- **Statistik:** Gewinn/Verlust-Kurve (7 T · 30 T · 3 M · 1 J · Alles), Kacheln (gewonnen x von y, Ø Quote, pro 10 € Einsatz,
+  Serie, größter Rückgang …), Form, Gewinn je Tag/Woche/Monat, „Wo du gewinnst“ (nach Art, Wette, Quote, Einsatz, Liga, Team,
+  Wochentag), Höhepunkte, Knapp daneben (Kombis mit nur einem falschen Tipp), Rekorde, „Das fällt auf“.
+- **Kasse:** Kontostand mit Kurve, Einzahlen/Auszahlen/Korrigieren, Geldfluss, Kontoauszug, **Limits** (Einsatz pro Woche,
+  Verlust pro Monat, Einzahlung pro Monat – bei Überschreitung ein ruhiger Hinweis mit Hilfe-Adressen).
+- **KI-Zentrale:** Status der Aufgaben (Wettschein-Leser, Spielplan, Abrechnung, Zeitgeber, Konten), Kacheln heute, 7-Tage-
+  Diagramm, Protokoll (`ra_kilog`) zum Aufklappen. Fehlt das Server-Update, steht dort „Server-Update fehlt“.
 
-## Aufbau (geplant)
+### Daten auf dem Gerät (Präfix `ra_`, Abgleich über das Konto in `web/sync.js`)
+- `ra_bets`: Wetten `{id, at, src: scan|manual|tip, legs, q, stake, win, status: open|won|lost|void|cash, cash, done, bookie,
+  free, system, old}`; Tipp (`leg`): `{g (ESPN-Spiel), slug (Liga), m (Wett-Code), home, away, event, pick, comp, t, q, res}`.
+  Geld intern in ganzen Cent rechnen.
+- Wett-Codes (`pickCode` liest Markt + Tipp vom Wettschein): `H/D/A`, `HD/DA/HA`, `O25/U25` (Linie × 10), `HO15` (Heim über 1,5),
+  `BY/BN` (beide treffen), `HS/AS` (Team trifft), `HN/AN` (Unentschieden keine Wette), `H1/D1/A1` (Halbzeit), `CSx:y`.
+  Unbekannte Märkte (Torschützen, Ecken, Karten, Handicap, Kombi-Märkte …) blockt `NO_CODE` → von Hand abrechnen.
+  Tests: `node tests/pick.test.mjs`.
+- `ra_wallet` (Kontostand, Ein-/Auszahlungen), `ra_limits`, `ra_kilog`, `ra_scans`, `ra_name`, `ra_theme`, `ra_device`, `ra_mlook`,
+  `ra_invite`; nur auf dem Gerät: `ra_auth`, `ra_sync`, `ra_api` (nur auf localhost: andere Server-Adresse zum Testen).
+
+## Aufbau
 
 | Teil | Wo | Kosten |
 |---|---|---|
-| App (eine Seite, PWA fürs iPhone) | dieses Repository, GitHub Pages (Quelle „GitHub Actions“) | kostenlos |
-| Täglicher Stärken-Rechner (`ratings.json`) | GitHub Actions in diesem Repository | kostenlos |
-| Scan, Recherche, Cache, Einladungscode | Cloudflare Worker + KV, KI-Schlüssel als Secret | kostenlos (Gratis-Kontingente) |
+| App (eine Seite, PWA) | `web/` → GitHub Pages über `.github/workflows/pages.yml` (vorher alle Tests) | kostenlos |
+| Spielplan (ohne KI, ohne Quoten) | `scripts/games.py` → `web/data/games.json`, `.github/workflows/games.yml` alle 2 Std. | kostenlos |
+| Scan, Konten, Zeitgeber | Cloudflare Worker `worker/worker.js` + D1-Datenbank, KI-Schlüssel als Secret | kostenlos (Gratis-Tarif) |
+
+- `web/app.js` (alles in einer Datei), `web/app.css`, `web/index.html` (Ladebildschirm `#splash` direkt drin), `web/sync.js`,
+  `web/sw.js` (**bei jeder App-Änderung `SHELL = 'ra-shell-vNN'` hochzählen**), `web/manifest.webmanifest`, `web/icons/`.
+- `scripts/games.py`: alle Fußballspiele von 5 Tagen zurück bis 16 Tage voraus aus rund 70 Wettbewerben (ESPN), mit Wappen,
+  Vereinsfarben und Endstand nach 90 Min. Die Datei wird nur veröffentlicht; im Repository liegt ein Startstand, `pages.yml` holt
+  vor dem Veröffentlichen den neueren von der Seite. Protokoll der Läufe in der Datei selbst (`runs`, für die KI-Zentrale).
+- `scripts/icons.py`: zeichnet App-Symbol und Startbilder (Wettschein mit grünem Haken, gleiche Form wie `logo()` in `app.js`).
+  Nur bei Änderungen am Symbol, vom PC aus, braucht Pillow.
+- Tests: `node tests/pick.test.mjs` (Wett-Codes), `node tests/sync.test.js` (Abgleich), `node tests/worker.test.mjs`
+  (Server mit SQLite statt D1, Node ≥ 22.13), `node tests/games.test.js` (Spielplan). Alle laufen in `pages.yml`.
+
+### Cloudflare-Server (`worker/worker.js`)
+- Adresse **https://result-ai.sneaxx141108.workers.dev** (Konto von Niklas, Worker `result-ai`). `GET /` zeigt `ki`, `zeitgeber`,
+  `einladung`, `konten` und `version` (nur Ja/Nein, nie Werte).
+- Routen: `POST /slip` (Screenshot → alle Wettscheine darauf, Gemini, Temperatur 0, festes JSON-Schema, nur ablesen),
+  `POST /bet` (alter Einzel-Scan für alte App-Stände), `GET /check` (Einladungscode), `GET /kick` + **Cron alle 30 Min.**
+  (startet `games.yml`, wenn der veröffentlichte Spielplan älter als 3 Std. ist), `/auth/signup|login|logout|delete`, `GET/PUT /sync`.
+  Die App fragt erst `/slip`; kennt der Server das nicht (404), nimmt sie `/bet`.
+- Geheimnisse trägt **Niklas selbst** ein (Settings → Variables and secrets), nie in den Chat oder Code: `GEMINI_API_KEY`,
+  `GITHUB_TOKEN` (fine-grained, nur `result-ai`, Actions: Read and write – **läuft ab**, dann neu erzeugen und ersetzen),
+  `INVITE_CODES`. Konten brauchen die D1-Bindung **`DB`** (Storage & Databases → D1 → Create, im Worker unter Bindings verbinden).
+- **Code aktualisieren:** Claude kann im Cloudflare-Editor nicht selbst einfügen. Ablauf: Claude legt `worker/worker.js` in die
+  Zwischenablage (`Get-Content -Raw worker/worker.js | Set-Clipboard`), Niklas öffnet Workers & Pages → result-ai → Edit code,
+  klickt in den Code, Strg+A, Strg+V, Deploy. Danach zeigt `GET /` die neue `version`.
+- Das GitHub-Secret `ODDS_API_KEY` (alter Tipico-Quoten-Abruf) braucht Wettbuch nicht mehr.
 
 ## iPhone-12-Regeln (aus der BVB-App gelernt – unbedingt einhalten)
 
-Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshalb von Anfang an:
-- Animationen nur mit `transform` und `opacity`, kurz und gezielt (Wow-Momente, z. B. beim Ergebnis), **keine Dauer-Deko**.
-- Keine View Transitions (gaben schwarzes Ruckeln), kein `:active`-Zusammenziehen (beim Antippen kurz abdunkeln – sonst
-  schwarze Flächen/Lichter-Blitzen), keine `filter: blur`/`drop-shadow` auf großen Flächen, `backdrop-filter` höchstens in
-  einer Leiste, keine festen Extra-Ebenen hinter dem Inhalt (Licht in den `body`-Hintergrund).
-- Langes Tippen ohne iOS-Menü/Textauswahl; Updates beim ersten Öffnen (Service Worker lädt am Cache vorbei, App lädt bei neuer
-  Version einmal neu).
+Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshalb:
+- Animationen nur mit `transform` und `opacity`, kurz und gezielt, **keine Dauer-Deko** (nur Lade-Kreisel).
+- Keine View Transitions, kein `:active`-Zusammenziehen (Antippen = kurz abdunkeln, `.pressed`), keine `filter: blur` /
+  `drop-shadow` auf großen Flächen, `backdrop-filter` nur in Leiste und Kopfzeile, keine festen Extra-Ebenen hinter dem Inhalt.
+- Langes Tippen ohne iOS-Menü/Textauswahl. Updates kommen beim ersten Öffnen an (Service Worker lädt am Cache vorbei, die App lädt
+  bei neuer Version einmal neu).
 - Jede neue Animation **auf Niklas' iPhone prüfen lassen** – der PC-Browser zeigt diese Probleme nicht.
+
+**iPad** (Einstellungen → Gerät, `ra_device`, `data-device` auf `<html>`): ab 700 px mehr Spalten, quer ab 960 px Leiste links
+(`ipadSide()` und CSS müssen zusammenpassen). Karten-Raster ohne Lücken mit `ipadPack()` (Zeilen von 1 px, `gridRowEnd = span
+Höhe + 18`) auf `.ovw`, `.ovg` und der KI-Zentrale – dort **immer `row-gap: 0`** und keine Außenabstände an den Karten.
 
 ## Arbeitsweise
 
 - Commit-Nachrichten enden mit `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-- Keine Passwörter, Logins oder API-Schlüssel im Chat oder im Code. Konten (Cloudflare, KI-Anbieter) legt Niklas selbst an.
+- **Keine Passwörter, Logins oder API-Schlüssel im Chat oder im Code.** Konten (Cloudflare, KI-Anbieter, GitHub-Token) legt Niklas
+  selbst an; Claude tippt nie einen Schlüssel ein.
 - **Das Repository ist öffentlich:** keine Nachnamen, Windows-Benutzernamen, Firmen oder E-Mail-Adressen in Dateien oder
-  Commit-Nachrichten.
-- Auf einem fremden Laptop: nichts speichern lassen, am Ende bei Claude und GitHub abmelden.
-- Reihenfolge beim Hochladen: erst committen, dann `git pull --rebase -X theirs`, dann `git push` (der Bot committet mehrmals
-  pro Stunde Bilanz/Protokoll/Stärken nach `web/data/`).
-- Nach App-Änderungen `SHELL` in `web/sw.js` hochzählen und alle Seiten im Browser bei iPhone-Breite (390 px) durchklicken
-  (keine Fehler in der Konsole, kein seitliches Überlaufen).
+  Commit-Nachrichten. Hilfs-Skripte aus Claudes Arbeitsordner nie ins Repository kopieren.
+- Hochladen: erst committen, dann `git pull --rebase -X theirs`, dann `git push`.
+- Nach App-Änderungen `SHELL` in `web/sw.js` hochzählen und alle Seiten im Browser bei iPhone-Breite (375–390 px) durchklicken,
+  hell und dunkel, dazu iPad hochkant und quer: keine Fehler in der Konsole, kein seitliches Überlaufen.
+  Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098 (Testdaten nur dort, danach löschen).
 - **„Mach noch was“** (Niklas): erst die laufende Aufgabe ganz fertig machen, dann selbst die nächste sinnvolle Sache wählen und
   am Ende kurz berichten.
-- Unter Windows: größere Änderungen per kleinem Python-Skript statt Bash-Heredoc (Backslashes/Backticks gingen dort kaputt).
+- Unter Windows: größere Änderungen per kleinem Python-Skript oder Edit statt Bash-Heredoc (Backslashes in Regeln gingen kaputt).
 
-## HIER WEITERMACHEN – Stand 10.11.2026
+## HIER WEITERMACHEN – Stand 11.11.2026
 
-**Niklas' Liste vom 10.11.2026** (App-Stand `ra-shell-v23`):
-1. **Tipico-Quoten** („gefühlt keine Spiele mit Quote“): In der Länderspielpause lag der nächste Spieltag 10–13 Tage weg, abgerufen wurde aber nur bis
-   6 Tage voraus. Jetzt (`scripts/tipico.py`): ein Spiel ohne Quote löst bis 7 Tage vorher einen Abruf aus (wichtige Ligen und Ligen mit ≥ 3 Top-Tipps:
-   10 Tage). Je Liga lernt die App, wie weit voraus Tipico zuletzt Quoten hatte (`tipico.lead`, Tage), und ruft höchstens 1 Tag früher ab; Ligen ganz
-   ohne Tipico-Angebot (`tipico.dry`) nach zwei leeren Abrufen nur noch einmal pro Woche. Jeder Abruf trägt die Quoten aller Spiele der Liga ein, auch
-   der weiter entfernten. Zuordnung: beste zuerst, jedes Spiel nur einmal, Heim/Gast vertauscht (neutraler Platz) zählt mit getauschten Quoten, mehr
-   Namens-Aliasse. Monats-Simulation in `tests/tipico.test.py`: der Gratis-Plan (500 Credits, Reset am 1.) reicht. Mehr Credits nur über einen
-   bezahlten Plan, den Niklas selbst abschließt – nie mehrere Gratis-Konten.
-2. **Konto** (nur Benutzername + Passwort): Knopf neben der KI-Zentrale (Kopf der Startseite, iPad quer unten in der Leiste links) und
-   Einstellungen → Konto. Server: `worker/worker.js` mit Cloudflare-D1 (Bindung `DB`), Routen `/auth/signup|login|logout|delete` und `GET/PUT /sync`.
-   Das Passwort streckt die App (PBKDF2, 150.000 Runden, Salz `result-ai|<name>`), nur das Ergebnis geht zum Server. Abgleich in `web/sync.js`
-   (`window.RS`): ein JSON-Dokument je Konto mit Version, bei 409 neu zusammenführen (höchstens 4×). Listen (Wetten 500, Verlauf 50, Scans 10) je
-   Eintrag: neueste Änderung gewinnt, gelöschte Wetten bleiben 180 Tage als gelöscht vermerkt, dieselbe Top-Tipp-Wette auf zwei Geräten → einmal.
-   Einzelwerte (Guthaben, Name, Darstellung, Karten-Look, Einladungscode, letzte Teams): neueste gewinnt. Nur auf dem Gerät: Handy-/iPad-Ansicht,
-   `ra_auth`, `ra_sync`, `ra_api`. Jede Änderung stempelt `store.onSet`; angemeldet wird 1,5 s später abgeglichen, sonst beim Öffnen, alle 3 Min. und
-   wenn das Netz zurückkommt. Erste Anmeldung mit Daten auf beiden Seiten → „Daten vom Konto nehmen“ (empfohlen) oder „Beides zusammenführen“.
-   Tests: `node tests/sync.test.js` und `node tests/worker.test.mjs` (Node ≥ 22.13, SQLite statt D1, feste Uhr) – beide laufen in `pages.yml`.
-   Im Browser getestet mit einem lokalen Test-Server (`worker.js` + SQLite, Port 8787; nur auf localhost schaltet `ra_api` die Adresse um).
-3. **Top-Tipps:** Liste „Empfohlen“ entfernt (ihre alten Tipps zählen in der Bilanz weiter bei „alle zusammen“). Tage-Leiste: Alle Tage · Mit Quote
-   (mit Anzahl) · Heute & Morgen · Heute · Morgen · Diese Woche · Später – angezeigt wird nur, was gerade Tipps hat, „Alle“ und „Mit Quote“ immer.
-4. **Spiel scannen statt Wettschein-Scan** und 5. **statt „Spiel selbst auswählen“**: Bereich „Scannen“ in der Leiste (`#/scan`, `vScan`). Ein Screenshot
-   (Fotos, Kamera, Einfügen, am iPad auch hineinziehen) → Server `POST /match` (Gemini liest nur ab: bis 12 Spiele mit Teams, Anstoß, Status, Minute,
-   Halbzeit, Stand, Roten Karten, 1X2-Quoten) → gerechnet wird in der App ohne KI. Quelle je Spiel: Tipp-Suche (Marktpreise) > Quoten vom Screenshot
-   (nur vor Anpfiff, `RE.fromOdds`) > Team-Stärken (`lamOf`). Live mit Minute, Stand und Roten Karten (`RE.analyze`). Extras: mehrere Spiele auf einmal,
-   Quoten-Check (Quote vom Screenshot gegen den fairen Preis), Antippen zum Ändern (Team falsch erkannt), vertauschte Heim/Gast wird erkannt,
-   „Ganze Analyse“ öffnet die Spielseite, die letzten 10 Scans (`ra_scans`). Alte Links `#/pick` und `#/slip` führen zu `#/scan`; `/bet` bleibt auf dem
-   Server für alte App-Stände.
-6. **Rechnen** – angefangen, **morgen weiter** (Niklas am 10.11.2026 um 23:45: „hör auf für heute, machen morgen weiter“).
-   *Befund:* Die Stärken-Rangliste ist schief: Ferencváros Platz 15 vor Atlético, Juventus und Dortmund; Győri ETO, Debrecen und Omonia vor
-   Napoli (Platz 43). Ursache: Das Liga-Niveau kleiner Ligen hängt an wenigen Europapokal-*Ergebnissen* (gute EL-Spiele von Ferencváros heben
-   ganz Ungarn), Europapokal-Spiele haben keine Quoten. Gegen die Marktpreise des 4. CL-Spieltags 2026/27 (18 Spiele, archiviert in
-   `bvb09/docs/data/model.json`) ist die Rechnung bei Top-Teams zu extrem: Arsenal 91 % statt 75 %, Man City 81 % statt 61 % (KL 0,0436,
-   Abstand der Überlegenheit 0,323). ClubElo wäre ideal, hat aber einen Cloudflare-Bot-Schutz → **nicht nutzen, nicht umgehen**.
-   *Plan:* (a) Europapokal-Marktpreise sammeln: `tips.py` hält für CL/EL/ECL-Spiele, die in 48 Std. beginnen, die Marktpreise (erwartete Tore
-   ohne Marge) in `data/cup_odds.json` fest (nicht in `web/`, wird nicht veröffentlicht; `tips.yml` muss die Datei mit committen), `ratings.py`
-   nutzt sie nach dem Spiel wie Schlussquoten (Gewicht `W_MARKET` × Europapokal-Gewicht); Startbestand = die 18 CL-Spiele aus der BVB-App.
-   (b) Rollierender Backtest: Stichtage alle 14 Tage ab Sep. 2025, je 450 Tage Daten davor (dafür 3 Spielzeiten laden: football-data
-   `mmz4281` ab 24/25, ESPN-Europapokal ab 2024), vorhersagen: die Spiele der nächsten 14 Tage, CL/EL/ECL getrennt und Ligen (gegen
-   Schlussquoten). Varianten: `W_EURO` 6/10/16, `HALF_LIFE` 180, eigene Halbwertszeit fürs Europapokal (365), `TAU_L` 5 und 0,2, CL stärker als
-   EL/ECL, `SPREAD` 1,0, mit Europapokal-Marktpreisen. Dazu Marktvergleich mit dem 4. CL-Spieltag und mit dem kommenden Spieltag (Marktpreise
-   der kommenden CL-/EL-Spiele stehen in der veröffentlichten `tips.json` → `all`, Kennung 0 = Markt). Ein Lauf ≈ 15 s, alle Varianten mit
-   6 Prozessen ≈ 15 Min. **Nur übernehmen, was im Backtest besser ist.**
-7. **Extra-Bereich** – noch nicht angefangen. Ideen: „Prognosen“ (Meister- und CL-Sieger-Chancen per Simulation, `cl_forecast`/`bl_forecast`
-   gibt es schon in `forecast.py`) oder ein Live-Center (alle laufenden Spiele mit Live-Prozenten aus `RE.analyze`).
+**Umbau zu Wettbuch fertig** (`ra-shell-v24`): App, Symbol, Startbilder, Spielplan (`games.yml`), Server-Code. Im Browser geprüft
+(iPhone-Breite hell/dunkel, iPad hochkant/quer, Scan mit nachgestellter Server-Antwort, Eintragen, Cashout, Bearbeiten, Löschen).
 
-**Stand 10.11.2026 nachts:** App `ra-shell-v23` ist online, der Cloudflare-Worker aber noch die alte Version (`2026-11-06`, ohne `konten`) →
-Spiel-Scan und Konto funktionieren erst nach dem Worker-Update + D1 (nächster Absatz). Das als Erstes mit Niklas machen.
+**Offen, in dieser Reihenfolge:**
+1. **Server-Update bei Cloudflare (macht Niklas, Claude erklärt):** D1-Datenbank anlegen und als `DB` binden (falls noch nicht
+   geschehen), dann den neuen `worker/worker.js` einfügen und Deploy. Bis dahin läuft dort der Stand vom 06.11.2026: Der Scan
+   geht über den alten Weg (`/bet`, nur ein Wettschein pro Bild), Konten gehen noch nicht, der Zeitgeber stößt noch den
+   gelöschten `tips.yml` an (harmlos, der Spielplan läuft trotzdem alle 2 Std. über GitHub).
+2. **Auf Niklas' iPhone und iPad prüfen:** App einmal vom Home-Bildschirm löschen und neu hinzufügen (neuer Name, neues Symbol),
+   echte Screenshots aus der Wett-App scannen (einzelne Wette, Kombi, ganze Liste „Meine Wetten“, Cashout), Abrechnung nach dem
+   Abpfiff, Kasse und Limits.
+3. Ideen danach (nur nach Rückfrage): Export der Wetten als Tabelle, Erinnerung an offene Wetten, Ziele (z. B. Monatsbudget).
 
-**Einmal bei Cloudflare (macht Niklas, Claude erklärt):** D1-Datenbank anlegen (Storage & Databases → D1 → Create, Name z. B. `result-ai`), im Worker
-`result-ai` unter Bindings eine D1-Bindung mit dem Variablennamen **`DB`** auf diese Datenbank anlegen, dann den neuen `worker/worker.js` einfügen und
-Deploy. `GET /` zeigt danach `konten: true`. Bis dahin sagt der Scan „Server noch nicht aktualisiert“ und das Konto „noch nicht eingerichtet“.
+## Geschichte (kurz)
 
-### Stand 09.11.2026, abends
-
-**So geht's am Laptop los:** Claude öffnen → Repository `result-ai` (Ordner klonen: `git clone
-https://github.com/sneaxx141108-gif/result-ai`, oder ohne Installation im Browser **claude.ai/code** → GitHub verbinden →
-`result-ai`). Diese Datei wird automatisch gelesen – Claude weiß dann alles. Erster Satz an Claude reicht, z. B.
-„Lies CLAUDE.md und mach bei HIER WEITERMACHEN weiter“.
-- Auf dem Laptop liegt der Ordner direkt im Benutzerordner (NICHT in „Dokumente“ – der wird dort per OneDrive in die Cloud
-  hochgeladen). In einem sehr langen Ordnerpfad (z. B. dem Sitzungsordner der Claude-App) scheitert `git clone` mit
-  „'$GIT_DIR' too big“ – dann einen kurzen Pfad nehmen.
-- Node.js ist auf dem Laptop nicht installiert (Tests laufen auf GitHub); lokal ansehen: `.claude/launch.json` (Python-Server, Port 8098).
-
-**Niklas' Checkliste vom 08.11.2026 – alle 9 Punkte eingebaut (App-Stand `ra-shell-v22`):**
-1. **Quoten nur von Tipico.** `scripts/tipico.py` holt sie über The Odds API (`tipico_de`, Region `eu`); GitHub-Secret `ODDS_API_KEY`
-   (Konto und Schlüssel macht Niklas selbst; Gratis-Plan 500 Credits im Monat). **Läuft live seit 09.11.2026** (erster Abruf: 8 Ligen, 16 Credits,
-   alle Vereinsspiele zugeordnet). Die Credits werden je Spieltag eingeteilt: ein Abruf je Liga und Runde, Auffrischen nur mit dem, was übrig ist
-   (Test über einen Monat: 97,9 % der Spiele haben beim Anpfiff eine Quote). 52 von 87 Wettbewerben gibt es beim Anbieter, der Rest bleibt „k. A.“.
-   Stand und Einteilung stehen in der KI-Zentrale (`tipicoCard`). Nations League im ersten Abruf: 28 Spiele, 0 zugeordnet, die Namen passen aber (geprüft),
-   also vermutlich noch keine Tipico-Quoten. `tipico.fetched[].offers` zeigt das ab dem nächsten Abruf (11.11.2026), **dann prüfen**.
-   Tipico selbst auslesen ist abgelehnt (Bot-Schutz, nicht umgehen). Quoten anderer Anbieter werden **nie angezeigt**, Unbekanntes
-   ist „k. A.“ (Doppelchance und Beide treffen liefert diese Schnittstelle nicht). Für die **Prozente** darf der Markt intern weiter
-   einfließen, das ist genauer. Tests: `tests/tipico.test.py`.
-2. **Ladebildschirm:** `#splash` steht direkt in `web/index.html` (Ring + Name, nur transform/opacity), Startbilder hell und dunkel in `web/icons/`.
-3. **Länder:** `scripts/nations.py` (ESPN, rund 4.500 Länderspiele, 218 Teams) mit eigenem `natModel` (Tor-Niveau, Heimvorteil, Halbwertszeit 3 Jahre),
-   in den Stärken `lg:'nat'`, `nat:true`, `grp:1000`. Backtest 1.200 Spiele (Sep. 2025 bis Okt. 2026, inkl. WM 2026): Log-Loss 0,8532, Favorit in 60 % richtig.
-4. **Geld-Tracker** (`#/bets`, ganz in `web/app.js`, großes Update 09.11.2026). **Plus grün mit +, Minus rot mit −** bei allem, was Geld oder Abstand ist (Niklas, 09.11.2026, ersetzt das frühere „kein Grün beim Geld“):
-   Farben `--pos`, `--neg`, `--posf`, `--negf`, im Fließtext `pm(wert, text)`, sonst Klasse aus `plusMinus(wert)`. Die große Karte gibt es in vier Farben (`ra_mlook`, Blatt „Guthaben“), Standard ist **Schwarz-Weiß**
-   (hell: Weiß mit leichtem Schwarz, dunkel umgekehrt; der Schlüssel heißt weiter `uv`). Nur dort ist die große Zahl im Gewinn-Modus grün/rot, auf den bunten Karten bliebe sie unlesbar. Reiter oben: Übersicht, Kalender, Offen, Erledigt.
-   Beim Umschalten zeichnet sich die Kurve fließend um (`lcMorph`, 110 Stützstellen, am Ende die exakte Linie durch jeden echten Wert), die Zahl läuft mit, die Knöpfe gleiten; die Seite wird dafür nicht neu aufgebaut (`moneySwitch`, `betsTab`).
-   Die Gewinn-Ansicht startet im Zeitraum bei null. Kalender: Plus/Minus je Tag (Zelle getönt, Zahl grün/rot, je kräftiger, desto mehr Geld), Monat wischen, Tag antippen, 12-Monats-Leiste mit dem Betrag unter jedem Monat. Eine Wette zählt am Tag ihres letzten Anpfiffs (`settleT`), Geld wird in ganzen Cent addiert.
-   Alles nur auf dem Handy, `ra_wallet` hat `start` und `fixes`. Nie Beispieldaten ausliefern.
-5. **3. Liga Deutschland in den Tipps:** ohne Marktquoten (`MODEL_ONLY`), Spiele und Ergebnisse von FotMob (`fmg:…`, Ergebnisse in `tips.json` → `res`).
-6. **Bilanz:** eigene Abteilung auf dem Start plus Seite `#/bilanz`; Beispiel-Wetten sind raus.
-7. **Design:** Die neutrale „Design-Runde 5“ hat Niklas noch am selben Abend zurückgenommen („alle Farben und 3D-Wappen wie vorher, sofort“). `web/app.css` ist wieder der Stand davor,
-   dazu unten nur der Block „Neue Bereiche“. **Vereinsfarben, Wappen-Teller, Wasserzeichen und farbiges Licht nicht wieder wegnehmen.**
-8. **Genauigkeit** (112.610 Spiele, Test ab 01.07.2025): Marge per Power-Methode raus (`devig`), Tor-Erwartung aus der Remis-Quote, wenn keine Über/Unter-Quote da ist,
-   Korrektur nur für Beide treffen und „Team trifft“ (`CAL`). Sicher-Tipps vorher 73,3 % erwartet gegen 75,8 % echt, jetzt 74,5 gegen 75,3. Schlussquoten sind kaum zu schlagen,
-   der Gewinn ist klein und liegt bei den Favoriten. Änderungen nur nach neuem Backtest.
-9. **Wettschein-Scan** (bis 10.11.2026, ersetzt durch „Spiel scannen“; damals `#/scan` → `#/slip`, Server `POST /bet`): `resolveTeam` ist absichtlich streng (lieber „k. A.“ als das falsche Team). Ohne Marktpreise wird nur innerhalb einer Liga gerechnet,
-   „Wert“ gibt es nur gegen Marktpreise. Sind alle Spiele erkannt, prüft die App die Wette selbst (`track:true`); Scans zählen nur fürs Guthaben, nicht für die Erfolgsquote.
-
-**Guthaben zurücksetzen** (Wetten → Ändern, mit Rückfrage): löscht Betrag, Ein-/Auszahlungen und Guthaben-Kurve; Wetten und Erfolgsquote bleiben.
-
-**Wichtig fürs Hochladen:** `pages.yml` testet die `web/data/tips.json` aus dem Repository, die der Bot nicht mehr committet. Ändert sich ihr Format, muss eine frische Datei mit (`python scripts/tips.py`, danach `tips_log.json` und `activity.json` wieder zurücksetzen).
-
-**Rechnen-Upgrade (09.11.2026, alles per Backtest, Log-Loss, kleiner = besser):**
-- *Vor dem Spiel* (Test 17.724 Spiele): feste Ergebnis-Tabelle `SCORE_TABLE` + Dixon-Coles (`MAXG=10`, `RHO=-0.07`) + neue `CAL`, gespiegelt in `web/engine.js`, `scripts/forecast.py`, `scripts/tips.py`.
-  Genaues Ergebnis 2,8746 → 2,8706, Tore 1,7976 → 1,7962, 1X2 0,9959 → 0,9957. Aus Team-Stärken: 1X2 1,0111 → 1,0103, Ü2,5 0,6946 → 0,6938, Beide treffen 0,6947 → 0,6924, Ergebnis 3,0049 → 3,0013.
-  Marktpreise sind fast nicht zu schlagen, die Gewinne sind klein. Echte Tipps bisher: 205 von 322 gewonnen, erwartet 204,0.
-- *Im Test durchgefallen, nicht wieder einbauen ohne neuen Beleg:* anderes `RHO`, IPF, Kalibrierung von 1X2 und Torlinien, Tabellen je Liga-Stärke, Mittel aus zwei Buchmachern, Heimvorteil je Liga, Frailty und Form je Team im Live-Modell.
-- *Live:* exaktes Modell Minute für Minute in `web/engine.js` (`playOut`, `nextGoal`, `GOAL_BINS`, `STATE_HOME`, `STATE_AWAY`, `RED`): Tore je Minute inkl. Nachspielzeit, Spielstand, rote Karten. Gefittet bis Juni 2025 (26.368 Spiele), Test danach (8.545),
-  Schnitt über die Minuten 1/15/30/46/60/75/85: 1X2 0,7765 → 0,7703, Ü2,5 0,4699 → 0,4663, Beide treffen 0,4840 → 0,4779, Ergebnis 2,1062 → 2,0934.
-  Halbzeit vor dem Spiel 1,0390 → 1,0382, ab Minute 15 0,8954 → 0,8935, ab Minute 30 0,6688 → 0,6650. Nächstes Tor „wer“ 0,9478 → 0,9397, „in 10 Min.“ 0,5694 → 0,5672.
-  Vor dem Anpfiff bleibt die Tabelle: die Minuten-Rechnung war dort nur 0,42 Punkte anders, die Tabelle trifft die Marktpreise exakt. Vor dem Spiel und für die Tipps gilt also weiter nur der Teil in `forecast.py`/`tips.py`.
-- *Bilanz:* `record.all` (alle Tipps, additiv, die App kommt ohne aus), Abstand zur eigenen Vorhersage in Prozentpunkten (`recDiff`), Rendite mit 1 € je Tipp (`roiLine`).
-
-**Handy oder iPad** (Einstellungen → Gerät, `ra_device`, `data-device` auf `<html>`, beim ersten Start nach Bildschirmgröße). Das Layout steht am Ende von `web/app.css`:
-- Ab 700 px Breite (iPad hochkant, Leiste unten): mehr Spalten.
-- **iPad quer** (Niklas: „im quer also breiten Format“; CSS `min-width: 960px` und Querformat, in JS `ipadSide()`, beides muss zusammenpassen): Leiste links (`--side: 92px`, `.side-brand`, `.side-foot` mit KI und Einstellungen), keine Kopfzeile auf den Bereichen (`.bar.tabtop`),
-  Wetten-Übersicht links Karte und Diagramme, rechts die Zahlen (`.ovg`), Ergebnis links Spiel, große Zahl und Sprung-Leiste (`.res-l`, bleibt stehen), rechts die Karten.
-- Karten-Raster ohne Lücken: `ipadPack()` (Zeilen von 1 px, `gridRowEnd = span Höhe + 18`). Dort **immer `row-gap: 0`** und keine eigenen Außenabstände an den Karten, sonst überlappen oder strecken sie sich. Beim Drehen zeichnet `redrawAll` alles neu.
-- Geprüft im Browser bei 1180×820, 1133×744, 1024×768, 1366×1024, hochkant 820×1180 und Handy 390 px, hell und dunkel. Am echten iPad noch nicht.
-
-**Noch zu prüfen:** alles auf Niklas' iPhone und iPad, ein echter Wettschein (bisher nur mit nachgestellter Server-Antwort getestet).
-
-**Neu am 06.11.2026 abends (gebaut im Zweig `wett-tracker`, seit spätabends in `main` und online; siehe Abschnitt „Wetten,
-Empfohlen, Cloudflare-Server“):** Wett-Tracker mit
-Guthaben (Bereich „Wetten“ unten), Speichern-Knopf bei Top-Tipps und Kombis, automatische Prüfung nach Abpfiff, Erfolgsquote im
-Verlauf, Kategorie „Empfohlen“, Wettbewerbs-Leiste in den Top-Tipps entfernt, Cloudflare-Server (`worker/worker.js`) für
-Wettschein-Scan und als Zeitgeber der Tipp-Suche.
-
-**Erledigt am 06.11.2026 spätabends:** Cloudflare eingerichtet und der Zweig `wett-tracker` in `main` übernommen (online).
-- Server: **https://result-ai.sneaxx141108.workers.dev** (Konto von Niklas, Worker `result-ai`, Gratis-Tarif). `GET /` zeigt
-  `ki`, `zeitgeber`, `einladung` – am 06.11. alle `true`. Cron Trigger **alle 30 Minuten** (im Dashboard: Settings → Trigger events).
-- Geheimnisse hat Niklas selbst eingetragen (Settings → Variables and secrets): `GEMINI_API_KEY` (neuer Schlüssel „Result AI“
-  aus Google AI Studio, Gratis-Stufe), `GITHUB_TOKEN` (fine-grained „result-ai Zeitgeber“, nur `result-ai`, Actions: Read and
-  write – **läuft ab**, Datum unter github.com/settings/personal-access-tokens; vorher neu erzeugen und in Cloudflare ersetzen),
-  `INVITE_CODES` (Code kennt nur Niklas, er gibt ihn Freunden).
-- Worker-Code aktualisieren: Claude kann im Cloudflare-Editor nicht selbst einfügen (Einfügen aus der Zwischenablage wird
-  blockiert). Ablauf: Claude legt `worker/worker.js` in die Zwischenablage (`Get-Content -Raw … | Set-Clipboard`), Niklas klickt
-  im Editor (Workers & Pages → result-ai → Edit code) in den Code, Strg+A, Strg+V, Deploy. Schlüssel tippt Claude nie ein.
-
-**Offen, in dieser Reihenfolge (ab 07.11.2026):**
-1. **Auf Niklas' iPhone prüfen:** Bereich „Wetten“ (Guthaben eintragen, Wette eintragen, Top-Tipp speichern), „Empfohlen“,
-   Verlauf + Erfolgsquote; in den Einstellungen den **Einladungscode** eintragen (✓ „Code passt“) und den **Wettschein-Scan**
-   mit einem echten Wettschein testen (KI liest Teams, Tipps, Quoten, Einsatz).
-2. ~~KI-Zentrale prüfen~~ – geprüft am 08.11.2026: Tipp-Suche seit dem 06.11. abends lückenlos stündlich „vom Zeitgeber“,
-   Zeitgeber „verbunden“.
-3. ~~3. Ligen prüfen~~ – geprüft am 08.11.2026: 61 Ligen, 1.056 Teams; Viktoria Köln, Saarbrücken, Real Zaragoza, Bari mit Wappen
-   und richtiger Liga. Automatische Auswertung mit 11 echten Spielen getestet (auch Verlängerung/Elfmeterschießen): alles richtig.
-4. **Cloudflare Worker ausbauen:** echter Spiel-Screenshot-Scan mit Gemini (Spielstand, Minute, Teams → Prognose).
-5. Kleinere Ideen: Quoten der Europapokal-Spiele archivieren (siehe „Vereine & Wappen“), danach Backtest.
-
-### Stand 06.11.2026, nachmittags (vor dem Wett-Tracker)
-
-**Fertig und online** (alles ohne KI-Schlüssel, alles automatisch auf GitHub Actions):
-- Startseite mit Begrüßung, Tipp des Tages, Top-Tipps-Karten, KI-Zentrale (oben rechts), „Spiel selbst auswählen“ (über 1.000
-  Teams), Top-Tipps (Sicher, Top-Quote, Kombis inkl. CL- und Bundesliga-Kombi, Bilanz), Verlauf, Einstellungen (Name, Hell/Dunkel/Auto).
-- **Neu heute: 3. Ligen der Top-5-Länder** (3. Liga, Primera Federación, Serie C, Ligue 3) – siehe Abschnitt unten. Sie tauchen
-  **ab morgen früh** (erster Stärken-Lauf des Tages) in der App auf; heute nicht mehr, weil gilt: gleiches Spiel am selben Tag =
-  gleiche Zahlen (die Stärken von heute standen schon).
-- **Automatik:** Tipp-Suche jetzt mit Terminen alle 10 Minuten (rechnet höchstens 1× pro Stunde), weil GitHub am 06.11. in
-  15 Stunden nur 4 von ~30 geplanten Läufen gestartet hat. App-Stand `ra-shell-v16`.
-
-Damals offen (inzwischen erledigt bzw. oben übernommen): GitHub verschluckte die Termine weiter (06.11.: von 10:55 bis abends
-keine einzige Tipp-Suche) → Zeitgeber jetzt über den Cloudflare-Server; „Treffsicherheit überarbeiten“ → von Niklas als
-Erfolgsquote der gespeicherten Top-Tipp-Wetten festgelegt.
-
-### Wetten, Empfohlen, Cloudflare-Server (06.11.2026, abends – Niklas am Laptop)
-
-Niklas' Wünsche: „unten einen Knopf, wo man seine Tipps mit Gewinn/Verlust und Guthaben tracken kann – manuell mit Quote und
-Einsatz, möglicher Gewinn wird angezeigt, danach gewonnen/verloren → Guthaben ändert sich automatisch; oder Screenshot rein und
-die KI erstellt die Wette“ · „bei den Top-Tipps die Wettbewerbe unter Morgen komplett raus, nur die Tagesangaben“ · „aus den
-Top-Tipps eine Wette speichern und damit tracken“ · „im Verlauf prüft die KI sofort nach Abpfiff, ob sie geklappt hat, und
-speichert das in Verlauf und Erfolgsquote – das kann nur die KI“. Entscheidungen (06.11.2026):
-- **Verlauf und Erfolgsquote zählen nur Wetten aus den Top-Tipps** (inkl. „Empfohlen“ und Kombis). Die prüft die App selbst nach
-  dem Abpfiff; von Hand lässt sich dort nichts ändern, und nach dem Anpfiff lassen sie sich nicht mehr löschen (sonst könnte man
-  die Quote schönen). Selbst eingetragene und gescannte Wetten markiert man selbst – sie zählen nur fürs Guthaben.
-- **Neue Kategorie „Empfohlen“** in den Top-Tipps (Niklas: „Spiele, die die KI empfiehlt wegen guter Quoten und halbwegs guter
-  Erfolgsquote“): echte Buchmacher-Quote ab 1,50, Chance ab 55 %, Result AI höchstens 2 Punkte unter dem Buchmacher; gereiht
-  nach vorsichtigerer Chance × Quote (`REC`, `REC_GAP` in `scripts/tips.py`, Liste `rec` in `tips.json`, Bilanz `record.rec`).
-- **Cloudflare statt cron-job.org** für Wettschein-Scan UND Zeitgeber (ein Konto für beides). Konto und Schlüssel macht Niklas.
-
-Umsetzung:
-- **Leiste unten mit fünf Bereichen:** Start · Top-Tipps · **Wetten** · Auswählen · Verlauf (`TABS`). Bereich „Wetten“ (`#/bets`,
-  `vBets`): Guthaben-Karte (Guthaben, im Spiel, möglicher Gewinn, Gewinn/Verlust), „Wette eintragen“ (Blatt: worauf, Spiel,
-  Quote, Einsatz mit Schnellwahl 2–50 €, möglicher Gewinn live, Anbieter), „Wettschein scannen“, Listen Offen/Erledigt;
-  selbst eingetragene Wetten: Gewonnen / Verloren / Storniert / „Wieder auf offen“, Löschen mit zweitem Tippen.
-- **Speichern:** Knopf „Wette speichern“ auf jeder Tipp-Karte, „Kombi speichern“ auf jeder Kombi, runder Knopf bei „Top-Tipps zu
-  diesem Spiel“ auf der Spielseite. Blatt mit vorausgefüllter Quote (zum Anpassen an den eigenen Anbieter) und Einsatz.
-  Gespeichert → Knopf zeigt „Gespeichert · in Wetten“ (Schlüssel `g|m` bzw. `k|g:m,…`).
-- **Daten nur auf dem Handy:** `ra_bets` (Liste der Wetten: `src` tip|manual|scan, `auto`, `list`, `legs` mit ESPN-Spiel `g`,
-  Liga `slug`, Wett-Code `m`, `res`; `q`, `p`, `stake`, `win` = Auszahlung inkl. Einsatz, `status` open|won|lost|void, `done`)
-  und `ra_wallet` (`base` = „Guthaben jetzt“ wie beim Anbieter, `at`, `moves` = Ein-/Auszahlungen). Guthaben = `base` + alles nach
-  `at`: neue Einsätze ab, Auszahlungen (gewonnen: `win`, storniert: Einsatz) dazu.
-- **Automatische Prüfung** (`checkBets`/`settleAuto`): die App holt den Endstand direkt bei ESPN (`summary?event=…`, CORS
-  erlaubt) – beim Start, beim Zurückkommen in die App, auf Wetten/Verlauf/Erfolgsquote und jede Minute, solange ein Spiel läuft
-  (zeigt dann „läuft · 1:0 · 63'“). Gewertet wie beim Buchmacher nach 90 Minuten: bei Verlängerung/Elfmeterschießen zählen die
-  Tore der zwei Halbzeiten (`linescores`). Abgesagt/verschoben und 48 Std. später nicht gespielt → zählt nicht (Einsatz zurück;
-  in einer Kombi zählt das Spiel wie Quote 1,0). Getestet mit Liverpool–Arsenal 0:1: „Sieg Arsenal“ ✓, „Über 2,5“ ✗.
-- **Verlauf** (`vHist`): oben „Erfolgsquote“ (Ring + x von y gewonnen + Gewinn/Verlust), darunter „Deine Wetten“ aus den
-  Top-Tipps nach Anstoß-Tag mit ✓/✗, dann wie bisher „Deine Prognosen“. **Erfolgsquote** (`#/acc`, `vAccuracy`, ersetzt die
-  alte Beispiel-Seite „Treffsicherheit“): x von y gewonnen, erwartet laut Buchmacher-Chance, Einsatz/Ausgezahlt/Gewinn/Rendite,
-  nach Kategorie, zuletzt ausgewertet, „Ehrlichkeit“ ab 20 Wetten.
-- **Top-Tipps:** Wettbewerbs-Leiste entfernt (nur noch Tage), vier Listen Sicher · Empfohlen · Top-Quote · Kombis, Punkt beim
-  Alter der Suche ehrlich grün/orange/rot (`freshness`), ebenso der KI-Knopf auf dem Start.
-- **Cloudflare-Server** (`worker/worker.js`, Gratis-Tarif): `GET /` Status (nur Ja/Nein, welche Geheimnisse da sind), `GET /check`
-  Einladungscode, `POST /bet` Wettschein lesen (Gemini, Temperatur 0, festes JSON-Schema, nur ablesen – nichts erfinden),
-  `GET /kick` + **Cron Trigger alle 30 Min.**: startet `tips.yml` über die GitHub-API (`workflow_dispatch`, `via=zeitgeber`),
-  wenn die veröffentlichte Tipp-Suche älter als 50 Min. ist. Geheimnisse (nur in Cloudflare, nie im Code/Chat): `GEMINI_API_KEY`,
-  `GITHUB_TOKEN` (fine-grained, nur `result-ai`, Actions: Read and write), `INVITE_CODES` (Komma-getrennt).
-  Einfügen/Aktualisieren: Datei komplett kopieren → Cloudflare → Workers & Pages → result-ai → Edit code → alles ersetzen → Deploy.
-  Die App braucht die Server-Adresse in `API` (oben in `web/app.js`) und den Einladungscode (Einstellungen → „Einladungscode“).
-  Der Scan verkleinert den Screenshot vorher (Breite ≤ 1280, Höhe ≤ 3600, JPEG), danach prüft man die erkannte Wette im Blatt.
-- **KI-Zentrale:** neue Zeile „Zeitgeber“ (verbunden / GitHub-Schlüssel fehlt / nicht erreichbar / noch nicht eingerichtet),
-  Knopf „Tipp-Suche jetzt starten“, wenn die Suche verspätet ist; im Protokoll steht, wer gestartet hat (vom Zeitgeber / von
-  GitHub / von Hand – `RA_VIA` in `tips.yml`). GitHubs eigene Termine nur noch als Ersatz (2× pro Stunde, mit Alters-Prüfung).
-- Service Worker `ra-shell-v17`.
-
-## Stand Ende 03.11.2026 (Anfang des Projekts – zur Geschichte)
-
-- Erledigt: Idee und alle Entscheidungen oben mit Niklas geklärt; Repository `result-ai` angelegt; Vorlagen aus der BVB-App
-  kopiert (`vorlage-bvb/`).
-- **App-Grundgerüst steht und ist online:** https://sneaxx141108-gif.github.io/result-ai/ – Niklas hat sie am iPhone als App
-  auf den Home-Bildschirm gelegt und getestet.
-  `web/` = die App (wird per `.github/workflows/pages.yml` auf GitHub Pages gelegt, vorher laufen die Tests).
-  `web/engine.js` = Rechen-Kern (exakt, ohne Zufall: Sieg/Remis/Niederlage, Top-Ergebnisse, Ergebnis-Karte, Über/Unter,
-  beide treffen, Doppelchance, Halbzeit, nächstes Tor + Zeitpunkt, live mit Minute/Spielstand/roten Karten,
-  Quoten → Tor-Erwartung). Tests: `node tests/engine.test.js`. `web/app.js` = Seiten: Start (Fotos/Kamera), Scan (ehrlicher
-  Hinweis, solange die KI fehlt), Ergebnis, Spieltag, Treffsicherheit, Einstellungen (Hell/Dunkel). Design „Clean“ (siehe
-  Entscheidungen). Beispiel-Spiele sind ausgedacht und als solche markiert. `web/sw.js`: bei jeder App-Änderung `SHELL`
-  hochzählen (aktueller Stand steht in `web/sw.js`).
-- Lokal ansehen: `python -m http.server 8098 --directory web` → http://localhost:8098
-- BVB-App (`bvb09`): **abgeschaltet & archiviert** (03.11.2026) – automatische Updates aus, Repository privat und archiviert,
-  Website offline. Ihre KI-Schlüssel sind damit frei für Result AI. Lokaler Ordner `Dokumente/bvb09` bleibt auf Niklas' Laptop.
-
-### Niklas' Urteil nach dem iPhone-Test (03.11.2026, abends)
-
-> „Das Prinzip der App finde ich gut, aber es braucht Verbesserungen, was das Design angeht, und Übergänge, Animationen etc.
-> Sieht vom Prinzip gut aus, die Richtung muss aber noch viel besser werden – in allem.“
-
-→ Die Richtung (weiß/clean, Vorbilder Apple Sports, FotMob, Revolut) bleibt. Die **Qualität muss in allem deutlich hoch**:
-Design, Übergänge, Animationen.
-
-### Design-Runde 2 umgesetzt (04.11.2026)
-
-- **Echte Vereinswappen** (ESPN, verkleinert über `a.espncdn.com/combiner/i?img=/i/teamlogos/soccer/500/<id>.png&w=..&h=..`,
-  im Dunkelmodus `500-dark`); Team-IDs und Vereinsfarben in `TEAMS` (`web/app.js`). Lädt ein Wappen nicht: Kreis mit Kürzel.
-  Der Service Worker speichert Wappen dauerhaft (`ra-img-v1`). Auf Vereinsfarbe stehen Wappen auf weißen Plaketten.
-- **Seiten wie in einer iPhone-App:** Seiten-Stapel (`.stack > .page`, jede Seite scrollt selbst, Scrollstand bleibt erhalten);
-  neue Seite schiebt sich von rechts herein, alte rückt nach links und wird leicht abgedunkelt (Web Animations, nur
-  `transform`/`opacity`). **Sicherung `settle`:** hakt das Handy oder geht die App in den Hintergrund, wird jeder Wechsel
-  nach spätestens ~1 s zu Ende gebracht. **Vom linken Rand wischen = zurück** (folgt dem Finger, schnappt zurück, wenn zu kurz).
-  Direktlink (z. B. `#/r/pre`): Startseite liegt unsichtbar darunter, „Zurück“ führt dorthin.
-- **Kopfleiste ohne Glas-Unschärfe** (backdrop-filter bricht in verschobenen Ebenen): oben unsichtbar, beim Scrollen feine
-  Linie + kleiner Titel (wie iOS).
-- **Ergebnis-Auftritt:** Karte → große Zahl rollt wie ein Zählwerk (Ziffern-Rollen, nur `transform`) → Balken → Liste.
-- **Haptik:** leichtes Tick beim Antippen, beim Zurückwischen und beim Umschalten (iOS-Schalter-Trick, iOS 18+).
-- **Startseite:** schwarze Scan-Karte (Fotos/Kamera), Beispiel-Karten in Vereinsfarben mit Wappen; Einstellungen als Blatt
-  mit Federung, zum Schließen nach unten ziehen; Scan-Ansicht mit Sucher-Ecken, Raster und Lade-Kreisel.
-- **Testen am PC:** im Browser-Fenster von Claude (Maße stimmen). Bilder aus Headless Chrome sind auf diesem Laptop
-  unbrauchbar (Windows-Skalierung vergrößert die App). Echte Prüfung bleibt Niklas' iPhone.
-
-### Design-Runde 3 (04.11.2026, Niklas: „Die Richtung ist super! Nur bitte upgrade das Design deutlich“)
-
-- **Weiße Karten schweben auf ganz hellem Grau** (`--bg: #F2F2F7`, Karten `#FFFFFF` mit weichem Schatten; dunkel: schwarz +
-  `#1C1C1E`) – wie Revolut/FotMob/Apple. Ergebnis-Seite ist eine Folge von Karten, die nacheinander aufsteigen.
-- **Spiel-Karten wie eine TV-Grafik** (`.teamcard`): scharfer Schnitt zwischen den Vereinsfarben mit heller Naht, große
-  Wappen als Wasserzeichen, leichter Glanz; Spielstand auf dunkler Kapsel über der Naht; Wappen gleiten beim Öffnen herein.
-- **Prognose-Karte:** große rollende Zahl + Abzeichen in Vereinsfarbe („Klarer Favorit“ / „Favorit“ / „Leicht vorne“ /
-  „Offenes Spiel“), Balken, Legende mit Wappen.
-- **Top-Ergebnis als Anzeigetafel** mit Wappen und „etwa jedes 10. Spiel endet so“, darunter die nächsten 5.
-- **Ergebnis-Karte in Teamfarben** (Heimsieg = Heimfarbe, Auswärtssieg = Gastfarbe, Remis = Grau).
-- **Tore im Spiel:** Balkendiagramm 0–6+ Tore (Rechen-Kern: `totals`), Kacheln Über 1,5/2,5/3,5 + beide treffen.
-- **Nächstes Tor:** wer trifft + **Tor-Kurve** (Chance auf ein Tor bis Minute x, Rechen-Kern: `next.curve`), 10/20/30 Min.
-- **„So kommt die Zahl zustande“:** erwartete Tore je Team mit Wappen + Text.
-
-### Täglicher Stärken-Rechner (04.11.2026, gebaut während Niklas' Essenspause)
-
-- `scripts/ratings.py` (nur Standardbibliothek, ohne KI) rechnet **jeden Morgen um 3:30 UTC** (`.github/workflows/ratings.yml`,
-  danach wird die App mit veröffentlicht) die Stärken von **~770 Teams aus 38 Ligen** + Europapokal → `web/data/ratings.json`
-  (~180 KB). Modell = `scripts/forecast.py` aus der BVB-App (Poisson, xG halb gemischt, Europapokal ×3, Zeitfenster 450 Tage).
-  Gleicher Tag = gleiche Stärken = gleiche Zahlen.
-- **Einstellungen per Backtest** (`scripts/backtest.py`, 04.11.2026: Stärken bis vor 28/56 Tagen, dann 1.406/2.246 echte Spiele
-  aller 38 Ligen vorhergesagt): Quoten ×8, Zug zur Mitte 1,5, Halbwertszeit 120 Tage, Stärke-Unterschiede ×1,25 (`SPREAD`).
-  Ergebnis 28 Tage: **Favorit richtig 54,0 %** (Buchmacher-Schlussquoten 56,2 %, Raten 33 %), Log-Loss 0,994 → **0,984**
-  (Buchmacher 0,964); vorher war das Modell bei klaren Favoriten zu vorsichtig. Nur nach erneutem Backtest ändern.
-  Folgerung: Wo Quoten zu einem Spiel bekannt sind, sind sie genauer als die Stärken → in der App bevorzugen.
-- **Tor-Prüfung (04.11.2026, abends):** Result AI sagte insgesamt zu wenige Tore voraus (2,83 statt echt 3,05 pro Spiel), vor
-  allem in den 16 Ligen ohne Über/Unter-Quoten (Norwegen −0,9, Schweiz −0,8, USA −0,6): dort nahm das Modell für die Quoten
-  pauschal 2,75 Tore an (mit Gewicht 8). Jetzt: **Tor-Schnitt der Liga** (zeitgewichtet) statt 2,75. Ergebnis (Backtest 28/56
-  Tage): Über 2,5 Log-Loss 0,6774 → 0,6714, genaues Ergebnis 3,0506 → 3,0428, Tor-Verteilung 1,8382 → 1,8308. Offizieller
-  Backtest danach (28 Tage, mit neuer Team-Zuordnung): **Favorit richtig 54,3 %** (vorher 54,0 %), Log-Loss **0,9825** (0,9841).
-  Getestet und verworfen: `SPREAD` nur auf den Abstand statt auf Angriff/Abwehr (nicht besser, genaue Ergebnisse schlechter)
-  – die 4,1 Tore bei Dortmund–Bayern kommen von Bayerns echtem Angriff (Ø ~3,5 Tore), nicht von einem Rechenfehler.
-- **Prüfung vor jeder Veröffentlichung:** `node tests/ratings.test.js` (Teamzahl, Zahlen endlich, IDs eindeutig, Stichproben
-  Dortmund/Bayern/Arsenal/Real/Barça/West Ham, „West Ham“ nicht bei einem fremden Verein, Ligagrößen). Schlägt sie fehl,
-  wird nichts gespeichert und die alte Version bleibt online (`ratings.yml`, `pages.yml`).
-- Quellen: football-data.co.uk (22 europäische Ligen inkl. 2.–5. Liga England, Schottland 1–4, je zwei Saison-Dateien mit xG +
-  16 weitere Ligen aus `/new/<Land>.csv`), ESPN (Tabellen für die Team-Zuordnung, alle CL/EL/ECL-Spiele).
-  football-data erlaubt normale Programme (robots.txt sperrt nur KI-Trainings-Crawler) – der Rechner meldet sich ehrlich als
-  `ResultAI-Stats/1.0`, nie als Browser verkleiden.
-- **Team-Zuordnung:** football-data-Name → ESPN-Team-ID, **zwei Durchgänge**: erst je Liga die ESPN-Tabelle (Name +
-  Bilanz) und, wo die fehlt, die ESPN-Teamliste derselben Liga (nur Name, `name_sim` ≥ 0,75 – so kamen Rumänien 0→13/16 und
-  die Schweiz 5→11/12 dazu); danach für den Rest Europapokal-Teams mit sehr ähnlichem vollen Namen (keine Kürzel – „HAM“
-  machte aus West Ham Hamrun Spartans, behoben 04.11.2026); umbenannte Vereine (gleiches Land, nie gleichzeitig gespielt,
-  sehr ähnlicher Name) werden zusammengelegt. Ein Name gilt landesweit (Auf-/Absteiger verbinden 1. und 2. Liga);
-  `lg` = Liga des letzten Spiels. Polen, Finnland, Irland: ESPN hat dort weder Tabelle noch Teamliste (nur Europapokal-Teams
-  mit Wappen); kleine rumänische Vereine haben bei ESPN kein Wappen → Kreis mit Kürzel. In der App sind Anzeigenamen
-  eindeutig (`_d`: Kurzname → voller Name → „Santos (Mexiko)“). Je Team: `id`, `name`, `short`, `abbr`, `alias` (für
-  die Zuordnung der Screenshots), `lg`, `att`, `def`, `logo`, `n` (Spiel-Gewicht), `grp`. Lücken: Finnland, Irland, Polen
-  (ESPN-Tabelle fehlt), Rumänien, Schweiz nur teilweise mit Wappen (Fallback Kreis mit Kürzel).
-- **Inseln (`grp`):** Teams sind nur vergleichbar, wenn sie über Spiele verbunden sind. Gruppe 0 = alle 31 europäischen Ligen
-  (über den Europapokal verbunden); Argentinien, MLS, Brasilien, Japan, Mexiko, Russland, China sind eigene Gruppen.
-  **Spiele zwischen Gruppen nicht aus den Stärken rechnen** → Quoten bzw. KI-Recherche (ehrlich „k. A.“, wenn nichts da).
-- Tor-Erwartung (in der App eingebaut, `calcPick`): `exp(mu + h + att[heim] - def[gast])` bzw. `exp(mu + att[gast] - def[heim])`
-  (`h` = 0 bei neutralem Platz; Stärken × `SPREAD` sind in `ratings.json` schon eingerechnet). Danach rechnet `web/engine.js`.
-- Vereinsfarben kommen aus ESPN (`/teams` je Liga, `pick_color`: Weiß/Hellgrau übersprungen) → `color` (652 von 773 Teams).
-- Noch offen: Name aus dem Screenshot → Team (KI-Scan, `searchTeams`), weitere Ligen/Länderspiele, Wappen für
-  FIN/IRL/POL/ROU/SUI.
-
-### Spiel selbst auswählen (04.11.2026, abends – Niklas: „mach noch was“)
-
-- Startseite → **„Spiel selbst auswählen“** (`#/pick`, `vPick` in `web/app.js`): Heim und Gast über eine Team-Suche wählen
-  (Blatt mit Suchfeld, „Zuletzt gewählt“ + „Beliebt“), Tauschen-Knopf, **Neutraler Platz**, **Spiel läuft schon** (Minute per
-  Regler, Tore und rote Karten per +/−). „Prognose berechnen“ rechnet mit den Stärken von heute und öffnet die normale
-  Ergebnis-Seite; das Spiel landet im Verlauf (mit Wappen/Farben in `teams`, damit es nach dem Neustart gleich aussieht).
-  Gleiche Eingaben am selben Tag = gleiche ID (`p_<heim>_<gast>_<h|n>_<vor|min-stand-rot>_<tag>`) = gleiche Zahlen.
-- **Suche** (`searchTeams`): ohne Akzente/Groß-Klein, Spitznamen in `NICK` (BVB, FCB, S04, HSV, SGE, Effzeh …, Wert = ESPN-ID → steht ganz oben), deutsche Anzeigenamen in
-  `DE` (Köln, Inter Mailand, Roter Stern Belgrad, Rapid Wien … – Schlüssel = Name in `ratings.json`); ESPN-Kürzel wie
-  „D Dresden“ werden durch den vollen Namen ersetzt (`tName`). Wappen/Farben fremder Teams laufen über `REG` + `logoSrc`.
-- **Ehrlich:** Teams aus verschiedenen Inseln (`grp`, z. B. Flamengo gegen Bayern) werden nicht gerechnet – Hinweis statt
-  geratener Zahlen. Rote Karten stehen als Kärtchen am Wappen und als „Bayern zu zehnt“ im Untertitel.
-- Die Stärken lädt die App 1,2 s nach dem Start im Hintergrund (`loadRatings`), der Service Worker holt `/data/` immer zuerst
-  frisch aus dem Netz.
-
-### Top-Tipps + Leiste unten (05.11.2026 – Niklas: „top quoten mit hoher gewinn warscheinlichkeit … die KI soll immer neu suchen“)
-
-- **Leiste unten** (schwebende Kapsel wie iOS 26, ohne Glas-Unschärfe): Start · Top-Tipps · Auswählen · Verlauf (`TABS`).
-  Bereichswechsel per `location.replace` → `switchTab` (ohne Schieben, Scrollstand je Bereich bleibt); Detailseiten schieben
-  sich wie gehabt von rechts herein; nochmal auf den aktiven Bereich tippen = zurück zu dessen Startseite bzw. nach oben.
-  Startseite: Scan, „Spiel selbst auswählen“, **Top-Tipps (die 3 sichersten)**, Beispiele, „Zuletzt“ (3). Verlauf + Treffsicherheit
-  wohnen jetzt im Bereich „Verlauf“ (`vHist`).
-- **`scripts/tips.py`** (ohne KI, nur Mathe) läuft **jede Stunde** (`.github/workflows/tips.yml`, Cron `17 * * * *`, gleiche
-  Concurrency-Gruppe wie der Stärken-Rechner): holt pro Liga/Pokal den Monats-Spielplan von ESPN (`scoreboard?dates=JJJJMM`,
-  ~50 Abrufe), nimmt alle Spiele der nächsten 4 Tage **mit Quoten (DraftKings)** → `web/data/tips.json`.
-- **Woher die Chance kommt** (Backtest 05.11.2026, 1.398/2.229 Spiele): wer gewinnt **nur aus den Quoten** (Result AI
-  beimischen machte es in jedem Test schlechter: 1X2-Log-Loss 0,9651 → 0,9846), Tore aus der Über/Unter-Quote, sonst aus
-  Result AI. Result AI steht als zweite Meinung dabei – nur wenn beide Teams genug Liga-Spiele haben (`n ≥ 5`; Teams, die
-  nur aus dem Europapokal bekannt sind, gaben absurde Werte, z. B. 5,8 Tore bei Torreense–Ararat).
-- **Wetten:** Sieg/Remis/Niederlage, Doppelchance, Über/Unter 1,5/2,5/3,5, beide treffen ja/nein, Heim/Gast trifft. Echte Quoten
-  gibt es nur für 1X2 und die Über/Unter-Linie des Buchmachers; sonst **„≈“ = geschätzte Quote** (faire Quote − 6 % Marge).
-- **Listen** (je Spiel höchstens ein Tipp): **Sicher** = Chance ≥ 70 %, Quote ≥ 1,20, gereiht nach Buchmacher-Chance + ¼ Abstand
-  zu Result AI (max. ±8 Punkte; ohne das stünden lauter Tipps genau an der Grenze, weil die geschätzte Quote an der Chance hängt).
-  **Top-Quote** = Quote ≥ 1,60 bei Chance ≥ 50 %, gereiht nach vorsichtigerer Chance × Quote. **Kombis**: „Sichere Kombi“
-  (bis 3 Tipps, Gesamtchance ≥ 45 %) und „Top-Kombi“ (bis 3, ≥ 30 %), bevorzugt Spiele der nächsten 36 Stunden.
-- **Ehrlich:** Buchmacher rechnen ihre Marge ein – kein Tipp ist ein sicherer Gewinn; die App sagt das, dazu „18+ · Glücksspiel
-  kann süchtig machen · check-dein-spiel.de · BZgA 0800 1 37 27 00“. Keine Links zu Buchmachern.
-- **Bilanz:** jeder angezeigte Tipp (Sicher/Top-Quote) wird bis zum Anpfiff in `web/data/tips_log.json` festgehalten, danach
-  mit dem Endstand ausgewertet (45 Tage); die Seite zeigt „x von y richtig · erwartet z %“ und die letzten Ergebnisse ✓/✗.
-- Prüfung vor jedem Speichern/Veröffentlichen: `node tests/tips.test.js`. Tipp-Spiele öffnen die normale Ergebnis-Seite
-  (`#/r/t_<ESPN-ID>`, Tor-Erwartung aus den Quoten, „Top-Tipps zu diesem Spiel“, „Markt vs. Result AI“ mit dem Modell).
-- **Reihenfolge laut Niklas (05.11.2026):** 1. Top-Tipps (erledigt) → 2. **Design maxen überall, auch auf der neuen Seite**
-  (Apple-Übergänge: Karte wächst in die Seite, Kopf schrumpft beim Scrollen; Ergebnis-Seite edler: Vereinsfarben-Glow,
-  Sprung-Leiste, schönere Grafiken; Scan-Animation; Stil „mehr Farbe & Glow“) → 3. **Vereine & Wappen fixen** (falsche Ligen,
-  fehlende Wappen; Teams nur aus dem Europapokal brauchen ihre Ligen, z. B. Tschechien, Ukraine, Serbien, Kroatien).
-
-### Design maxen (05.11.2026, abends – Niklas: „Übergänge wie bei Apple, Ergebnis-Seite edler, Scan-Animation“, Stil „mehr Farbe & Glow“)
-
-- **Karte wächst in die Seite** (wie im App Store): Beispiel-Karten, Tipp-Karten, Tipp-Zeilen, Kombi-Zeilen, Verlauf-Zeilen öffnen das
-  Spiel mit einem fliegenden Abbild der Spiel-Karte (`morphPush`: Klon der echten `.match`-Karte, gleichmäßig skaliert, nur
-  transform/opacity, Seite blendet darunter ein); zurück schrumpft sie in die angetippte Karte (`morphPop`, nur wenn beide sichtbar
-  sind, sonst normales Zurückschieben; Wischen vom Rand schiebt immer). Sicherung `settle` wie bei den Seitenwechseln.
-- **Ergebnis-Seite:** Glow in beiden Vereinsfarben hinter der Spiel-Karte (ruhender Verlauf, dunkel kräftiger), Kopfleiste oben
-  durchsichtig; ist die große Karte weggescrollt, zeigt die Leiste eine **Mini-Spielzeile** (Wappen · Stand · Wappen).
-  **Sprung-Leiste** (Übersicht · Tipps · Ergebnisse · Markt · Tore · Halbzeit · Nächstes Tor · Erklärung) klebt unter der
-  Kopfleiste und markiert den Abschnitt (`pageGeo` misst einmal aus dem Layout, `spy` beim Scrollen). Balken mit Schein,
-  Favorit-Abzeichen leuchtet, große Zahl auf einem Hauch Vereinsfarbe, Tor-Kurve und Tore-Balken in der Farbe des Favoriten,
-  wahrscheinlichstes Feld der Ergebnis-Karte hervorgehoben.
-- **Scan:** Linie läuft, solange gelesen wird; „Beispiel-Scan ansehen“ (Startseite, Scan-Karte) zeigt einen nachgebauten
-  Live-Screenshot (Arsenal–Chelsea 1:1, 63.): erkannte Felder leuchten nacheinander grün auf (mit Haptik), Schritte haken sich
-  ab, dann verwandelt sich der Screenshot in die Prognose (`#/r/live`). Echte Screenshots: ehrlicher Hinweis, bis die KI läuft.
-- **Mehr Farbe:** Beispiel-Karten werfen einen Schein in beiden Vereinsfarben, Tipp-Karten haben einen zarten Farbschein, gewählte
-  Teams in „Auswählen“ leuchten in ihrer Farbe, die Leiste unten färbt „Top-Tipps“ orange. Listen-Karten (`.group`) wieder weiß.
-- Offen fürs Design: am iPhone prüfen lassen (Flug der Karte, Glow), ggf. Feinschliff; danach **Vereine & Wappen** (siehe oben).
-
-### Vereine & Wappen (05.11.2026, spätabends – Niklas: „viele Teams sind in der falschen Liga und haben kein Wappen“)
-
-- **19 Ligen von FotMob** (`FM_LEAGUES` in `scripts/ratings.py`: Tschechien, Ukraine, Serbien, Kroatien, Ungarn, Bulgarien, Zypern,
-  Israel, Slowakei, Slowenien, Kasachstan, Aserbaidschan, Bosnien, Armenien, Georgien, Albanien, Lettland, Litauen, Portugal 2):
-  aktuelle Saison + Vorsaison aus den Liga-Seiten (`__NEXT_DATA__`; robots.txt erlaubt die Seiten, nur `/api` ist gesperrt,
-  ehrlicher UA). Europapokal-Teams behalten ihre ESPN-ID (Namensabgleich ≥ 0,85, FotMob-Namen in `FD_ALIAS`), alle anderen
-  bekommen `fm:<ID>`, Wappen `images.fotmob.com/…/teamlogo/<ID>.png` und Vereinsfarbe (`teamColors.lightMode`).
-  Ergebnis: nur noch 6 statt 40 Teams ohne Liga (Mini-Ligen: Island, Gibraltar, Andorra, Kosovo, Malta, Nordmazedonien).
-- **Wappen von FotMob** für football-data-Teams, die ESPN nicht kennt (`FM_CRESTS`: Polen, Finnland, Irland, Rumänien).
-  Ohne Wappen nur noch 26 statt 122 (kleine rumänische Vereine, National League, Schottland 3./4. Liga).
-  FotMob schickt keine CORS-Freigabe → die App bindet diese Bilder **ohne** `crossorigin` ein (`cors()` in `web/app.js`),
-  der Service Worker lässt sie durch (Browser-Zwischenspeicher, 30 Tage).
-- **Abgestiegene ausblenden:** wer über 60 Tage kein Spiel mehr in seiner Liga hatte, während die Liga weiterspielt, spielt
-  dort nicht mehr (z. B. in eine Liga abgestiegen, die Result AI nicht lädt) → nicht mehr in `ratings.json` (~100 Teams).
-- **Liga-Niveau im Modell** (`fc.fit_ratings_lg`, `TAU_L = 1`, `fit_all` in ratings.py, auch im Backtest): Stärke = Niveau der
-  Liga + Abweichung des Teams; vorher zog der Zug zur Gesamt-Mitte jedes Team einzeln zur Weltmitte (schwache Ligen wirkten
-  zu stark). Backtest Europapokal-Spiele (Ligen gegeneinander): Log-Loss 0,9810 → **0,9578** (28 Tage), 0,9954 → **0,9888**
-  (56 Tage); Liga-Spiele 0,9848 → 0,9837. `W_EURO = 3` per Test bestätigt (2 / 1,5 / 1 waren bei Europapokal-Spielen schlechter).
-  Offizieller Backtest danach (28 Tage, jetzt 1.877 Spiele inkl. FotMob-Ligen): Favorit 53,9 %; mit Schlussquoten 54,4 % /
-  0,9825 (Buchmacher 55,9 % / 0,9658). Hinweis: Ferencváros steht gerade sehr hoch (4 Europapokal-Siege seit September, u. a.
-  2:0 beim AC Mailand am 05.11.) – das sagen die Daten; vor 8 Wochen lag der Verein bei 0,66.
-- Tipps: FotMob-Ligen haben bei ESPN keine Spiele/Quoten → `tips.py` überspringt Ligen mit `src: 'fotmob'`.
-- Noch offen: Quoten der Europapokal-Spiele archivieren (die Tipp-Suche sieht sie jede Stunde) → als Markt-Beobachtung ins
-  Modell, damit wenige Europapokal-Spiele Teams aus Ligen ohne Quoten nicht so stark verschieben.
-
-### KI-Zentrale + Champions League in den Tipps (05.11.2026, nachts – Niklas: „oben rechts ne Zentrale von der KI, wo ich gucken kann,
-wie oft die AIs was geadded haben und auch was“ · „bei Top-Matches nicht nur Samstag/Sonntag, sonst gibt's keine UCL“)
-
-- **Protokoll** `scripts/activity.py` → `web/data/activity.json`: jeder Lauf von Tipp-Suche (`tips.py`) und Stärken-Rechner (`ratings.py`)
-  hängt einen Eintrag an (Zeit, Dauer, ok, Zahlen; Tipps: neu / raus / angepasst ≥ 2 Punkte / ausgewertet + ✓; Stärken: Teams,
-  neue Spiele seit dem letzten Lauf, neue Teams, größte Sprünge ≥ 0,03). 14 Tage, Einzelheiten 3 Tage. Die Workflows speichern
-  die Datei mit (`git add … activity.json`). `tips.json` bekommt `ki` (heutige Läufe/neue Tipps) für den Knopf.
-- **App:** Knopf „KI“ oben rechts auf dem Start (grüner Punkt = Tipps jünger als 3 Std., Zahl = neue Tipps heute) → `#/ki`
-  (`vKI`): Status je Rechner (läuft / verspätet / hängt nach Alter), Kacheln heute, 7-Tage-Diagramm (neue Tipps, Läufe),
-  Protokoll nach Tagen zum Aufklappen (neue Tipps mit Chance/Quote, ausgewertete Tipps ✓/✗ mit Endstand, Stärke-Sprünge).
-  Ehrlich im Fuß: die Rechner sind Mathe ohne Sprach-KI; Gemini & Co. kommen mit dem Screenshot-Scan dazu.
-- **Tipps 3 Wochen voraus** (`DAYS = 21`, Listen bis 90): der nächste Champions/Europa/Conference-League-Spieltag ist immer dabei.
-  Neue Kombis: **Champions-League-Kombi** und **Bundesliga-Kombi** (nächster Spieltag, sichere Tipps). Filter in der App: Zeitraum
-  (Heute · Morgen · Diese Woche · Später) und Wettbewerb (wichtigste zuerst, gleiche Namen mit Land); Datum ab 7 Tagen Abstand.
-- **Reihenfolge laut Niklas (05.11.2026, nachts):** 1. KI-Zentrale (erledigt) → 2. **Design deutlich upgraden, überall** →
-  3. **Automatik absichern** (alles mehrmals täglich: Tipps, Sicher, Top-Quote, Kombis, Bilanz, Stärken) → 4. **3. Liga in den
-  Top-5-Ländern** (Deutschland 3. Liga, Spanien Primera Federación, Italien Serie C, Frankreich National; England hat bis Liga 5).
-
-### Design-Runde 4 (05.11.2026, nachts – Niklas: „alles in der App nochmal vom Design sehr upgraden, deutlich“)
-
-- **Startseite neu:** Begrüßung mit Namen (Einstellungen → „Dein Name“, `store name`) und Datum; großer **„Tipp des Tages“**
-  (`spotlight`: sicherster Tipp heute/morgen, Spiel-Karte in Vereinsfarben mit Wappen-Tellern, Tipp + Chance + Quote, fliegt beim
-  Antippen in die Spielseite); **Top-Tipps als wischbare Karten** mit Verlaufs-Ringen (`tipCarousel`); Scan-Karte mit Slogan
-  „Screenshot rein. Prozente raus.“ und einem schräg gestellten Mini-Handy, das gerade einen Spielstand liest (ruhend).
-- **Lichtschein je Seite** (`aura(kind)`: home grün/blau, tips orange/pink, pick violett/blau, hist türkis, ki violett) – ruhende
-  Verläufe hinter dem Inhalt, Kopfleiste oben durchsichtig bis man scrollt. Feinere Kanten: `--shadow` mit Haarlinie,
-  dunkel `--card #18181A` mit Lichtkante.
-- **Top-Tipps:** Zahlen-Leiste (sicher · Top-Quote · Kombis · „vor x Min.“), Ringe mit Farbverlauf (`#rg-safe` grün→türkis,
-  `#rg-top` orange→pink, einmal als SVG-defs im Dokument), Vergleichsbalken Buchmacher / Result AI, Bilanz mit Treffer-Ring.
-- **Auswählen:** sobald beide Teams stehen, Vorschau-Karte in Vereinsfarben mit Sieg/Remis/Niederlage (`matchPreview`).
-- **Verlauf:** nach Tagen gruppiert, rechts die Prognose in der Farbe des Favoriten (`histGrouped`).
-- **KI-Zentrale:** farbige Kacheln mit Symbolen. **Leiste unten:** gefüllte Symbole im aktiven Bereich (`I.*F`).
-- **Einstellungen:** Name + Darstellung **Hell · Dunkel · Automatisch** (`theme auto` folgt dem iPhone, auch beim Start in index.html).
-- **Startbild** fürs iPhone (`icons/splash-1170x2532.png`, `-1284x2778`): Ring-Logo auf `#F2F2F7` (mit PIL gezeichnet); greift bei
-  neu zum Home-Bildschirm hinzugefügter App.
-
-### Automatik abgesichert (05.11.2026, nachts – Niklas: „sicher gehen, dass alles in der App wirklich jeden Tag mehrmals automatisch läuft“)
-
-Was automatisch läuft (alles ohne KI, alles auf GitHub Actions, Protokoll in der KI-Zentrale):
-
-| Was | Wie oft | Workflow |
-|---|---|---|
-| Top-Tipps: Sicher, Top-Quote, alle Kombis (inkl. Champions-League- und Bundesliga-Kombi), Tipp des Tages, Bilanz-Auswertung, KI-Zentrale | jede Stunde (Termine alle 10 Min., gerechnet nur, wenn die letzte Suche älter als 50 Min. ist) | `tips.yml` |
-| Team-Stärken (61 Ligen + Europapokal, Wappen, Farben) | 1× pro Tag gültig, bis zu 5 Versuche (1:35, 5:35, 9:35, 14:35, 19:35 UTC) + Nachholen durch die Tipp-Suche | `ratings.yml` |
-| App-Änderungen | bei jedem Push | `pages.yml` |
-
-- **GitHub verschluckt/verzögert geplante Läufe** (05.11.2026: Stärken-Lauf 3:30 kam um 11:21, die neue stündliche Tipp-Suche lief
-  die ersten Stunden gar nicht). Darum: Ersatz-Termin :47 läuft nur, wenn die veröffentlichte Suche älter als 50 Min. ist
-  (`scripts/stale.py`); `ratings.py --if-stale` rechnet nur, wenn die Stärken von heute (deutsche Zeit, `berlin_date`) fehlen –
-  die Tipp-Suche ruft das vor jeder Suche auf (fehlender Stärken-Lauf wird nachgeholt, aber nie zweimal am Tag gerechnet →
-  gleiches Spiel am selben Tag = gleiche Zahlen).
-- Alle drei Workflows in **einer Warteschlange** (`concurrency: pages`, nichts wird abgebrochen); veröffentlicht wird nur bei Änderungen.
-- **Tipp-Datei wird nur veröffentlicht, nicht gespeichert** (hält das Repository klein); `pages.yml` und `ratings.yml` holen vor dem
-  Veröffentlichen die aktuelle Tipp-Datei von der Seite (sonst würde ein App-Update ältere Tipps zurückspielen). Gespeichert werden
-  Bilanz (`tips_log.json`, 31 Tage), Protokoll (`activity.json`, 8 Tage, Einzelheiten für die letzten 30 Läufe) und die Stärken.
-  `tips.py` vergleicht für die KI-Zentrale deshalb mit der **veröffentlichten** Suche (`last_search`), nicht mit der Datei im
-  Repository (die bleibt alt: bis 08.11.2026 galten so stündlich rund 200 Tipps als „neu“; diese falschen Zahlen sind aus dem
-  Protokoll gelöscht). Ist die Seite nicht erreichbar, meldet der Lauf keine Zahlen statt falscher.
-- Kontrolle: KI-Zentrale zeigt je Rechner „läuft / verspätet / hängt“; schlägt ein Lauf fehl, schickt GitHub Niklas eine E-Mail.
-- **06.11.2026:** trotzdem nur 4 Tipp-Läufe in 15 Stunden (00:59, 01:50, 07:59, 09:55 UTC, dann 5 Stunden nichts). Darum jetzt
-  **Termine alle 10 Minuten** (`7,17,27,…,57`), alle mit Alters-Prüfung (eigener kleiner Prüf-Job ohne Veröffentlichung, der nach
-  Sekunden endet); von Hand/von außen gestartete Läufe rechnen immer. Die Warteschlange `pages` gilt jetzt nur für den Rechen-Job.
-- Ganz sicher wird es erst mit einem **externen Zeitgeber**, der den Workflow über die GitHub-API anstößt. Das macht **Niklas
-  selbst** (Konto + Schlüssel, nie in den Chat), Claude erklärt nur:
-  1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token:
-     Name „result-ai Zeitgeber“, Ablauf z. B. 1 Jahr, *Only select repositories* → `result-ai`, Permissions → Repository →
-     **Actions: Read and write** (sonst nichts). Token kopieren (wird nur einmal angezeigt).
-  2. Kostenloses Konto bei **cron-job.org** → Create cronjob: URL
-     `https://api.github.com/repos/sneaxx141108-gif/result-ai/actions/workflows/tips.yml/dispatches`, jede Stunde (z. B. Minute 20),
-     Advanced: Methode **POST**, Header `Accept: application/vnd.github+json`, `Authorization: Bearer <Token>`,
-     `X-GitHub-Api-Version: 2022-11-28`, Body `{"ref":"main"}`. Erfolg = Antwort **204**; in GitHub erscheint ein Lauf
-     „workflow_dispatch“. Später kann das auch der Cloudflare-Worker per Cron übernehmen.
-
-### 3. Ligen der Top-5-Länder (06.11.2026 – Niklas: „adde in den Top-5-Ländern die 3. Liga, also 1., 2. und 3. Liga“)
-
-- Von FotMob (wie die anderen FotMob-Ligen, `FM_LEAGUES` in `scripts/ratings.py`): **3. Liga** (FotMob 208, 20 Teams),
-  **Primera Federación** (8968, 2 Gruppen, 40 Teams), **Serie C** (147, 3 Gruppen, 60 Teams), **Ligue 3** (8970, 18 Teams).
-  England hatte schon die Ligen 1–5 (football-data). Jetzt **61 Ligen, ~1.056 Teams**.
-- **Auf-/Absteiger verbinden** (sonst wären die neuen Ligen Inseln ohne Vergleich): jedes FotMob-Team wird mit einem
-  football-data-Namen der Liga **eine Stufe höher** im selben Land verbunden, wenn der Name sehr ähnlich ist (≥ 0,85, oder gleich
-  einem der ESPN-Namen – so wird „Celta Fortuna“ = „Celta B“) **und beide nie gleichzeitig gespielt haben** (`apart`). Zweite
-  Mannschaften (`RESERVE`/`is_reserve`: II, B, U19/U21/U23, Next Gen, Futuro, Castilla, Atlètic …) nie mit Profis. Greift auch für
-  Liga Portugal 2 ↔ Primeira Liga (vorher Insel-Gefahr). 06.11.: 20 Verbindungen, u. a. Düsseldorf, Münster, Cottbus, Osnabrück,
-  Zaragoza, Huesca, Bari, Spezia, Bastia, Amiens, Tondela, AVS; der Rest (Arezzo, Eldense, Dijon …) hieß schon gleich.
-- Ergebnis: alle vier Ligen in Gruppe 0 (vergleichbar mit allen europäischen Ligen); Schnitt-Stärke je Land Liga 1 > 2 > 3
-  (z. B. Deutschland 1,07 / 0,33 / −0,15; England League One liegt mit 0,38 etwa auf Höhe der 2. Bundesliga). BVB II, Castilla,
-  Juventus Next Gen, Atalanta U23 usw. bleiben eigene Teams.
-- Test `tests/ratings.test.js` Abschnitt 6: 3. Ligen verbunden, Reihenfolge Liga 1 > 2 > 3, keine zweite Mannschaft bei Dortmund,
-  Bayern, Real, Barça, Juve. Fehlt eine Liga einmal (FotMob kurz nicht erreichbar), blockiert das nichts.
-- App: Zahl der Ligen steht nicht mehr fest im Text („38 Ligen“), sondern kommt aus `ratings.json`.
-
-### Ursprünglicher Plan Design-Runde 2 (Punkte 2–5 umgesetzt, 6 offen)
-
-1. **Kurz mit Niklas klären**, was ihn am meisten stört (konkrete Stellen; gern Screenshots von Apps, die er schön findet).
-   Dann **zeigen statt beschreiben** – Varianten direkt auf seinem iPhone ausprobieren lassen.
-2. **Echte Vereinswappen statt Buchstaben-Kreisen** – größter Qualitätssprung (Quelle klären, z. B. ESPN-/TheSportsDB-Logos,
-   Nutzungsbedingungen/robots.txt beachten; Fallback: Kreis mit Kürzel).
-3. **Übergänge wie in einer iPhone-App:** Detailseite schiebt sich von rechts rein und beim Zurück wieder raus (nur
-   `transform` auf **einem** Seiten-Container – keine View Transitions, die gaben bei der BVB-App schwarzes Ruckeln);
-   Beispiel-Karte „wächst“ in die Spiel-Karte (Shared Element per FLIP, nur transform/opacity); Blätter mit Federung;
-   vom linken Rand wischen zum Zurückgehen.
-4. **Animationen mit Gefühl:** Ergebnis-Auftritt als kleine Inszenierung (Karte → Zahl zählt → Balken → Liste), Zahlen
-   rollen statt springen, Scan-Animation hochwertiger (z. B. Raster/Linien über dem Screenshot, gefundene Teams werden
-   markiert), Lade-Skelette, haptisches Feedback (iOS-Schalter-Trick aus der BVB-App: `hapLabel` in `docs/app.js` des archivierten
-   Repositorys `bvb09`, lokal `Dokumente/bvb09`).
-5. **Design-Details:** Typo-Skala und Abstände nachschärfen, Spiel-Karte edler (Farbübergang, Wappen groß), Ergebnis-Karte
-   als echte Matrix-Grafik, einheitliche Icons, Startseite mit mehr Charakter (z. B. großes Live-Beispiel als Blickfang),
-   Dunkelmodus genauso hochwertig.
-6. **Treffsicherheit überarbeiten – das Prinzip und die Seite** (Niklas, 03.11.2026 abends: „die Treffsicherheit muss
-   geupdatet werden, das Prinzip und so“). Zuerst mit Niklas klären, was genau ihn stört. Mögliche Punkte:
-   - Die Seite ist am Anfang leer (es zählen nur eigene, schon beendete Scans) → wenig Wert. Idee: zusätzlich eine ehrliche
-     Bilanz aus vergangenen Spielen (Backtest, z. B. „in 5.000 Spielen lag Result AI so oft richtig“). **Achtung:** Niklas
-     hatte „jeder nur seine eigenen Scans“ gewählt – das nur nach Rückfrage ändern.
-   - Verständlicher und visueller: eine große Trefferquote, die letzten Scans mit ✓/✗, Serien, nach Ligen, „Ehrlichkeit“
-     einfacher erklärt (Diagramm nur, wenn genug Spiele da sind).
-   - Ergebnis nach Spielende automatisch prüfen und den Scan im Verlauf als richtig/falsch markieren.
-7. **Jede Runde auf Niklas' iPhone prüfen lassen** – am PC sieht man iPhone-Ruckeln nicht. iPhone-12-Regeln oben einhalten.
-
-### Danach (Reihenfolge)
-
-1. Niklas: Cloudflare-Konto anlegen; Gemini-Schlüssel aus AI Studio bereithalten (alter Schlüssel), ggf. neuen Groq-Schlüssel.
-2. ~~Täglicher Stärken-Rechner mit 30+ Ligen + Backtest~~ – erledigt, in der App als „Spiel selbst auswählen“.
-3. **Cloudflare Worker:** Scan (Gemini Vision), Internet-Recherche, Cache, Einladungscode, Schutz vor Überlastung.
-4. **App komplett:** echter Scan-Ablauf, Verlauf & Treffsicherheit mit echten Ergebnissen, Live mitrechnen.
-5. **Test auf Niklas' iPhone 12**, Feinschliff, Freunde einladen.
+- 03.–10.11.2026 **Result AI**: Prognose-App (Spiel-Screenshot → Prozente), Team-Stärken aus 61 Ligen, Top-Tipps mit Tipico-Quoten,
+  Wett-Tracker mit Kasse, Konto-Abgleich, Cloudflare-Server. Am 11.11.2026 komplett zu Wettbuch umgebaut; der alte Stand steht
+  im Git-Verlauf (bis Commit `e7e1c76`).
+- Vorgänger: die BVB-App (Repository `bvb09`, abgeschaltet und archiviert). Von dort stammen die iPhone-Regeln.

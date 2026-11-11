@@ -1,9 +1,9 @@
-/* Result AI – Abgleich zwischen Handy und iPad (Niklas, 10.11.2026: „sodass man am iPad und Handy bei Wetten und so überall wirklich
+/* Wettbuch – Abgleich zwischen Handy und iPad (Niklas, 10.11.2026: „sodass man am iPad und Handy bei Wetten und so überall wirklich
    1 zu 1 das Gleiche hat“). Die App speichert alles im Browser (localStorage, ra_…). Mit Konto schickt sie die Daten als ein Dokument
    an den Server (worker/worker.js, /sync) und holt dort, was das andere Gerät geändert hat. Zusammengeführt wird hier – ohne Server-Logik:
-     Listen (Wetten, Verlauf, Scans): je Eintrag (id) gewinnt die neuere Änderung; gelöschte Wetten bleiben 180 Tage als gelöscht vermerkt,
-       damit sie nicht vom anderen Gerät zurückkommen. Dieselbe Top-Tipp-Wette auf beiden Geräten gespeichert → nur einmal.
-     Einzelwerte (Guthaben, Name, Darstellung, Einladungscode, zuletzt gewählte Teams): die neuere Änderung gewinnt.
+     Listen (Wetten, Scans, KI-Protokoll, alter Verlauf): je Eintrag (id) gewinnt die neuere Änderung; gelöschte Wetten bleiben 180 Tage als
+       gelöscht vermerkt, damit sie nicht vom anderen Gerät zurückkommen. Derselbe Wettschein auf beiden Geräten gescannt → nur einmal.
+     Einzelwerte (Kasse, Limits, Name, Darstellung, Einladungscode, zuletzt gewählte Teams): die neuere Änderung gewinnt.
    Nur auf diesem Gerät bleiben: Handy-/iPad-Ansicht, Anmeldung, Abgleich-Stand und die Test-Adresse.
    Jede Änderung bekommt einen Zeitstempel (stamp), sobald die App sie speichert. Die Regeln prüft tests/sync.test.js. */
 (function (root, factory) {
@@ -12,9 +12,9 @@
   else root.RS = RS;
 }(typeof self !== 'undefined' ? self : this, () => {
   'use strict';
-  const LISTS = { bets: 500, history: 50, scans: 10 }; // Listen mit id → höchstens so viele Einträge
-  const TOMB = { bets: true }; // nur hier wird Löschen weitergegeben (Verlauf und Scans werden nur gekürzt)
-  const KEYS = ['wallet', 'name', 'theme', 'mlook', 'invite', 'recentTeams'];
+  const LISTS = { bets: 500, history: 50, scans: 10, kilog: 120 }; // Listen mit id → höchstens so viele Einträge
+  const TOMB = { bets: true }; // nur hier wird Löschen weitergegeben (Scans, Protokoll und Verlauf werden nur gekürzt)
+  const KEYS = ['wallet', 'limits', 'name', 'theme', 'mlook', 'invite', 'recentTeams'];
   const DEAD_MS = 180 * 864e5;
   const isSynced = (k) => k in LISTS || KEYS.includes(k);
   const json = (v) => JSON.stringify(v === undefined ? null : v);
@@ -116,15 +116,18 @@
         else delete dead[id]; // nach dem Löschen noch geändert → bleibt
       });
       let list = [...items.values()];
-      if (k === 'bets') { // dieselbe Top-Tipp-Wette auf zwei Geräten gespeichert: die zuerst gespeicherte bleibt
+      if (k === 'bets') { // derselbe Wettschein (bzw. alte Top-Tipp-Wette) auf zwei Geräten gespeichert: der zuerst gespeicherte bleibt
+        const dup = (v) => ((v.auto || v.src === 'scan') && v.key ? v.src + '|' + v.key : null);
         const keep = new Map();
         list.forEach((it) => {
-          if (!it.v.auto || !it.v.key) return;
-          const o = keep.get(it.v.key);
-          if (!o || atOf(it) < atOf(o) || (atOf(it) === atOf(o) && String(it.v.id) < String(o.v.id))) keep.set(it.v.key, it);
+          const key = dup(it.v);
+          if (!key) return;
+          const o = keep.get(key);
+          if (!o || atOf(it) < atOf(o) || (atOf(it) === atOf(o) && String(it.v.id) < String(o.v.id))) keep.set(key, it);
         });
         list = list.filter((it) => {
-          if (!it.v.auto || !it.v.key || keep.get(it.v.key) === it) return true;
+          const key = dup(it.v);
+          if (!key || keep.get(key) === it) return true;
           dead[String(it.v.id)] = Math.max(dead[String(it.v.id)] || 0, it.u);
           return false;
         });
@@ -158,7 +161,7 @@
   // gleicher Inhalt? (für „muss hochgeladen werden?“)
   const same = (a, b) => canon(cleanDoc(a)) === canon(cleanDoc(b));
   // gibt es auf diesem Gerät schon eigene Daten? (vor der ersten Anmeldung fragen, was passieren soll)
-  const hasData = (read) => asList(read('bets')).length > 0 || asList(read('history')).length > 0 || asList(read('scans')).length > 0
+  const hasData = (read) => asList(read('bets')).length > 0 || asList(read('history')).length > 0 || asList(read('scans')).length > 0 || asList(read('kilog')).length > 0
     || (read('wallet') != null && json(read('wallet')) !== '{}');
 
   // Konto-Stand auf dieses Gerät schreiben (ohne neue Zeitstempel); changed sammelt, was sich geändert hat

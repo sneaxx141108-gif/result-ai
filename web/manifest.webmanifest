@@ -1,7 +1,7 @@
 {
-  "name": "Result AI",
-  "short_name": "Result AI",
-  "description": "Fußball-Prognosen, Top-Tipps, Spiel-Scan und dein Wett-Tracker.",
+  "name": "Wettbuch",
+  "short_name": "Wettbuch",
+  "description": "Wettscheine scannen, Wetten mitzählen: Kontostand, Statistik und Limits – in Euro, ohne Prozente.",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

@@ -1,8 +1,8 @@
-/* Result AI – Service Worker: App startet auch ohne Netz, Updates kommen beim ersten Öffnen an.
+/* Wettbuch – Service Worker: App startet auch ohne Netz, Updates kommen beim ersten Öffnen an.
    Bei jeder App-Änderung SHELL hochzählen. */
-const SHELL = 'ra-shell-v23';
+const SHELL = 'ra-shell-v24';
 const IMG = 'ra-img-v1'; // Vereinswappen (ESPN), bleiben gespeichert
-const FILES = ['./', 'index.html', 'app.css', 'app.js', 'engine.js', 'sync.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+const FILES = ['./', 'index.html', 'app.css', 'app.js', 'sync.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 // Beim Installieren am Browser-Zwischenspeicher vorbei laden, sonst landet evtl. noch eine alte Datei im Cache
 self.addEventListener('install', (e) => {
@@ -20,7 +20,7 @@ async function staleWhileRevalidate(req) {
   return hit || net;
 }
 
-// Daten (z. B. Team-Stärken): immer frisch vom Server, ohne Netz die zuletzt geladene Fassung
+// Daten (Spielplan): immer frisch vom Server, ohne Netz die zuletzt geladene Fassung
 async function networkFirst(req) {
   const cache = await caches.open(SHELL);
   try {
