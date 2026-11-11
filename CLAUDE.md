@@ -157,15 +157,17 @@ Höhe + 18`) auf `.ovw`, `.ovg`, Start, KI-Zentrale und „Erledigt“ (`.blist.
 (iPhone-Breite hell/dunkel, iPad hochkant/quer, Scan mit nachgestellter Server-Antwort, Eintragen, Cashout, Bearbeiten, Löschen).
 **Danach Redesign „Clean 2“** (`ra-shell-v25`, 11.11.2026 abends): neue Optik, aufgeräumter Start, Auftritts-Animationen –
 im Browser auf allen Seiten und Blättern geprüft (iPhone-Breite hell/dunkel, iPad hochkant/quer), Tests grün.
-**12.11.2026:** `ra-shell-v26` – „Eigene Wette“ (jede Sportart, frei eingetragen) und neues App-Logo („W“-Kurve). Für das
-neue Symbol muss Niklas die App einmal vom Home-Bildschirm löschen und neu hinzufügen.
+**12.11.2026:** `ra-shell-v26` – „Eigene Wette“ (jede Sportart, frei eingetragen) und neues App-Logo („W“-Kurve). **Achtung:** Das
+neue Symbol kommt erst, wenn die App vom Home-Bildschirm gelöscht und neu hinzugefügt wird – das löscht am iPhone aber die
+Daten der App (Wetten!), eine Wiederherstellung gibt es nicht (CSV-Export nur zum Ansehen). Deshalb erst, wenn Konten laufen
+(Cloudflare-Update) und die Wetten im Konto gesichert sind – oder wenn noch keine Wetten drin sind.
 
 **Offen, in dieser Reihenfolge:**
 1. **Server-Update bei Cloudflare (macht Niklas, Claude erklärt):** D1-Datenbank anlegen und als `DB` binden (falls noch nicht
    geschehen), dann den neuen `worker/worker.js` einfügen und Deploy. Bis dahin läuft dort der Stand vom 06.11.2026: Der Scan
    geht über den alten Weg (`/bet`, nur ein Wettschein pro Bild), Konten gehen noch nicht, der Zeitgeber stößt noch den
    gelöschten `tips.yml` an (harmlos, der Spielplan läuft trotzdem alle 2 Std. über GitHub).
-2. **Auf Niklas' iPhone und iPad prüfen:** App einmal vom Home-Bildschirm löschen und neu hinzufügen (neuer Name, neues Symbol),
+2. **Auf Niklas' iPhone und iPad prüfen:** App einfach öffnen (aktualisiert sich selbst; nicht löschen, siehe oben),
    echte Screenshots aus der Wett-App scannen (einzelne Wette, Kombi, ganze Liste „Meine Wetten“, Cashout), Abrechnung nach dem
    Abpfiff, Kasse und Limits. Dazu die neuen Animationen von „Clean 2“: ruckelt etwas oder blitzt schwarz, sofort zurücknehmen.
 3. Ideen danach (nur nach Rückfrage): Export der Wetten als Tabelle, Erinnerung an offene Wetten, Ziele (z. B. Monatsbudget).
