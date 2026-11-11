@@ -100,9 +100,21 @@
     ul: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14.5v-10M7.5 9L12 4.5 16.5 9"/><path d="M5 19.5h14"/></svg>',
     chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5l6.5 6.5-6.5 6.5"/></svg>',
   });
-  // Wettbuch-Zeichen: ein Wettschein mit Haken (auch App-Symbol und Startbild, siehe scripts/icons.py)
-  const SLIP_D = 'M10 3.5h16a3 3 0 0 1 3 3V32l-1.83-2-1.84 2-1.83-2-1.83 2-1.84-2L18 32l-1.83-2-1.84 2-1.83-2-1.83 2-1.84-2L7 32V6.5a3 3 0 0 1 3-3z';
-  const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><path d="${SLIP_D}" fill="var(--text)"/><path d="M11.5 10.5h13M11.5 15.5h9" stroke="var(--lbg, var(--bg))" stroke-width="2.6" stroke-linecap="round" fill="none"/><circle cx="26.5" cy="26.5" r="8" fill="var(--posf)" stroke="var(--lbg, var(--bg))" stroke-width="2.5"/><path d="M22.9 26.7l2.5 2.5 4.6-4.9" stroke="var(--on-pos)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
+  // Wettbuch-Zeichen: ein „W“ als grüne Kurve, die am Ende steigt, mit weißem Punkt – wie die Kontostand-Kurve.
+  // Gleiche Form wie das App-Symbol (scripts/icons.py) und der Ladebildschirm (index.html), Raster 100 × 100.
+  const W_D = 'M22.6 37.7L36.5 64.2 50 45.1l13.5 19.1L77.4 30.3';
+  let logoN = 0; // eigene Verlauf-Namen je Zeichen, sonst greift ein verstecktes Zeichen auf ein anderes zu
+  const logo = (cls = '') => {
+    const i = ++logoN, st = 'fill="none" stroke-linecap="round" stroke-linejoin="round"';
+    return `<svg class="${cls}" viewBox="0 0 100 100" aria-hidden="true"><defs>`
+      + `<linearGradient id="wb${i}" x2="0" y2="1"><stop offset="0" stop-color="#2F3339"/><stop offset="1" stop-color="#0A0A0C"/></linearGradient>`
+      + `<radialGradient id="ws${i}" cx="18" cy="-5" r="94" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".13"/><stop offset=".45" stop-color="#fff" stop-opacity=".12"/><stop offset=".66" stop-color="#fff" stop-opacity=".065"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`
+      + `<linearGradient id="wl${i}" y2="100" x2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6EE7A0"/><stop offset="1" stop-color="#1FB955"/></linearGradient></defs>`
+      + `<rect width="100" height="100" rx="23" fill="url(#wb${i})"/><rect width="100" height="100" rx="23" fill="url(#ws${i})"/>`
+      + `<path d="${W_D}" ${st} stroke="#30D158" stroke-opacity=".05" stroke-width="18"/><path d="${W_D}" ${st} stroke="#30D158" stroke-opacity=".07" stroke-width="14"/><path d="${W_D}" ${st} stroke="#30D158" stroke-opacity=".1" stroke-width="11"/>`
+      + `<path d="${W_D}" ${st} stroke="url(#wl${i})" stroke-width="8.2"/><circle cx="77.4" cy="30.3" r="6.3" fill="#16181B"/><circle cx="77.4" cy="30.3" r="4.4" fill="#fff"/>`
+      + `<rect x="1.5" y="1.5" width="97" height="97" rx="21.5" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="1.5"/></svg>`;
+  };
 
   // ------------------------------------------------------------------ Darstellung: hell (Standard) oder dunkel
   const isDark = () => document.documentElement.dataset.theme === 'dark';
@@ -530,7 +542,7 @@
     return 'Sonstige';
   }
   // Text eines Tipps für die Anzeige: erkannter Code mit Teamnamen, sonst so, wie er auf dem Schein steht
-  const legPick = (l) => (l.m && l.home && l.away ? tipLabel(l.m, l.home, l.away) : l.pick || 'Tipp');
+  const legPick = (l) => (l.own ? l.pick || 'Tipp' : l.m && l.home && l.away ? tipLabel(l.m, l.home, l.away) : l.pick || 'Tipp'); // eigene Wette: immer der eigene Text
 
   // ------------------------------------------------------------------ Spiel suchen (Tipp eintragen, falsch zugeordnetes Spiel korrigieren)
   function searchGames(q, n) {
@@ -794,6 +806,25 @@
     const pl = betPL(b);
     return [b.status === 'won' ? 'Gewinn' : b.status === 'cash' ? 'Cashout' : 'Verlust', signed(pl), plusMinus(pl)];
   }
+  // eigene Wetten (Niklas, 12.11.2026: „custom Wetten“): frei beschrieben, jede Sportart, von Hand abgerechnet
+  const SPORTS = [['fb', 'Fußball'], ['tennis', 'Tennis'], ['bb', 'Basketball'], ['hockey', 'Eishockey'], ['hb', 'Handball'],
+    ['darts', 'Darts'], ['motor', 'Motorsport'], ['nfl', 'Football'], ['esport', 'eSports'], ['other', 'Andere']];
+  const SPORT_LONG = { fb: 'Fußball', tennis: 'Tennis', bb: 'Basketball', hockey: 'Eishockey', hb: 'Handball', darts: 'Darts', motor: 'Motorsport',
+    nfl: 'American Football', esport: 'eSports', other: 'Andere Sportart' };
+  const SP_SVG = (inner, w = 1.9) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  const SPORT_IC = {
+    fb: SP_SVG('<circle cx="12" cy="12" r="9"/><path d="M12 7.8l4 2.9-1.5 4.7h-5L8 10.7z"/><path d="M12 3v4.8M16 10.7l4.6-1.5M14.5 15.4l2.8 3.9M9.5 15.4l-2.8 3.9M8 10.7L3.4 9.2"/>', 1.7),
+    tennis: SP_SVG('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6a9 9 0 0 1 0 12.8M18.4 5.6a9 9 0 0 0 0 12.8"/>'),
+    bb: SP_SVG('<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6c1.7 1.7 2.6 3.9 2.6 6.4s-.9 4.7-2.6 6.4M18.4 5.6c-1.7 1.7-2.6 3.9-2.6 6.4s.9 4.7 2.6 6.4"/>', 1.7),
+    hockey: SP_SVG('<path d="M17.5 2.5L8.7 15.3a1.6 1.6 0 0 1-1.3.7H3.5"/><ellipse cx="16.5" cy="17.2" rx="4.5" ry="1.9"/><path d="M12 17.2v1.4c0 1 2 1.9 4.5 1.9s4.5-.9 4.5-1.9v-1.4"/>'),
+    hb: SP_SVG('<circle cx="12" cy="12" r="9"/><path d="M12 12c0-4 1.6-7 4.6-8.3M12 12c-3.4 2-6.8 2.2-9 .5M12 12c3.4 2 5.3 4.8 5.1 8.1"/>'),
+    darts: SP_SVG('<circle cx="11" cy="13" r="8"/><circle cx="11" cy="13" r="3.8"/><path d="M11 13l8.5-8.5M17.2 3.6l2.3 1-.9-2.4M19.5 4.5l1 2.3-2.4-.9"/>'),
+    motor: SP_SVG('<path d="M5 21V3.5"/><rect x="5" y="4" width="14" height="9" rx="1"/><path d="M5 4h3.5v4.5H5zM12 4h3.5v4.5H12zM8.5 8.5H12V13H8.5zM15.5 8.5H19V13h-3.5z" fill="currentColor" stroke="none"/>'),
+    nfl: SP_SVG('<ellipse cx="12" cy="12" rx="9.5" ry="5.6" transform="rotate(-45 12 12)"/><path d="M9.3 14.7l5.4-5.4M10.2 11.8l2 2M11.8 10.2l2 2"/>'),
+    esport: SP_SVG('<path d="M6.5 7.5h11a4.5 4.5 0 0 1 4.4 5.4l-.7 3.5a2.6 2.6 0 0 1-4.6 1.1L15 15.5H9l-1.6 2a2.6 2.6 0 0 1-4.6-1.1l-.7-3.5A4.5 4.5 0 0 1 6.5 7.5z"/><path d="M7.5 10v3.5M5.75 11.75h3.5"/><circle cx="15.6" cy="10.9" r="1" fill="currentColor" stroke="none"/><circle cx="17.9" cy="13.1" r="1" fill="currentColor" stroke="none"/>'),
+    other: SP_SVG('<path d="M12 3.6l2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.6l-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/>'),
+  };
+  const sportIc = (l) => SPORT_IC[l.sport] || SPORT_IC.fb;
   function legRow(l, extra) {
     const lv = l.g && LIVE[l.g];
     let info = '';
@@ -803,8 +834,9 @@
     else if (l.t) info = kickoff(l.t);
     const s = legState(l);
     const mk = s ? { won: [I.check, 'won'], lost: [I.x, 'lost'], void: ['–', 'void'] }[s] : null;
-    const sub = [legTeams(l), l.m ? '' : l.mk, info].filter(Boolean).join(' · ');
-    return `<div class="bleg">${l.home && l.away ? `<span class="duo">${crest(l.home, 24, true)}${crest(l.away, 24, true)}</span>` : `<span class="bl-ic">${I.ticket}</span>`}<span class="grow"><b>${esc(legPick(l))}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</span>${l.q ? `<span class="bl-q">${nf2.format(l.q)}</span>` : ''}${mk ? `<span class="bl-mk ${mk[1]}">${mk[0]}</span>` : ''}${extra || ''}</div>`;
+    const sub = [l.own && l.sport && l.sport !== 'fb' ? SPORT_LONG[l.sport] : '', legTeams(l), l.m ? '' : l.mk, info].filter(Boolean).join(' · ');
+    const ic = l.own ? `<span class="bl-ic own">${sportIc(l)}</span>` : l.home && l.away ? `<span class="duo">${crest(l.home, 24, true)}${crest(l.away, 24, true)}</span>` : `<span class="bl-ic">${I.ticket}</span>`;
+    return `<div class="bleg">${ic}<span class="grow"><b>${esc(legPick(l))}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</span>${l.q ? `<span class="bl-q">${nf2.format(l.q)}</span>` : ''}${mk ? `<span class="bl-mk ${mk[1]}">${mk[0]}</span>` : ''}${extra || ''}</div>`;
   }
   function ticketCard(b) {
     regTeams(b);
@@ -820,6 +852,7 @@
   // Symbol links in einer Zeile: zwei Wappen (Einzelwette), Zahl der Tipps (Kombi) oder ein Schein
   function betIcon(b) {
     const l = b.legs[0] || {};
+    if (b.legs.length === 1 && l.own) return `<span class="li-ic own">${sportIc(l)}</span>`;
     if (b.legs.length === 1 && l.home && l.away) return `<span class="duo">${crest(l.home, 24, true)}${crest(l.away, 24, true)}</span>`;
     if (b.legs.length > 1) return `<span class="li-n"><b>${b.legs.length}</b><small>Tipps</small></span>`;
     return `<span class="li-ic">${I.ticket}</span>`;
@@ -1605,6 +1638,7 @@
   // ------------------------------------------------------------------ Wette eintragen / bearbeiten / Wettschein ergänzen (ein Blatt von unten)
   // Tipps kommen aus dem Spielplan (dann prüft Wettbuch nach dem Abpfiff selbst) oder werden frei eingetragen (dann rechnest du selbst ab).
   const isoDay = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const dtLocal = (t) => { const d = new Date(t); return `${isoDay(d)}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }; // für datetime-local
   // Datum aus dem Blatt → Zeitpunkt: gleicher Tag wie vorher = alter Zeitpunkt, heute = jetzt, sonst 12 Uhr an dem Tag
   function atFromDay(day, at0) {
     if (at0 && isoDay(at0) === day) return at0;
@@ -1619,7 +1653,7 @@
   function openBetSheet(o) {
     if ($('.sheet')) return;
     B.draft = Object.assign({ src: 'manual', legs: [], q: null, qSet: false, stake: null, win: null, winSrc: 'auto', free: false, status: 'open', cash: null,
-      bookie: 'Tipico', old: false, day: isoDay(Date.now()), view: 'main', leg: null, gq: '' }, o);
+      bookie: 'Tipico', old: false, day: isoDay(Date.now()), view: 'main', leg: null, gq: '', legMode: 'plan' }, o);
     if (!B.draft.legs.length) startLeg();
     sheet('', 'bet-panel', 'Wette');
     drawDraft();
@@ -1703,7 +1737,15 @@
       <p class="bf-note">${esc(trackNote(d))}</p>
       <button class="btn" data-act="betsave">Speichern</button>`;
   }
+  // Tipp hinzufügen: oben die Wahl „Aus dem Spielplan“ (Wettbuch prüft selbst) oder „Eigene Wette“ (frei, jede Sportart)
   function legEditor(d) {
+    const own = d.legMode === 'own';
+    return `<h2>Tipp hinzufügen</h2>
+      <div class="seg lg-mode" style="--k:${own ? 1 : 0}"><span class="ind"></span><button class="${own ? '' : 'on'}" data-act="lmode" data-val="plan">Aus dem Spielplan</button><button class="${own ? 'on' : ''}" data-act="lmode" data-val="own">Eigene Wette</button></div>
+      <div class="lg-body">${own ? ownLeg(d) : planLeg(d)}</div>
+      <div class="bf-2 bf-2w"><button class="btn soft" data-act="legback">${d.legs.length ? 'Zurück' : 'Abbrechen'}</button><button class="btn" data-act="legok">Tipp übernehmen</button></div>`;
+  }
+  function planLeg(d) {
     const l = d.leg;
     const h = l.home || 'Heim';
     const a = l.away || 'Gast';
@@ -1712,18 +1754,65 @@
       : `<input class="search" type="search" data-act="gsearch" value="${esc(d.gq || '')}" placeholder="Team suchen, z. B. BVB" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Spiel suchen">
         <div class="gres">${gameList(d.gq || '', 'lgame')}</div>
         <label class="bf wide"><span>Nicht dabei? Spiel selbst eintragen</span><input type="text" data-act="levent" maxlength="80" value="${esc(l.event || '')}" placeholder="z. B. Dortmund – Bayern" autocomplete="off"></label>`;
-    return `<h2>Tipp hinzufügen</h2><div class="lab">SPIEL</div>${game}
+    return `<div class="lab">SPIEL</div>${game}
       <div class="lab" style="margin-top:16px">WETTE</div>
       <div class="chips lg-chips">${QUICK.map(([c, t]) => `<button class="${l.code === c ? 'on' : ''}" data-act="lpick" data-val="${c}">${t}</button>`).join('')}</div>
       ${l.code === 'x' ? `<label class="bf wide"><span>Worauf hast du gewettet?</span><input type="text" data-act="lother" maxlength="80" value="${esc(l.other || '')}" placeholder="z. B. Kane trifft, Ecken über 9,5" autocomplete="off"></label>`
         : l.code ? `<p class="lg-what">${esc(tipLabel(l.code, h, a))}</p>` : ''}
-      <label class="bf wide"><span>Quote dieses Tipps (wenn du sie weißt)</span><input type="text" inputmode="decimal" data-act="lq" value="${l.q ? nf2.format(l.q) : ''}" placeholder="z. B. 1,85" autocomplete="off"></label>
-      <div class="bf-2 bf-2w"><button class="btn soft" data-act="legback">${d.legs.length ? 'Zurück' : 'Abbrechen'}</button><button class="btn" data-act="legok">Tipp übernehmen</button></div>`;
+      <label class="bf wide"><span>Quote dieses Tipps (wenn du sie weißt)</span><input type="text" inputmode="decimal" data-act="lq" value="${l.q ? nf2.format(l.q) : ''}" placeholder="z. B. 1,85" autocomplete="off"></label>`;
+  }
+  const evHint = (sp) => ({ fb: 'z. B. Dortmund – Bayern', tennis: 'z. B. Sinner – Alcaraz', bb: 'z. B. Lakers – Celtics', hockey: 'z. B. Eisbären – Adler',
+    hb: 'z. B. Kiel – Flensburg', darts: 'z. B. WM-Finale', motor: 'z. B. Großer Preis von Monza', nfl: 'z. B. Chiefs – Bills', esport: 'z. B. G2 – Vitality' }[sp] || 'z. B. Wer wird Meister');
+  function ownLeg(d) {
+    const l = d.leg;
+    const sp = l.sport || 'fb';
+    return `<label class="bf wide lg-own"><span>Worauf hast du gewettet?</span><input type="text" data-act="lown" maxlength="120" value="${esc(l.own || '')}" placeholder="z. B. Haaland trifft und über 2,5 Tore" autocomplete="off"></label>
+      <div class="lab" style="margin-top:16px">SPORTART</div>
+      <div class="sp-grid">${SPORTS.map(([v, t]) => `<button class="${sp === v ? 'on' : ''}" data-act="lsport" data-val="${v}" aria-pressed="${sp === v}">${SPORT_IC[v]}<span>${t}</span></button>`).join('')}</div>
+      <label class="bf wide"><span>Spiel oder Ereignis (wenn du magst)</span><input type="text" data-act="levent" maxlength="80" value="${esc(l.event || '')}" placeholder="${evHint(sp)}" autocomplete="off"></label>
+      <label class="bf wide"><span>Wann? (wenn du magst)</span><input type="datetime-local" data-act="lwhen" value="${esc(l.when || '')}"></label>
+      <label class="bf wide"><span>Quote dieses Tipps (wenn du sie weißt)</span><input type="text" inputmode="decimal" data-act="lq" value="${l.q ? nf2.format(l.q) : ''}" placeholder="z. B. 2,40" autocomplete="off"></label>
+      <p class="bf-note">Eigene Wetten rechnest du selbst ab: Wette antippen, dann auf Gewonnen oder Verloren.</p>`;
+  }
+  // Umschalten Spielplan ↔ eigene Wette, ohne das Blatt neu aufzubauen (die Markierung gleitet hinüber)
+  function legMode(v) {
+    const d = B.draft;
+    if (!d || !d.leg || d.legMode === v) return;
+    d.legMode = v;
+    const l = d.leg;
+    // schon ein Spiel aus dem Plan gewählt? Dann stehen Spiel und Anpfiff gleich in der eigenen Wette
+    if (v === 'own' && l.g && !l.event) { l.event = `${l.home} – ${l.away}`; if (!l.when && l.t) l.when = dtLocal(l.t); }
+    const seg = $('.sheet .lg-mode');
+    const body = $('.sheet .lg-body');
+    if (!seg || !body) { drawDraft(); return; }
+    seg.style.setProperty('--k', v === 'own' ? 1 : 0);
+    $$('button', seg).forEach((x) => x.classList.toggle('on', x.dataset.val === v));
+    body.innerHTML = v === 'own' ? ownLeg(d) : planLeg(d);
+    stagger([...body.children]);
+  }
+  // eigener Tipp: frei beschrieben, Wettbuch rechnet ihn nie selbst ab
+  function ownLegOk(d, l) {
+    const pick = String(l.own || '').trim();
+    if (!pick) { toast('Bitte eintragen, worauf du gewettet hast.'); const o = $('.sheet [data-act="lown"]'); if (o) o.focus(); return; }
+    const ev = String(l.event || '').trim();
+    const two = ev ? ev.split(/\s+[-–—:]\s+|\s+vs\.?\s+|\s+gegen\s+/i) : [];
+    const home = two.length === 2 ? two[0].trim() : null;
+    const away = two.length === 2 ? two[1].trim() : null;
+    const sport = SPORT_LONG[l.sport] ? l.sport : 'fb';
+    const tt = l.when ? new Date(l.when).getTime() : NaN;
+    const m = sport === 'fb' ? pickCode({ pick }, home, away) : null;
+    d.legs.push({ g: null, slug: null, t: Number.isFinite(tt) ? new Date(tt).toISOString() : null, comp: sport === 'fb' ? null : SPORT_LONG[sport],
+      home, away, event: two.length === 2 ? null : ev || null, m: m || null, pick, q: l.q || null, res: null, own: true, sport });
+    autoQ(d);
+    d.leg = null;
+    d.view = 'main';
+    drawDraft();
   }
   function legOk() {
     const d = B.draft;
     const l = d && d.leg;
     if (!l) return;
+    if (d.legMode === 'own') { ownLegOk(d, l); return; }
     if (!l.code) { toast('Bitte wählen, worauf du gewettet hast.'); return; }
     const ev = String(l.event || '').trim();
     if (!l.g && !ev && l.code !== 'x') { toast('Bitte ein Spiel wählen oder selbst eintragen.'); return; }
@@ -1869,7 +1958,7 @@
     const when = (t) => (t ? new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
     const rows = [['Gesetzt', 'Abgerechnet', 'Stand', 'Art', 'Tipps', 'Quote', 'Einsatz', 'Gratiswette', 'Auszahlung', 'Ergebnis', 'Anbieter']];
     list.slice().sort((x, y) => x.at - y.at).forEach((b) => {
-      rows.push([when(b.at), when(b.done), ST_NAME[b.status] || b.status, betKind(b), b.legs.map((l) => [legTeams(l), legPick(l), l.q ? `(${nf2.format(l.q)})` : ''].filter(Boolean).join(' ')).join(' | '),
+      rows.push([when(b.at), when(b.done), ST_NAME[b.status] || b.status, betKind(b), b.legs.map((l) => [l.own && l.sport && l.sport !== 'fb' ? `${SPORT_LONG[l.sport]}:` : '', legTeams(l), legPick(l), l.q ? `(${nf2.format(l.q)})` : ''].filter(Boolean).join(' ')).join(' | '),
         n2(b.q), n2(b.stake), b.free ? 'ja' : '', b.status === 'open' ? '' : n2(backC(b) / 100), b.status === 'open' ? '' : n2(betPL(b)), b.bookie || '']);
     });
     const csv = '﻿' + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\r\n');
@@ -3425,6 +3514,15 @@
     else if (act === 'legdel') { if (d) { d.legs.splice(+a.dataset.i, 1); autoQ(d); redrawDraft(); } }
     else if (act === 'legback') { if (d && !d.legs.length) { B.draft = null; closeSheet(); } else if (d) { d.leg = null; d.view = 'main'; drawDraft(); } }
     else if (act === 'legok') legOk();
+    else if (act === 'lmode') legMode(a.dataset.val);
+    else if (act === 'lsport') {
+      if (d && d.leg) {
+        d.leg.sport = a.dataset.val;
+        $$('.sheet .sp-grid button').forEach((x) => { x.classList.toggle('on', x === a); x.setAttribute('aria-pressed', String(x === a)); });
+        const ev = $('.sheet .lg-body [data-act="levent"]');
+        if (ev) ev.placeholder = evHint(d.leg.sport);
+      }
+    }
     else if (act === 'lpick') { if (d && d.leg) { d.leg.code = a.dataset.val; redrawDraft(); const o = $('.sheet [data-act="lother"]'); if (o && d.leg.code === 'x') o.focus(); } }
     else if (act === 'lgame') { const r = G.byGid[a.dataset.g]; if (d && d.leg && r) { Object.assign(d.leg, legFromRow(r)); d.leg.event = null; redrawDraft(); } }
     else if (act === 'lgclear') { if (d && d.leg) { ['g', 'slug', 't', 'comp', 'home', 'away'].forEach((k) => { delete d.leg[k]; }); d.gq = ''; redrawDraft(); } }
@@ -3542,6 +3640,8 @@
     else if (act === 'lq' && d.leg) d.leg.q = dec(t.value);
     else if (act === 'lother' && d.leg) d.leg.other = t.value;
     else if (act === 'levent' && d.leg) d.leg.event = t.value;
+    else if (act === 'lown' && d.leg) d.leg.own = t.value;
+    else if (act === 'lwhen' && d.leg) d.leg.when = t.value;
   });
   // Eingabetaste: Code prüfen, Cashout übernehmen, Suche schließt die Tastatur
   document.addEventListener('keydown', (e) => {
@@ -3555,7 +3655,7 @@
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = '.tk[data-act], button.li, .qa-b, .mact button, .bd-acts button, .bd-foot button, .mh-btn, .wc[data-act], .bl-x, .bl-fix, .bf-add, a.row, button.row, .btn, .round, .sbtn, .seg button, .tabbar button, .chips button, .kib, .pseg button, .more, .cal-nav, button.cd, .cy, .lk';
+    const PRESS = '.tk[data-act], button.li, .qa-b, .mact button, .bd-acts button, .bd-foot button, .mh-btn, .wc[data-act], .bl-x, .bl-fix, .bf-add, a.row, button.row, .btn, .round, .sbtn, .seg button, .tabbar button, .chips button, .sp-grid button, .kib, .pseg button, .more, .cal-nav, button.cd, .cy, .lk';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };

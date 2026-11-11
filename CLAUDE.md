@@ -40,7 +40,7 @@ neuer Name, nichts mit Tipico“):
 - Server-Funktionen (Scan) nur mit **Einladungscode** (schützt das Gratis-Kontingent). Konto nur mit **Benutzername + Passwort**.
 - **Tipico selbst auslesen ist abgelehnt** (Bot-Schutz, nicht umgehen). Ehrliche User-Agents, keine Bot-Schutz-Umgehung irgendwo.
 
-## Was die App kann (`web/app.js`, Stand `ra-shell-v25`)
+## Was die App kann (`web/app.js`, Stand `ra-shell-v26`)
 
 Leiste unten (`TABS`): **Start · Wetten · Scannen · Statistik · Kasse**; dazu die **KI-Zentrale** (`#/ki`, Knopf „KI“ oben) und
 Einstellungen (Zahnrad). Am iPad quer ist die Leiste links.
@@ -49,8 +49,10 @@ Einstellungen (Zahnrad). Am iPad quer ist die Leiste links.
   zuletzt abgerechnet (4). Ohne Wetten statt der Listen „So geht's“.
 - **Wetten:** Offen · Erledigt (Filter) · Kalender (Plus/Minus je Tag, Tag antippen). Je Wette: Gewonnen, Verloren, Cashout
   (Betrag eintragen), Storniert, Bearbeiten, Löschen (zweimal tippen).
-- **Eintragen** (Blatt): Tipps aus dem Spielplan wählen (Teamsuche, Schnellwahl 1 · X · 2 · 1X · X2 · 12 · Über/Unter ·
-  Beide treffen …, „Andere Wette“ als Freitext) oder Spiel selbst eintippen; Kombi mit mehreren Tipps; Quote, Einsatz
+- **Eintragen** (Blatt): „Tipp hinzufügen“ hat oben zwei Wege (`legMode`): **Aus dem Spielplan** (Teamsuche, Schnellwahl
+  1 · X · 2 · 1X · X2 · 12 · Über/Unter · Beide treffen …, „Andere Wette“ als Freitext; Wettbuch rechnet selbst ab) oder
+  **Eigene Wette** (seit v26, Wunsch Niklas: Text frei, Sportart aus `SPORTS` mit eigenem Symbol, Spiel/Ereignis, Zeit, Quote –
+  Tipp mit `own: true`, `sport`, violettes Sport-Symbol; rechnet Niklas selbst ab). Kombi mit mehreren Tipps; Quote, Einsatz
   (2–50 € Schnellwahl), Auszahlung (Einsatz × Quote oder selbst), Gratiswette, Stand, Anbieter, Datum, „Schon im Kontostand“.
 - **Scannen:** Screenshot aus der Wett-App (Fotos, Kamera, Einfügen; am iPad hineinziehen). Ein Bild kann eine ganze Liste
   „Meine Wetten“ sein (bis zu 10 Wetten). Der Server liest ab (`POST /slip`, Gemini), die App ordnet die Teams dem Spielplan zu
@@ -92,7 +94,8 @@ Einstellungen (Zahnrad). Am iPad quer ist die Leiste links.
 - `scripts/games.py`: alle Fußballspiele von 5 Tagen zurück bis 16 Tage voraus aus rund 70 Wettbewerben (ESPN), mit Wappen,
   Vereinsfarben und Endstand nach 90 Min. Die Datei wird nur veröffentlicht; im Repository liegt ein Startstand, `pages.yml` holt
   vor dem Veröffentlichen den neueren von der Seite. Protokoll der Läufe in der Datei selbst (`runs`, für die KI-Zentrale).
-- `scripts/icons.py`: zeichnet App-Symbol und Startbilder (Wettschein mit grünem Haken, gleiche Form wie `logo()` in `app.js`).
+- `scripts/icons.py`: zeichnet App-Symbol und Startbilder (seit v26: grünes „W“ als steigende Kurve mit weißem Punkt auf
+  dunklem Verlauf; gleiche Form wie `logo()` in `app.js` und der Ladebildschirm in `index.html`, Raster 100 × 100).
   Nur bei Änderungen am Symbol, vom PC aus, braucht Pillow.
 - Tests: `node tests/pick.test.mjs` (Wett-Codes), `node tests/sync.test.js` (Abgleich), `node tests/worker.test.mjs`
   (Server mit SQLite statt D1, Node ≥ 22.13), `node tests/games.test.js` (Spielplan). Alle laufen in `pages.yml`.
@@ -154,6 +157,8 @@ Höhe + 18`) auf `.ovw`, `.ovg`, Start, KI-Zentrale und „Erledigt“ (`.blist.
 (iPhone-Breite hell/dunkel, iPad hochkant/quer, Scan mit nachgestellter Server-Antwort, Eintragen, Cashout, Bearbeiten, Löschen).
 **Danach Redesign „Clean 2“** (`ra-shell-v25`, 11.11.2026 abends): neue Optik, aufgeräumter Start, Auftritts-Animationen –
 im Browser auf allen Seiten und Blättern geprüft (iPhone-Breite hell/dunkel, iPad hochkant/quer), Tests grün.
+**12.11.2026:** `ra-shell-v26` – „Eigene Wette“ (jede Sportart, frei eingetragen) und neues App-Logo („W“-Kurve). Für das
+neue Symbol muss Niklas die App einmal vom Home-Bildschirm löschen und neu hinzufügen.
 
 **Offen, in dieser Reihenfolge:**
 1. **Server-Update bei Cloudflare (macht Niklas, Claude erklärt):** D1-Datenbank anlegen und als `DB` binden (falls noch nicht

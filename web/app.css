@@ -792,6 +792,15 @@ button.li.pressed, .row.pressed { opacity: 1; background: var(--fill); }
 .lg-sel .link { flex: none; font-size: 14px; font-weight: 700; }
 .chips.lg-chips { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
 .lg-what { margin: 12px 4px 0; font-size: 14px; font-weight: 600; }
+/* eigene Wette: Umschalter oben, Sportarten als Kacheln (gewählt = schwarz), eigene Tipps mit violettem Sport-Symbol */
+.lg-mode { margin: 0 0 18px; }
+.sp-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.sp-grid button { min-width: 0; height: 64px; padding: 0 1px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); color: var(--text); font-size: 11px; font-weight: 600; letter-spacing: -.02em; transition: background-color .2s, color .2s; }
+.sp-grid button svg { width: 22px; height: 22px; }
+.sp-grid button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-grid button.on { background: var(--ink); color: var(--on-ink); box-shadow: none; }
+.sp-grid button.on svg { animation: pop .45s var(--spring); }
+.bl-ic.own, .li-ic.own { background: var(--violet-bg); color: var(--violet); }
 .gres { margin-top: 12px; }
 .gres .lab { margin-top: 4px; }
 /* Farbe der Konto-Karte */
@@ -947,7 +956,7 @@ button.li.pressed, .row.pressed { opacity: 1; background: var(--fill); }
   :root[data-device="ipad"] .tb-scan .ti { width: 44px; height: 44px; }
   :root[data-device="ipad"] .tb-scan .tl { display: block; }
   :root[data-device="ipad"] .tb-scan.on .tb-c { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
-  :root[data-device="ipad"] .side-brand { display: grid; place-items: center; position: absolute; left: 0; right: 0; top: calc(var(--safe-t) + 18px); --lbg: var(--card); }
+  :root[data-device="ipad"] .side-brand { display: grid; place-items: center; position: absolute; left: 0; right: 0; top: calc(var(--safe-t) + 18px); }
   :root[data-device="ipad"] .side-brand svg { width: 40px; height: 40px; }
   :root[data-device="ipad"] .side-foot { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: auto; }
   :root[data-device="ipad"] .side-foot button { background: var(--fill); box-shadow: none; color: var(--text); }
