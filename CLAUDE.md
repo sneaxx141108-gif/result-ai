@@ -104,7 +104,8 @@ Einstellungen (Zahnrad). Am iPad quer ist die Leiste links.
   `GITHUB_TOKEN` (fine-grained, nur `result-ai`, Actions: Read and write – **läuft ab**, dann neu erzeugen und ersetzen),
   `INVITE_CODES`. Konten brauchen die D1-Bindung **`DB`** (Storage & Databases → D1 → Create, im Worker unter Bindings verbinden).
 - **Code aktualisieren:** Claude kann im Cloudflare-Editor nicht selbst einfügen. Ablauf: Claude legt `worker/worker.js` in die
-  Zwischenablage (`Get-Content -Raw worker/worker.js | Set-Clipboard`), Niklas öffnet Workers & Pages → result-ai → Edit code,
+  Zwischenablage (`Get-Content -Raw -Encoding UTF8 worker/worker.js | Set-Clipboard` – ohne `-Encoding UTF8` gehen in Windows
+  PowerShell 5.1 die Umlaute kaputt), Niklas öffnet Workers & Pages → result-ai → Edit code,
   klickt in den Code, Strg+A, Strg+V, Deploy. Danach zeigt `GET /` die neue `version`.
 - Das GitHub-Secret `ODDS_API_KEY` (alter Tipico-Quoten-Abruf) braucht Wettbuch nicht mehr.
 
