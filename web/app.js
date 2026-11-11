@@ -96,11 +96,13 @@
     download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19h14"/></svg>',
     receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h12a1 1 0 0 1 1 1v16l-2.3-1.5-2.4 1.5-2.3-1.5-2.3 1.5-2.4-1.5L5 20.5v-16a1 1 0 0 1 1-1z"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    dl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5v10M7.5 10l4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></svg>',
+    ul: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14.5v-10M7.5 9L12 4.5 16.5 9"/><path d="M5 19.5h14"/></svg>',
+    chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 5.5l6.5 6.5-6.5 6.5"/></svg>',
   });
   // Wettbuch-Zeichen: ein Wettschein mit Haken (auch App-Symbol und Startbild, siehe scripts/icons.py)
   const SLIP_D = 'M10 3.5h16a3 3 0 0 1 3 3V32l-1.83-2-1.84 2-1.83-2-1.83 2-1.84-2L18 32l-1.83-2-1.84 2-1.83-2-1.83 2-1.84-2L7 32V6.5a3 3 0 0 1 3-3z';
   const logo = (cls = '') => `<svg class="${cls}" viewBox="0 0 36 36" aria-hidden="true"><path d="${SLIP_D}" fill="var(--text)"/><path d="M11.5 10.5h13M11.5 15.5h9" stroke="var(--lbg, var(--bg))" stroke-width="2.6" stroke-linecap="round" fill="none"/><circle cx="26.5" cy="26.5" r="8" fill="var(--posf)" stroke="var(--lbg, var(--bg))" stroke-width="2.5"/><path d="M22.9 26.7l2.5 2.5 4.6-4.9" stroke="var(--on-pos)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
-  const decoMark = `<svg class="deco" viewBox="0 0 36 36" aria-hidden="true"><path d="${SLIP_D}" fill="currentColor"/></svg>`;
 
   // ------------------------------------------------------------------ Darstellung: hell (Standard) oder dunkel
   const isDark = () => document.documentElement.dataset.theme === 'dark';
@@ -173,9 +175,6 @@
   }
   const plate = (name, p, extra = '') => `<span class="plate" style="--p:${p}px">${crest(name, Math.round(p * 0.66), true)}${extra}</span>`;
 
-  // farbiges Licht oben auf jeder Seite
-  const aura = (kind) => `<div class="aura aura-${kind}" aria-hidden="true"></div>`;
-
   // Wappen lädt nicht (z. B. offline) → Kreis mit Kürzel in Vereinsfarbe
   document.addEventListener('error', (e) => {
     const im = e.target;
@@ -229,10 +228,10 @@
   const canPaste = () => !!(navigator.clipboard && navigator.clipboard.read);
   const scanBtns = (paste) => `<div class="acts${paste && canPaste() ? ' a3' : ''}"><label class="sbtn">${I.photo}<span>Fotos</span><input type="file" accept="image/*" data-act="scanpic" aria-label="Screenshot aus den Fotos wählen"></label>
     <label class="sbtn alt">${I.cam}<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-act="scanpic" aria-label="Wettschein fotografieren"></label>${paste && canPaste() ? `<button class="sbtn alt" data-act="scanpaste">${I.paste}<span>Einfügen</span></button>` : ''}</div>`;
-  // kleines Handy mit Wettschein (nur Deko, ohne Bewegung)
-  const scPhone = '<div class="sc-phone" aria-hidden="true"><div class="sc-screen sc-slipv"><span class="sc-lg">MEINE WETTEN</span>'
-    + '<span class="ss-r"><i></i><em></em><b>2,10</b></span><span class="ss-r"><i></i><em></em><b>1,65</b></span><span class="ss-r"><i></i><em></em><b>1,90</b></span>'
-    + '<span class="ss-t"><em></em><b>6,58</b></span><span class="sc-box"></span></div></div>';
+  // Bild auf der Scan-Karte: Wettschein im Scan-Rahmen, die grüne Linie liest gerade (ruht, keine Dauer-Animation)
+  const SCAN_ART = '<svg class="sc-art" viewBox="0 0 120 120" aria-hidden="true"><path class="sa-c" d="M16 38V26a10 10 0 0 1 10-10h12M82 16h12a10 10 0 0 1 10 10v12M104 82v12a10 10 0 0 1-10 10H82M38 104H26a10 10 0 0 1-10-10V82"/>'
+    + '<path class="sa-s" d="M42 28h36a5 5 0 0 1 5 5v59l-4.6-3.5-4.6 3.5-4.6-3.5-4.6 3.5-4.6-3.5-4.6 3.5-4.6-3.5-4.6 3.5-4.6-3.5-4.6 3.5V33a5 5 0 0 1 5-5z"/>'
+    + '<path class="sa-l" d="M46 41h22M46 50h28M46 59h16"/><rect class="sa-q" x="46" y="68" width="28" height="9" rx="4.5"/><path class="sa-g" d="M24 60h72"/><path class="sa-b" d="M24 60h72"/></svg>';
   const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const round2 = (v) => Math.round(v * 100) / 100;
 
@@ -609,6 +608,62 @@
   // so viel Euro bringt eine Gruppe von Wetten im Schnitt pro 10 € Einsatz (statt Prozent)
   const per10 = (c, st) => (st ? signed(((c / st) * 10)) : 'k. A.');
   const nBets = (n) => `${n} ${n === 1 ? 'Wette' : 'Wetten'}`;
+  // Betrag groß, Cent klein („1.234“ + „,56 €“) – wie in Banking-Apps
+  function moneyHtml(v, sg) {
+    const s = sg ? signed(v) : eur(v);
+    const m = /^(.*?)(,\d\d\s?€)$/.exec(s);
+    return m ? `${esc(m[1])}<small>${esc(m[2])}</small>` : esc(s);
+  }
+  function setNum(el, v, sg) {
+    if (!el) return;
+    if (el._cu) { cancelAnimationFrame(el._cu); el._cu = 0; }
+    el.innerHTML = moneyHtml(v, sg);
+  }
+  // große Zahl vom alten zum neuen Wert laufen lassen (data-cu = Ziel, data-sg = mit Vorzeichen); nur Text, keine Ebenen
+  function countUp(el, from) {
+    const to = +el.dataset.cu;
+    const sg = el.dataset.sg === '1';
+    if (reduce || !Number.isFinite(to) || Math.abs(to - from) < 0.01) return;
+    if (el._cu) cancelAnimationFrame(el._cu);
+    let t0 = 0;
+    const step = (now) => {
+      if (!t0) t0 = now;
+      const k = Math.min(1, (now - t0) / 950);
+      const e = 1 - Math.pow(1 - k, 4);
+      el.innerHTML = moneyHtml(round2(from + (to - from) * e), sg);
+      el._cu = k < 1 ? requestAnimationFrame(step) : 0;
+    };
+    el.innerHTML = moneyHtml(from, sg);
+    el._cu = requestAnimationFrame(step);
+  }
+  // Auftritt: Elemente gleiten gestaffelt herein (einmalig, nur transform/opacity – iPhone-Regel)
+  function stagger(items) {
+    if (reduce || !items.length) return;
+    const list = items.slice(0, 14);
+    list.forEach((c, i) => { c.classList.remove('rvi'); c.style.setProperty('--r', i); });
+    void list[0].offsetWidth;
+    list.forEach((c) => c.classList.add('rvi'));
+    setTimeout(() => list.forEach((c) => c.classList.remove('rvi')), 1300);
+  }
+  // Seite zeigt sich (Bereich gewechselt, App geöffnet): Inhalt gestaffelt, große Zahlen laufen vom zuletzt gezeigten Wert zum neuen
+  const CU = {};
+  const REVEAL_IN = ['ovg', 'hbody', 'bbody', 'blist', 'cal', 'dday']; // Behälter: deren Karten kommen einzeln
+  const revealItems = (box, items = []) => {
+    [...box.children].forEach((c) => { if (REVEAL_IN.some((k) => c.classList.contains(k))) revealItems(c, items); else items.push(c); });
+    return items;
+  };
+  function reveal(p) {
+    const w = p && $('.wrap', p.el);
+    if (!w) return;
+    stagger(revealItems(w));
+    $$('[data-cu]', w).forEach((n, i) => {
+      const k = `${p.path}:${i}`;
+      const to = +n.dataset.cu;
+      const from = k in CU ? CU[k] : 0;
+      CU[k] = to;
+      countUp(n, from);
+    });
+  }
 
   // Kontostand: „Kontostand jetzt“ (wie beim Wettanbieter) + alles danach – neue Einsätze ab, Auszahlungen dazu, Ein-/Auszahlungen.
   // Wetten mit „old“ (beim Eintragen schon im Kontostand) zählen nur in der Statistik.
@@ -708,16 +763,36 @@
     return `<section class="sec"><div class="sec-h"><h2>Limits</h2><button class="link" data-act="limits">Ändern</button></div><div class="card lim-c">${ls.map(row).join('')}</div></section>`;
   }
 
-  // ------------------------------------------------------------------ Wett-Karten
+  // ------------------------------------------------------------------ Wett-Karten (sehen aus wie ein Wettschein) und Listen-Zeilen – Antippen öffnet die Wette
   const ST_NAME = { open: 'Offen', won: 'Gewonnen', lost: 'Verloren', void: 'Storniert', cash: 'Cashout' };
   // Stand einer offenen Wette: läuft gerade (mit Spielstand), nächster Anpfiff oder „wird geprüft“
-  function liveText(b) {
+  function openState(b) {
     const now = Date.now();
     const run = b.legs.map((l) => !l.res && l.g && LIVE[l.g]).find((x) => x && x.state === 'in');
-    if (run) return `läuft · ${run.hs}:${run.as}${run.clock ? ' · ' + run.clock : ''}`;
+    if (run) return { live: true, txt: `${run.hs}:${run.as}${run.clock ? ' · ' + run.clock : ''}` };
     const next = b.legs.filter((l) => !l.res && l.t && new Date(l.t).getTime() > now).map((l) => l.t).sort()[0];
-    if (next) return kickoff(next);
-    return trackable(b) ? 'wird nach dem Abpfiff geprüft' : 'offen';
+    if (next) return { txt: kickoff(next) };
+    return { txt: trackable(b) ? 'wird geprüft' : 'offen' };
+  }
+  function liveText(b) {
+    const s = openState(b);
+    return s.live ? `läuft · ${s.txt}` : s.txt === 'wird geprüft' ? 'wird nach dem Abpfiff geprüft' : s.txt;
+  }
+  // Abzeichen oben rechts: Live mit Spielstand, Anpfiff oder das Ergebnis
+  function stPill(b) {
+    if (b.status === 'open') {
+      const s = openState(b);
+      return s.live ? `<span class="pill live"><i></i>Live · ${esc(s.txt)}</span>` : `<span class="pill">${I.clock}${esc(s.txt)}</span>`;
+    }
+    return `<span class="pill ${b.status}">${b.status === 'won' ? I.check : b.status === 'lost' ? I.x : ''}${esc(ST_NAME[b.status] || '')}</span>`;
+  }
+  const kindTxt = (b) => (b.system ? `System ${b.system} · ${b.legs.length} Tipps` : b.legs.length > 1 ? `${b.title || 'Kombi'} · ${b.legs.length} Tipps` : 'Einzelwette');
+  // rechts unten auf der Karte: offen = möglicher Gewinn, sonst Plus/Minus
+  function betResult(b) {
+    if (b.status === 'open') return ['Mögl. Gewinn', b.win ? eur(winC(b) / 100) : 'k. A.', ''];
+    if (b.status === 'void') return ['Zurück', eur(stakeC(b) / 100), ''];
+    const pl = betPL(b);
+    return [b.status === 'won' ? 'Gewinn' : b.status === 'cash' ? 'Cashout' : 'Verlust', signed(pl), plusMinus(pl)];
   }
   function legRow(l, extra) {
     const lv = l.g && LIVE[l.g];
@@ -727,38 +802,64 @@
     else if (lv && lv.cancelled) info = 'verschoben';
     else if (l.t) info = kickoff(l.t);
     const s = legState(l);
-    const mk = s ? { won: ['✓', 'won'], lost: ['✗', 'lost'], void: ['–', 'void'] }[s] : null;
+    const mk = s ? { won: [I.check, 'won'], lost: [I.x, 'lost'], void: ['–', 'void'] }[s] : null;
     const sub = [legTeams(l), l.m ? '' : l.mk, info].filter(Boolean).join(' · ');
-    return `<div class="bleg">${l.home && l.away ? `<span class="duo">${crest(l.home, 26, true)}${crest(l.away, 26, true)}</span>` : `<span class="bl-ic">${I.ticket}</span>`}<span class="grow"><b>${esc(legPick(l))}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</span>${l.q ? `<span class="bl-q">${nf2.format(l.q)}</span>` : ''}${mk ? `<span class="bl-mk ${mk[1]}">${mk[0]}</span>` : ''}${extra || ''}</div>`;
+    return `<div class="bleg">${l.home && l.away ? `<span class="duo">${crest(l.home, 24, true)}${crest(l.away, 24, true)}</span>` : `<span class="bl-ic">${I.ticket}</span>`}<span class="grow"><b>${esc(legPick(l))}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</span>${l.q ? `<span class="bl-q">${nf2.format(l.q)}</span>` : ''}${mk ? `<span class="bl-mk ${mk[1]}">${mk[0]}</span>` : ''}${extra || ''}</div>`;
   }
-  function betCard(b) {
+  function ticketCard(b) {
     regTeams(b);
-    const id = esc(b.id);
-    const nLinked = b.legs.filter((l) => l.g && l.m).length;
-    const srcTxt = b.src === 'scan' ? 'Gescannt' : 'Eingetragen';
-    const src = trackable(b) ? `<span class="bc-src ai">${I.spark}${srcTxt} · ${nLinked === b.legs.length ? 'prüft Wettbuch selbst' : `${nLinked} von ${b.legs.length} prüft Wettbuch`}</span>`
-      : `<span class="bc-src">${srcTxt}${b.free ? ' · Gratiswette' : ''}</span>`;
-    const pl = betPL(b);
-    const third = b.status === 'open' ? ['Mögl. Gewinn', b.win ? eur(winC(b) / 100) : 'k. A.', '']
-      : b.status === 'void' ? ['Zurück', eur(stakeC(b) / 100), ''] : [b.status === 'won' ? 'Gewinn' : b.status === 'cash' ? 'Ergebnis' : 'Verlust', signed(pl), plusMinus(pl)];
-    const acts = b.status === 'open'
-      ? `<div class="bc-acts a4"><button class="won" data-act="settle" data-id="${id}" data-val="won">${I.check}Gewonnen</button><button class="lost" data-act="settle" data-id="${id}" data-val="lost">Verloren</button><button data-act="cashout" data-id="${id}">Cashout</button><button data-act="settle" data-id="${id}" data-val="void">Storniert</button></div>`
-      : `<div class="bc-acts"><button data-act="settle" data-id="${id}" data-val="open">Wieder auf offen</button></div>`;
-    const stTxt = b.status === 'cash' ? `Cashout ${eur(b.cash)}` : ST_NAME[b.status];
-    const head = b.legs.length > 1 ? `<div class="bc-title">${esc(b.system ? `System ${b.system}` : b.title || 'Kombi')} · ${b.legs.length} Tipps${b.status === 'open' ? ` · ${esc(liveText(b))}` : ''}</div>` : '';
-    return `<article class="bcard ${b.status}"><div class="bc-top">${src}<span class="bc-st ${b.status}">${{ won: '✓ ', lost: '✗ ' }[b.status] || ''}${esc(stTxt)}</span></div>
-      ${head}<div class="bc-legs">${b.legs.map((l) => legRow(l)).join('')}</div>
-      <div class="bc-money"><div><span>Einsatz${b.free ? ' (gratis)' : ''}</span><b>${eur(b.stake)}</b></div><div><span>Quote</span><b>${b.q ? nf2.format(b.q) : 'k. A.'}</b></div><div><span>${third[0]}</span><b class="${third[2]}">${third[1]}</b></div></div>
-      ${acts}<div class="bc-foot"><span>${esc(['Gesetzt ' + agoText(b.at), b.bookie].filter(Boolean).join(' · '))}</span><span class="bc-fa"><button class="bc-ed" data-act="editbet" data-id="${id}">Bearbeiten</button><button class="bc-del" data-act="delbet" data-id="${id}">Löschen</button></span></div></article>`;
+    const r = betResult(b);
+    const more = b.legs.length - 3;
+    return `<article class="tk ${b.status}" data-act="betview" data-id="${esc(b.id)}" role="button" tabindex="0">
+      <div class="tk-h"><span class="tk-k">${esc(kindTxt(b))}${b.free ? ' · Gratiswette' : ''}</span>${stPill(b)}</div>
+      <div class="tk-legs">${b.legs.slice(0, 3).map((l) => legRow(l)).join('')}${more > 0 ? `<div class="tk-more">+ ${more} ${more === 1 ? 'weiterer Tipp' : 'weitere Tipps'}</div>` : ''}</div>
+      <div class="tk-cut" aria-hidden="true"></div>
+      <div class="tk-f"><div><span>Einsatz</span><b>${eur(b.stake)}</b></div><div><span>Quote</span><b>${b.q ? nf2.format(b.q) : 'k. A.'}</b></div><div class="r"><span>${r[0]}</span><b class="${r[2]}">${esc(r[1])}</b></div></div></article>`;
+  }
+  const MK = { won: I.check, lost: I.x, void: '–', cash: '€', open: I.clock };
+  // Symbol links in einer Zeile: zwei Wappen (Einzelwette), Zahl der Tipps (Kombi) oder ein Schein
+  function betIcon(b) {
+    const l = b.legs[0] || {};
+    if (b.legs.length === 1 && l.home && l.away) return `<span class="duo">${crest(l.home, 24, true)}${crest(l.away, 24, true)}</span>`;
+    if (b.legs.length > 1) return `<span class="li-n"><b>${b.legs.length}</b><small>Tipps</small></span>`;
+    return `<span class="li-ic">${I.ticket}</span>`;
   }
   function betLine(b, label, noDate) {
     regTeams(b);
     const pl = betPL(b);
-    return `<div class="rec-it ${b.status}"><span class="mk">${{ won: '✓', lost: '✗', void: '–', cash: '€' }[b.status] || '…'}</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc([label, noDate ? '' : fmtDate(settleT(b)), b.q ? `Quote ${nf2.format(b.q)}` : ''].filter(Boolean).join(' · '))}</span></span><span class="rp2 ${plusMinus(pl)}">${b.status === 'void' ? 'zurück' : signed(pl)}</span></div>`;
+    const sub = [label, noDate ? '' : fmtDate(settleT(b)), b.q ? `Quote ${nf2.format(b.q)}` : ''].filter(Boolean).join(' · ');
+    return `<button class="li" data-act="betview" data-id="${esc(b.id)}"><span class="mk ${b.status}">${MK[b.status] || ''}</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc(sub)}</span></span><span class="li-v ${b.status === 'void' ? '' : plusMinus(pl)}">${b.status === 'void' ? 'zurück' : signed(pl)}</span></button>`;
   }
   function openLine(b) {
     regTeams(b);
-    return `<div class="rec-it open"><span class="mk">…</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc(`Offen · ${liveText(b)}`)}</span></span><span class="rp2">${eur(b.stake)}</span></div>`;
+    const s = openState(b);
+    return `<button class="li" data-act="betview" data-id="${esc(b.id)}">${betIcon(b)}<span class="grow"><b>${esc(betTitle(b))}</b><span${s.live ? ' class="lv"' : ''}>${s.live ? `<i></i>Live · ${esc(s.txt)}` : esc(s.txt)}</span></span><span class="li-v2"><b>${eur(b.stake)}</b>${b.win ? `<span>→ ${eur(winC(b) / 100)}</span>` : ''}</span></button>`;
+  }
+  // Wette antippen: alle Tipps und Zahlen, darunter Abrechnen, Bearbeiten und Löschen
+  function openBetView(id) {
+    const b = betsAll().find((x) => x.id === id);
+    if (!b || $('.sheet')) return;
+    regTeams(b);
+    const r = betResult(b);
+    const i2 = esc(b.id);
+    const nLinked = b.legs.filter((l) => l.g && l.m).length;
+    const auto = trackable(b) ? (nLinked === b.legs.length ? 'Wettbuch prüft nach dem Abpfiff selbst' : `${nLinked} von ${b.legs.length} Tipps prüft Wettbuch selbst`) : '';
+    const big = b.status === 'open' ? (b.win ? moneyHtml(winC(b) / 100) : 'k. A.') : b.status === 'void' ? moneyHtml(stakeC(b) / 100) : moneyHtml(betPL(b), true);
+    const gain = b.win ? (winC(b) - stakeC(b)) / 100 : null;
+    const third = b.status === 'open' ? ['Plus bei Gewinn', gain != null ? signed(gain) : 'k. A.', gain != null ? plusMinus(gain) : ''] : ['Auszahlung', eur(backC(b) / 100), ''];
+    const acts = b.status === 'open'
+      ? `<div class="bd-acts"><button class="won" data-act="settle" data-id="${i2}" data-val="won">${I.check}<span>Gewonnen</span></button><button class="lost" data-act="settle" data-id="${i2}" data-val="lost">${I.x}<span>Verloren</span></button><button data-act="cashout" data-id="${i2}">${I.cash}<span>Cashout</span></button><button data-act="settle" data-id="${i2}" data-val="void"><b>–</b><span>Storniert</span></button></div>`
+      : `<button class="btn soft bd-re" data-act="settle" data-id="${i2}" data-val="open">Wieder auf offen setzen</button>`;
+    const meta = [b.src === 'scan' ? 'Gescannt' : 'Eingetragen', `gesetzt ${fmtWhen(b.at)}`, b.bookie, b.done && b.status !== 'open' ? `abgerechnet ${fmtDate(b.done)}` : ''].filter(Boolean).join(' · ');
+    const sh = sheet(`<div class="bd-h"><span class="bd-k">${esc(kindTxt(b))}${b.free ? ' · Gratiswette' : ''}</span>${stPill(b)}</div>
+      <div class="bd-big"><span>${b.status === 'open' ? 'Möglicher Gewinn' : esc(r[0])}</span><b class="${b.status === 'open' || b.status === 'void' ? '' : r[2]}">${big}</b></div>
+      <div class="bd-legs">${b.legs.map((l) => legRow(l)).join('')}</div>
+      <div class="bd-grid"><div><span>Einsatz${b.free ? ' (gratis)' : ''}</span><b>${eur(b.stake)}</b></div><div><span>Quote</span><b>${b.q ? nf2.format(b.q) : 'k. A.'}</b></div><div><span>${third[0]}</span><b class="${third[2]}">${esc(third[1])}</b></div></div>
+      ${auto ? `<p class="bd-auto">${I.spark}<span>${esc(auto)}</span></p>` : ''}
+      ${acts}
+      <div class="bd-foot"><button data-act="editbet" data-id="${i2}">${I.pen}<span>Bearbeiten</span></button><button class="bd-del" data-act="delbet" data-id="${i2}">Löschen</button></div>
+      <p class="bd-meta">${esc(meta)}</p>`, 'bet-panel bd-panel', betTitle(b));
+    stagger([...$('.panel', sh).children].slice(1));
   }
   // Seiten mit Wetten neu zeichnen (live = nur Start und Wetten, dort stehen die Spielstände)
   function refreshBets(live) {
@@ -785,7 +886,7 @@
     }
     betsSave(all);
     haptic();
-    if (st === 'won') toast(`Gewonnen: ${signed(betPL(b))}`);
+    if (st === 'won') toast(`Gewonnen: ${signed(betPL(b))}`, 'won');
     else if (st === 'cash') toast(`Cashout ${eur(b.cash)} · ${signed(betPL(b))}`);
     refreshBets();
     if (st === 'open') setTimeout(() => checkBets(), 300);
@@ -1070,7 +1171,6 @@
     const sinceStart = mode === 'bal' && lg.st && lg.st.t > from; // Kontostand neu eingetragen: zählt erst ab da
     const list = betsFrom(sinceStart ? lg.st.t : from).filter((b) => mode !== 'bal' || !b.old);
     const pl = sumPL(list);
-    const won = list.filter((b) => b.status === 'won').length;
     let pts;
     let val;
     if (mode === 'bal') { pts = slicePts(walletPts(lg), from); val = ws.balance; } else {
@@ -1083,18 +1183,19 @@
     const fmtV = mode === 'bal' ? eur : signed;
     const when = esc(sinceStart ? 'seit dem Eintragen' : PERIOD_TXT[B.period]);
     const sub = mode === 'bal' ? `<span class="mh-chg ${plusMinus(pl)}">${esc(signed(pl))} mit Wetten</span><span class="mh-w">${when}</span>`
-      : `<span class="mh-w">${list.length ? `${won} von ${list.length} gewonnen` : 'keine Wette abgerechnet'} · ${when}</span>`;
+      : `<span class="mh-w">${list.length ? `${nBets(list.length)} · Einsatz ${eur(sumStake(list))}` : 'keine Wette abgerechnet'} · ${when}</span>`;
     return { mode, pts, val, fmtV, big: fmtV(val), sub, label: mode === 'bal' ? 'Kontostand' : 'Gewinn und Verlust' };
   }
   function hero(mode) {
     const ws = walletState();
     const lg = ledger();
     const look = esc(store.get('mlook', 'uv'));
-    const head = `<section class="mh" data-look="${look}" data-mode="${mode}"><div class="mh-top"><span class="eyebrow">${mode === 'bal' ? 'Kontostand' : 'Gewinn und Verlust'}</span>${mode === 'bal' && ws.balance != null ? '<button class="link" data-act="wallet" data-val="base">Ändern</button>' : ''}</div>`;
-    if ((mode === 'bal' && ws.balance == null) || (mode === 'pl' && !ws.n)) {
+    const bal = mode === 'bal';
+    const head = `<section class="mh" data-look="${look}" data-mode="${mode}"><div class="mh-top"><span class="eyebrow">${bal ? 'Kontostand' : 'Gewinn und Verlust'}</span>${bal && ws.balance != null ? '<button class="mh-btn" data-act="wallet" data-val="base">Ändern</button>' : ''}</div>`;
+    if ((bal && ws.balance == null) || (!bal && !ws.n)) {
       lcStop();
       CH.line = null;
-      return head + (mode === 'bal'
+      return head + (bal
         ? '<p class="mh-empty">Trag ein, wie viel gerade auf deinem Wettkonto ist. Ab dann rechnet Wettbuch jeden Einsatz, Gewinn und Cashout selbst mit.</p><button class="btn" data-act="wallet" data-val="base">Kontostand eintragen</button></section>'
         : '<p class="mh-empty">Noch keine Wette gespeichert. Scanne deinen ersten Wettschein oder trag eine Wette ein – dann siehst du hier deine Kurve.</p></section>');
     }
@@ -1103,9 +1204,9 @@
     if (h.pts.length >= 2) chart = lineChart(h);
     else { lcStop(); CH.line = null; chart = '<p class="mh-empty">Noch nichts in diesem Zeitraum. Sobald die erste Wette abgerechnet ist, erscheint hier deine Kurve.</p>'; }
     const k = Math.max(0, PERIODS_M.findIndex(([v]) => v === B.period));
-    return `${head}<div class="mh-n ${mhTone(mode, h.val)}">${esc(h.big)}</div><div class="mh-d">${h.sub}</div>${chart}
+    return `${head}<div class="mh-n ${mhTone(mode, h.val)}" data-cu="${round2(h.val)}" data-sg="${bal ? 0 : 1}">${moneyHtml(h.val, !bal)}</div><div class="mh-d">${h.sub}</div>${chart}
       <div class="pseg" style="--k:${k};--n:${PERIODS_M.length}"><span class="ind"></span>${PERIODS_M.map(([v, l]) => `<button class="${B.period === v ? 'on' : ''}" data-act="mperiod" data-val="${v}">${l}</button>`).join('')}</div>
-      <div class="mh-open"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Möglicher Gewinn</span><b>${eur(ws.openWin)}</b></div><div><span>Offen</span><b>${ws.nOpen}</b></div></div></section>`;
+      ${bal ? `<div class="mh-open"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Mögl. Gewinn</span><b>${eur(ws.openWin)}</b></div><div><span>Offen</span><b>${ws.nOpen}</b></div></div>` : ''}</section>`;
   }
   // Zeitraum gewechselt: Knöpfe gleiten, Kurve zeichnet sich um, Zahl läuft mit – die Seite wird dafür nicht neu aufgebaut
   function heroSwitch() {
@@ -1131,12 +1232,15 @@
     swapFade($('.lc-xl:not(.out)', lc), m.xl);
     lc.setAttribute('aria-label', lcAria(h, m));
     num.className = `mh-n ${mhTone(h.mode, h.val)}`;
+    num.dataset.cu = round2(h.val);
+    const sg = h.mode === 'pl';
+    setNum(num, a, sg);
     const sub = $('.mh-d', mh);
     sub.innerHTML = h.sub;
     replay(sub, 'fadein');
-    lcMorph(lc, from, base0, false, (e) => { num.textContent = h.fmtV(a + (h.val - a) * e); }, () => { num.textContent = h.big; });
+    lcMorph(lc, from, base0, false, (e) => { num.innerHTML = moneyHtml(a + (h.val - a) * e, sg); }, () => { setNum(num, h.val, sg); });
     const body = $('.hbody', pg.el);
-    if (body) { B.anim = 'switch'; body.innerHTML = mode === 'bal' ? moneyBody() : statsBody(); B.anim = null; replay(body, 'fadein'); }
+    if (body) { B.anim = 'switch'; body.innerHTML = mode === 'bal' ? moneyBody() : statsBody(); B.anim = null; stagger([...body.children]); }
     pg.el._geo = null;
   }
 
@@ -1238,14 +1342,14 @@
     const sum = near.reduce((a, b) => a + winC(b), 0);
     const rows = near.slice(-3).reverse().map((b) => {
       const bad = b.legs.find((l) => legState(l) === 'lost');
-      return `<div class="rec-it lost"><span class="mk">✗</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc(`gescheitert an: ${legPick(bad)}${legTeams(bad) ? ` (${legTeams(bad)})` : ''}`)}</span></span><span class="rp2">${eur(winC(b) / 100)}</span></div>`;
+      return `<button class="li" data-act="betview" data-id="${esc(b.id)}"><span class="mk lost">${I.x}</span><span class="grow"><b>${esc(betTitle(b))}</b><span>${esc(`gescheitert an: ${legPick(bad)}${legTeams(bad) ? ` (${legTeams(bad)})` : ''}`)}</span></span><span class="li-v">${eur(winC(b) / 100)}</span></button>`;
     }).join('');
-    return `<section class="sec ov-near"><div class="sec-h"><h2>Knapp daneben</h2></div><div class="card rec"><p class="nr-t">${near.length === 1 ? 'Eine Kombi ist' : `${near.length} Kombis sind`} an nur einem Tipp gescheitert – ${near.length === 1 ? 'sie hätte' : 'zusammen hätten sie'} <b>${eur(sum / 100)}</b> ausgezahlt.</p><div class="rec-list">${rows}</div></div></section>`;
+    return `<section class="sec ov-near"><div class="sec-h"><h2>Knapp daneben</h2></div><p class="nr-t">${near.length === 1 ? 'Eine Kombi ist' : `${near.length} Kombis sind`} an nur einem Tipp gescheitert – ${near.length === 1 ? 'sie hätte' : 'zusammen hätten sie'} <b>${eur(sum / 100)}</b> ausgezahlt.</p><div class="lst">${rows}</div></section>`;
   }
   function statsBody() {
     const from = periodFrom();
     const list = betsFrom(from);
-    if (!list.length) return `<div class="empty">In diesem Zeitraum ist noch keine Wette abgerechnet. Danach stehen hier deine Zahlen: Gewinn pro 10 € Einsatz, Serien, Rekorde und wo du gewinnst.</div>${recordsHtml()}`;
+    if (!list.length) return `<div class="empty"><span class="em-ic">${I.chart}</span><b>Noch nichts abgerechnet</b><p>In diesem Zeitraum ist noch keine Wette abgerechnet. Danach stehen hier deine Zahlen: Gewinn pro 10 € Einsatz, Serien, Rekorde und wo du gewinnst.</p></div>${recordsHtml()}`;
     const plC = list.reduce((a, b) => a + betCents(b), 0);
     const stC = list.reduce((a, b) => a + stakeC(b), 0);
     const won = list.filter((b) => b.status === 'won').length;
@@ -1271,37 +1375,26 @@
       dd = Math.max(dd, peak - cum);
     });
     const curTxt = curR === 'w' ? `${cur} ${cur === 1 ? 'Sieg' : 'Siege'}` : curR === 'l' ? `${cur} ${cur === 1 ? 'Niederlage' : 'Niederlagen'}` : `${cur} Cashout${cur === 1 ? '' : 's'}`;
-    const maxW = Math.max(...list.map(betCents));
     const tile = (l, v, sub, c) => `<div class="kpi"><span>${l}</span><b class="${c || ''}">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
-    const kpis = tile('Gewinn/Verlust', signed(plC / 100), `bei ${eur(stC / 100)} Einsatz`, plusMinus(plC))
-      + tile('Pro 10 € Einsatz', per10(plC, stC), plC >= 0 ? 'kamen im Schnitt dazu' : 'gingen im Schnitt verloren', plusMinus(plC))
+    // vier Zahlen statt acht – Gewinn und Verlust stehen schon groß in der Karte darüber
+    const kpis = tile('Pro 10 € Einsatz', per10(plC, stC), plC >= 0 ? 'kamen im Schnitt dazu' : 'gingen im Schnitt verloren', plusMinus(plC))
       + tile('Gewonnen', `${won} von ${list.length}`, [lost ? `${lost} verloren` : '', cash ? `${cash} Cashout` : ''].filter(Boolean).join(' · ') || 'alle gewonnen')
       + tile('Ø Quote', avgQ ? nf2.format(avgQ) : 'k. A.', maxQ ? `höchste: ${nf2.format(maxQ)}` : 'keine Quote bekannt')
-      + tile('Aktuelle Serie', curTxt, `längste Siegesserie: ${best}`)
-      + tile('Größter Rückgang', dd ? `−${eur(dd / 100)}` : eur(0), 'vom Höchststand aus', dd ? 'down' : '')
-      + tile('Höchster Gewinn', signed(maxW / 100), 'bei einer einzelnen Wette', plusMinus(maxW))
-      + tile('Ø Einsatz', eur(list.reduce((a, b) => a + cents(b.stake), 0) / 100 / list.length), nBets(list.length));
+      + tile('Größter Rückgang', dd ? `−${eur(dd / 100)}` : eur(0), 'vom Höchststand aus', dd ? 'down' : '');
     const last10 = list.slice(-10);
-    const form = `<div class="card fcard"><div class="f-h"><b>Form</b><span>letzte ${last10.length}, die neueste rechts</span></div><div class="fstrip">${last10.map((b) => `<i class="${b.status === 'won' ? 'w' : b.status === 'lost' ? 'l' : 'c'}" title="${esc(betTitle(b))}">${b.status === 'won' ? '✓' : b.status === 'lost' ? '✗' : '€'}</i>`).join('')}</div></div>`;
+    const form = `<div class="card fcard"><div class="f-h"><b>Form</b><span>gerade ${esc(curTxt)} · längste Siegesserie ${best}</span></div><div class="fstrip">${last10.map((b) => `<i class="${b.status === 'won' ? 'w' : b.status === 'lost' ? 'l' : 'c'}" title="${esc(betTitle(b))}">${b.status === 'won' ? I.check : b.status === 'lost' ? I.x : '€'}</i>`).join('')}</div></div>`;
     const { unit, bk } = bucketize(list, from);
     const lastK = bk.slice().reverse().find((x) => x.n) || bk[bk.length - 1];
-    const sorted = list.slice().sort((a, b) => betPL(b) - betPL(a));
-    const bestB = sorted[0];
-    const worstB = sorted[sorted.length - 1];
-    const days = [...dayBook().values()].filter((x) => x.n && x.t >= from).sort((a, b) => b.c - a.c);
-    const dayRow = (x, name) => `<div class="rec-it ${x.c < 0 ? 'lost' : 'won'}"><span class="mk">${I.cal}</span><span class="grow"><b>${name}</b><span>${esc(dayShort(x.t))} · ${nBets(x.n)}</span></span><span class="rp2 ${plusMinus(x.c / 100)}">${signed(x.c / 100)}</span></div>`;
-    const dayRows = days.length >= 2 ? (days[0].c > 0 ? dayRow(days[0], 'Bester Tag') : '') + (days[days.length - 1].c < 0 ? dayRow(days[days.length - 1], 'Schlechtester Tag') : '') : '';
     return `<div class="kpis">${kpis}</div>${form}
       <section class="sec ov-bars"><div class="sec-h"><h2>Gewinn je ${{ day: 'Tag', week: 'Woche', month: 'Monat' }[unit]}</h2></div><div class="card"><p class="bc-read">${bucketRead(lastK, unit)}</p>${barChart(bk, unit)}</div></section>
-      ${insightsHtml(list)}
       <section class="sec ov-split"><div class="sec-h"><h2>Wo du gewinnst</h2></div><div class="card"><div class="chips sp-chips">${SPLITS.map(([v, l]) => `<button class="${B.split === v ? 'on' : ''}" data-act="bsplit" data-val="${v}">${l}</button>`).join('')}</div><div class="srs${B.anim ? ' in' : ''}">${splitRows(list)}</div></div></section>
+      ${insightsHtml(list)}
       ${nearHtml(list)}
-      <section class="sec ov-high"><div class="sec-h"><h2>Höhepunkte</h2><span class="note">${esc(PERIOD_TXT[B.period])}</span></div><div class="card rec"><div class="rec-list" style="border-top:0">${betLine(bestB, 'Beste Wette')}${worstB !== bestB ? betLine(worstB, 'Schlechteste Wette') : ''}${dayRows}</div></div></section>
       ${recordsHtml()}`;
   }
   function vStats() {
-    const html = `${aura('stats')}<h1 class="ptitle">Statistik</h1><div class="ovg">${hero('pl')}<div class="hbody ovw">${statsBody()}</div></div>
-      <p class="foot">Gezählt werden abgerechnete Wetten, stornierte nicht. Gratiswetten zählen mit dem, was sie gebracht haben. Keine Prozente – nur Euro und Anzahlen.<br>${RG_TEXT}</p>`;
+    const html = `<h1 class="ptitle">Statistik</h1><div class="ovg">${hero('pl')}<div class="hbody ovw">${statsBody()}</div></div>
+      <p class="foot">Gezählt werden abgerechnete Wetten, stornierte nicht. Keine Prozente – nur Euro und Anzahlen.<br>${RG_TEXT}</p>`;
     B.anim = null;
     return html;
   }
@@ -1312,8 +1405,14 @@
     const rows = lg.ev.filter((e) => e.v !== 0 && e.t >= from).reverse();
     if (!rows.length) return '';
     const NAMES = { stake: 'Einsatz', won: 'Gewinn ausgezahlt', void: 'Einsatz zurück', cash: 'Cashout', in: 'Einzahlung', out: 'Auszahlung', fix: 'Korrektur' };
+    const ICON = { stake: ['ticket', 'open'], won: ['check', 'won'], void: ['back', 'void'], cash: ['cash', 'cash'], in: ['dl', 'won'], out: ['ul', 'open'], fix: ['pen', 'open'] };
     const shown = B.more ? rows.slice(0, 200) : rows.slice(0, 6);
-    return `<section class="sec ov-led"><div class="sec-h"><h2>Kontoauszug</h2><span class="note">${esc(PERIOD_TXT[B.period])}</span></div><div class="group">${shown.map((e) => `<div class="row lgr"><span class="grow"><div class="t">${NAMES[e.k] || 'Buchung'}</div><div class="s">${esc([e.k === 'stake' || e.k === 'in' || e.k === 'out' || e.k === 'fix' ? fmtWhen(e.t) : fmtDate(e.t), e.txt].filter(Boolean).join(' · '))}</div></span><span class="lgv"><b class="${plusMinus(e.v)}">${signed(e.v)}</b>${e.bal != null ? `<span>${eur(e.bal)}</span>` : ''}</span></div>`).join('')}</div>${rows.length > 6 ? `<button class="more" data-act="lgmore">${B.more ? 'Weniger anzeigen' : `Alle ${rows.length} anzeigen`}</button>` : ''}</section>`;
+    const row = (e) => {
+      const [ic, cls] = ICON[e.k] || ['receipt', 'open'];
+      const when = e.k === 'stake' || e.k === 'in' || e.k === 'out' || e.k === 'fix' ? fmtWhen(e.t) : fmtDate(e.t);
+      return `<div class="li lgr"><span class="mk ${cls}">${I[ic]}</span><span class="grow"><b>${NAMES[e.k] || 'Buchung'}</b><span>${esc([when, e.txt].filter(Boolean).join(' · '))}</span></span><span class="lgv"><b class="${plusMinus(e.v)}">${signed(e.v)}</b>${e.bal != null ? `<span>${eur(e.bal)}</span>` : ''}</span></div>`;
+    };
+    return `<section class="sec ov-led"><div class="sec-h"><h2>Kontoauszug</h2><span class="note">${esc(PERIOD_TXT[B.period])}</span></div><div class="lst">${shown.map(row).join('')}</div>${rows.length > 6 ? `<button class="more" data-act="lgmore">${B.more ? 'Weniger anzeigen' : `Alle ${rows.length} anzeigen`}</button>` : ''}</section>`;
   }
   // Geldfluss seit dem ersten Eintragen: Start + Einzahlungen − Auszahlungen ± Wetten (± Korrekturen) = Kontostand jetzt
   function flowCard(lg) {
@@ -1336,10 +1435,10 @@
   }
   function vMoney() {
     const has = hasWallet();
-    const html = `${aura('money')}<h1 class="ptitle">Kasse</h1><div class="ovg">${hero('bal')}
-      ${has ? `<div class="bet-acts m3"><button class="bact" data-act="wallet" data-val="move">${I.plus}<span>Einzahlen</span></button><button class="bact" data-act="wallet" data-val="move">${I.cash}<span>Auszahlen</span></button><button class="bact" data-act="wallet" data-val="base">${I.pen}<span>Korrigieren</span></button></div>` : ''}
+    const html = `<h1 class="ptitle">Kasse</h1><div class="ovg">${hero('bal')}
+      ${has ? `<div class="mact"><button data-act="wallet" data-val="move"><span>${I.dl}</span>Einzahlen</button><button data-act="wallet" data-val="move"><span>${I.ul}</span>Auszahlen</button><button data-act="wallet" data-val="base"><span>${I.pen}</span>Korrigieren</button><button data-act="limits"><span>${I.shield}</span>Limits</button></div>` : ''}
       <div class="hbody ovw">${moneyBody()}</div></div>
-      <p class="foot">Der Kontostand hier ist deine eigene Rechnung – verbindlich ist der bei deinem Wettanbieter. Stimmt etwas nicht, einfach korrigieren.<br>${RG_TEXT}</p>`;
+      <p class="foot">Der Kontostand hier ist deine eigene Rechnung – verbindlich ist der bei deinem Wettanbieter.<br>${RG_TEXT}</p>`;
     B.anim = null;
     return html;
   }
@@ -1439,7 +1538,7 @@
       const op = opens.get(key) || [];
       const t = new Date(y, mo, B.calDay).getTime();
       const items = (x ? x.list.slice().reverse().map((b) => betLine(b, catOf(b), true)) : []).concat(op.map(openLine)).join('');
-      return `<section class="sec"><div class="sec-h"><h2>${esc(dayLong(t))}</h2>${x ? `<span class="sv ${plusMinus(x.c / 100)}">${signed(x.c / 100)}</span>` : ''}</div><div class="card rec"><div class="rec-list" style="border-top:0">${items}</div></div><button class="more" data-act="calday" data-val="0">Ganzen Monat anzeigen</button></section>`;
+      return `<section class="sec"><div class="sec-h"><h2>${esc(dayLong(t))}</h2>${x ? `<span class="sv ${plusMinus(x.c / 100)}">${signed(x.c / 100)}</span>` : ''}</div><div class="lst">${items}</div><button class="more" data-act="calday" data-val="0">Ganzen Monat anzeigen</button></section>`;
     }
     if (!rows.length) return '';
     return `<section class="sec"><div class="sec-h"><h2>Alle Tage</h2></div><div class="group">${rows.slice().reverse().map((r) => `<button class="row cal-r" data-act="calday" data-val="${r.d}"><span class="grow"><div class="t">${esc(dayLong(r.t))}</div><div class="s">${r.list.length} ${r.list.length === 1 ? 'Wette' : 'Wetten'}${r.n ? ` · ${r.won} gewonnen` : ''}</div></span><b class="sv ${plusMinus(r.c / 100)}">${signed(r.c / 100)}</b><span class="chev">›</span></button>`).join('')}</div></section>`;
@@ -1784,44 +1883,67 @@
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
-  // ------------------------------------------------------------------ Start
-  function homeMoney() {
-    const ws = walletState();
-    if (ws.balance == null) {
-      return `<button class="hm-card none" data-act="wallet" data-val="base"><span class="hm-ic">${I.wallet}</span><span class="grow"><b>Kontostand eintragen</b><span>Dann rechnet Wettbuch jeden Einsatz, Gewinn und Cashout selbst mit.</span></span><span class="chev">›</span></button>`;
-    }
-    return `<button class="hm-card" data-act="tab" data-tab="/money"><span class="grow"><span class="eyebrow">Kontostand</span><b class="hm-n">${eur(ws.balance)}</b><span class="hm-s">${ws.nOpen ? `${eur(ws.open)} im Spiel · ${ws.nOpen} ${ws.nOpen === 1 ? 'Wette' : 'Wetten'} offen` : 'keine Wette offen'}</span></span><span class="chev">›</span></button>`;
-  }
-  function homeTiles() {
+  // ------------------------------------------------------------------ Start (Niklas, 11.11.2026: „viel cleaner und aufgeräumter“): große Konto-Karte,
+  // zwei Knöpfe (Scannen, Eintragen), offene Wetten und die letzten Ergebnisse – sonst nichts
+  function weekStats() {
     const now = new Date();
     const wk = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7)).getTime();
-    const mo = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-    const tile = (label, from) => {
-      const list = betsFrom(from);
-      const c = list.reduce((a, b) => a + betCents(b), 0);
-      const won = list.filter((b) => b.status === 'won').length;
-      return `<button class="htile" data-act="tab" data-tab="/stats"><span>${label}</span><b class="${plusMinus(c / 100)}">${signed(c / 100)}</b><small>${list.length ? `${won} von ${list.length} gewonnen` : 'nichts abgerechnet'}</small></button>`;
-    };
-    return `<section class="sec h-tiles"><div class="htiles">${tile('Diese Woche', wk)}${tile('Dieser Monat', mo)}${tile('Gesamt', -Infinity)}</div></section>`;
+    const list = betsFrom(wk);
+    return { pl: sumPL(list), n: list.length, won: list.filter((b) => b.status === 'won').length };
   }
-  const HOW = [[I.scan, '1. Scannen', 'Screenshot vom Wettschein oder von „Meine Wetten“ – Wettbuch liest Einsatz, Quote und Tipps.'],
-    [I.check, '2. Abwarten', 'Nach dem Abpfiff prüft Wettbuch die Spiele selbst und rechnet die Wette ab.'],
-    [I.chart, '3. Überblick', 'Kasse, Statistik und Kalender zeigen, wo du stehst – in Euro, ohne Prozente.']];
+  // kleine Kurve des Kontostands (letzte 30 Tage) – zeichnet sich beim Auftritt einmal von links nach rechts
+  function sparkHtml(pts) {
+    if (pts.length < 2) return '';
+    const W = 340;
+    const H = 64;
+    const P = 6;
+    const vs = pts.map((p) => p.v);
+    let lo = Math.min(...vs);
+    let hi = Math.max(...vs);
+    if (hi - lo < 0.01) { lo -= 1; hi += 1; }
+    const t0 = pts[0].t;
+    const t1 = pts[pts.length - 1].t;
+    const xs = [];
+    pts.forEach((p, i) => xs.push(i ? Math.max(((p.t - t0) / Math.max(1, t1 - t0)) * (W - 8), xs[i - 1] + 0.02) : 0));
+    const ys = vs.map((v) => P + (1 - (v - lo) / (hi - lo)) * (H - 2 * P));
+    const ms = monoSlopes(xs, ys);
+    let d = `M${f1(xs[0])} ${f1(ys[0])}`;
+    for (let i = 0; i < xs.length - 1; i++) {
+      const h = (xs[i + 1] - xs[i]) / 3;
+      d += `C${f1(xs[i] + h)} ${f1(ys[i] + ms[i] * h)} ${f1(xs[i + 1] - h)} ${f1(ys[i + 1] - ms[i + 1] * h)} ${f1(xs[i + 1])} ${f1(ys[i + 1])}`;
+    }
+    const lx = xs[xs.length - 1];
+    return `<svg class="spk" viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs><linearGradient id="spk-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".22"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient><clipPath id="spk-c"><rect class="spk-r" width="${W}" height="${H}"/></clipPath></defs>
+      <g clip-path="url(#spk-c)"><path d="${d}L${f1(lx)} ${H}L0 ${H}Z" fill="url(#spk-g)"/><path class="spk-l" d="${d}"/></g><circle class="spk-d" cx="${f1(lx)}" cy="${f1(ys[ys.length - 1])}" r="4"/></svg>`;
+  }
+  function walletCard() {
+    const ws = walletState();
+    const look = esc(store.get('mlook', 'uv'));
+    const foot = `<span class="mh-open"><span><span>Im Spiel</span><b>${eur(ws.open)}</b></span><span><span>Mögl. Gewinn</span><b>${eur(ws.openWin)}</b></span><span><span>Offen</span><b>${ws.nOpen}</b></span></span>`;
+    if (ws.balance == null) {
+      return `<section class="mh wc none" data-look="${look}"><div class="mh-top"><span class="eyebrow">Kontostand</span></div><p class="mh-empty">Trag ein, wie viel gerade auf deinem Wettkonto ist – dann rechnet Wettbuch jeden Einsatz, Gewinn und Cashout mit.</p><button class="btn" data-act="wallet" data-val="base">Kontostand eintragen</button>${ws.nOpen ? foot : ''}</section>`;
+    }
+    const wk = weekStats();
+    const chip = wk.n ? `<span class="mh-chg ${plusMinus(wk.pl)}">${esc(signed(wk.pl))}</span><span class="mh-w">diese Woche · ${wk.won} von ${wk.n} gewonnen</span>` : '<span class="mh-w">diese Woche noch nichts abgerechnet</span>';
+    return `<section class="mh wc" data-look="${look}" data-act="tab" data-tab="/money" role="button" tabindex="0" aria-label="Kasse öffnen">
+      <span class="mh-top"><span class="eyebrow">Kontostand</span><span class="wc-go">${I.chev}</span></span>
+      <span class="mh-n" data-cu="${round2(ws.balance)}" data-sg="0">${moneyHtml(ws.balance)}</span>
+      <span class="mh-d">${chip}</span>${sparkHtml(slicePts(walletPts(ledger()), Date.now() - 30 * 864e5))}${foot}</section>`;
+  }
+  const HOW = [[I.scan, 'Scannen', 'Screenshot vom Wettschein oder von „Meine Wetten“ – Wettbuch liest Einsatz, Quote und Tipps.'],
+    [I.check, 'Abwarten', 'Nach dem Abpfiff prüft Wettbuch die Spiele selbst und rechnet die Wette ab.'],
+    [I.chart, 'Überblick', 'Kasse, Statistik und Kalender zeigen, wo du stehst – in Euro, ohne Prozente.']];
   function vHome() {
     const bets = betsAll();
     const open = bets.filter((b) => b.status === 'open').sort((x, y) => (firstKick(x) - firstKick(y)) || (y.at - x.at));
-    const last = settledBets().slice(-3).reverse();
-    const openSec = `<section class="sec h-open"><div class="sec-h"><h2>Offen${open.length ? ` <span class="cnt">${open.length}</span>` : ''}</h2><span class="sec-r"><button class="link" data-act="newbet">Eintragen</button>${open.length > 3 ? '<button class="link" data-act="betsgo" data-val="open">Alle</button>' : ''}</span></div>
-      ${open.length ? `<button class="card rec h-list" data-act="betsgo" data-val="open"><span class="rec-list" style="border-top:0">${open.slice(0, 3).map(openLine).join('')}</span></button>` : '<div class="empty">Keine Wette offen. Scanne einen Wettschein oder trag eine Wette ein.</div>'}</section>`;
-    return `${aura('home')}<section class="hello"><h1>${esc(greet())}</h1><p>${esc(todayLong())}</p></section>
-      ${rgNotice()}
-      <div class="hm-slot">${homeMoney()}</div>
-      <section class="scan-card">${decoMark}${scPhone}
-        <div class="sc-text"><span class="sc-eb">${I.scan}Wettschein scannen</span><h2>Screenshot rein.<br><span>Wette drin.</span></h2><p>Aus deiner Wett-App: Wettbuch liest Einsatz, Quote und Tipps – und rechnet nach dem Abpfiff selbst ab.</p></div>
-        ${scanBtns()}</section>
-      ${openSec}
-      ${bets.length ? homeTiles() : `<section class="sec"><div class="sec-h"><h2>So geht's</h2></div><div class="feat-grid">${HOW.map(([ic, t, s]) => `<div class="feat"><span class="fi">${ic}</span><b>${t}</b><span>${s}</span></div>`).join('')}</div></section>`}
-      ${last.length ? `<section class="sec h-last"><div class="sec-h"><h2>Zuletzt abgerechnet</h2><button class="link" data-act="betsgo" data-val="done">Alle</button></div><div class="card rec"><div class="rec-list" style="border-top:0">${last.map((b) => betLine(b, betKind(b))).join('')}</div></div></section>` : ''}
+    const last = settledBets().slice(-4).reverse();
+    const qa = `<div class="qa"><label class="qa-b pri">${I.scanF}<span>Scannen</span><input type="file" accept="image/*" data-act="scanpic" aria-label="Wettschein scannen"></label><button class="qa-b" data-act="newbet">${I.plus}<span>Eintragen</span></button></div>`;
+    const openSec = !bets.length ? '' : `<section class="sec h-open"><div class="sec-h"><h2>Offen${open.length ? ` <span class="cnt">${open.length}</span>` : ''}</h2>${open.length ? '<button class="link" data-act="betsgo" data-val="open">Alle</button>' : ''}</div>
+      ${open.length ? `<div class="lst">${open.slice(0, 3).map(openLine).join('')}${open.length > 3 ? `<button class="li li-more" data-act="betsgo" data-val="open">Alle ${open.length} offenen Wetten${I.chev}</button>` : ''}</div>` : '<p class="h-none">Gerade keine Wette offen.</p>'}</section>`;
+    const lastSec = last.length ? `<section class="sec h-last"><div class="sec-h"><h2>Zuletzt</h2><button class="link" data-act="betsgo" data-val="done">Alle</button></div><div class="lst">${last.map((b) => betLine(b, betKind(b))).join('')}</div></section>` : '';
+    const how = bets.length ? '' : `<section class="sec h-how"><div class="sec-h"><h2>So geht's</h2></div><div class="lst">${HOW.map(([ic, t, s], i) => `<div class="li"><span class="li-ic s${i}">${ic}</span><span class="grow"><b>${t}</b><span class="wrap2">${s}</span></span></div>`).join('')}</div></section>`;
+    return `<section class="hello"><p>${esc(todayLong())}</p><h1>${esc(greet())}</h1></section>
+      ${rgNotice()}${walletCard()}${qa}${openSec}${lastSec}${how}
       <p class="foot">${RG_TEXT}</p>`;
   }
 
@@ -1829,7 +1951,9 @@
   const BTABS = ['open', 'done', 'cal'];
   const FILTERS = [['all', 'Alle'], ['won', 'Gewonnen'], ['lost', 'Verloren'], ['cash', 'Cashout'], ['void', 'Storniert']];
   const openSort = (x, y) => (firstKick(x) - firstKick(y)) || (y.at - x.at);
-  const betActs = () => `<div class="bet-acts"><label class="bact">${I.scan}<span>Scannen</span><input type="file" accept="image/*" data-act="scanpic" aria-label="Wettschein scannen"></label><button class="bact" data-act="newbet">${I.pen}<span>Eintragen</span></button></div>`;
+  // leerer Zustand: Symbol, Satz, Erklärung – auf Wunsch mit den Knöpfen Scannen und Eintragen
+  const emptyHtml = (ic, t, sub, btns) => `<div class="empty big"><span class="em-ic">${ic}</span><b>${esc(t)}</b><p>${esc(sub)}</p>${btns ? `<div class="em-b"><label class="btn pri">${I.scanF}<span>Scannen</span><input type="file" accept="image/*" data-act="scanpic" aria-label="Wettschein scannen"></label><button class="btn soft" data-act="newbet">${I.plus}<span>Eintragen</span></button></div>` : ''}</div>`;
+  // abgerechnete Wetten nach Tagen – jeder Tag ein eigener Block (.dday), am iPad liegen die Tage dicht nebeneinander
   function doneList(done) {
     const book = dayBook();
     let out = '';
@@ -1837,24 +1961,25 @@
     done.forEach((b) => {
       const k = calKey(new Date(settleT(b)));
       if (k !== day) {
-        day = k;
         const x = book.get(k);
-        out += `<div class="dgrp"><span>${esc(dayLong(settleT(b)))}</span>${B.filter === 'all' && x ? `<b class="${plusMinus(x.c / 100)}">${signed(x.c / 100)}</b>` : ''}</div>`;
+        out += `${day ? '</div>' : ''}<div class="dday"><div class="dgrp"><span>${esc(dayLong(settleT(b)))}</span>${B.filter === 'all' && x ? `<b class="${plusMinus(x.c / 100)}">${signed(x.c / 100)}</b>` : ''}</div>`;
+        day = k;
       }
-      out += betCard(b);
+      out += ticketCard(b);
     });
-    return out;
+    return day ? `${out}</div>` : out;
   }
   function betsBody() {
     const bets = betsAll();
     if (B.tab === 'cal') return `<div class="cal">${calHtml()}</div>`;
     if (B.tab === 'open') {
       const open = bets.filter((b) => b.status === 'open').sort(openSort);
+      if (!open.length) return emptyHtml(I.ticket, 'Keine Wette offen', 'Scanne deinen Wettschein oder trag eine Wette ein. Erkannte Spiele rechnet Wettbuch nach dem Abpfiff selbst ab – mit dem echten Endstand nach 90 Minuten.', true);
       const ws = walletState();
-      return `${betActs()}${open.length ? `<div class="bsum"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Möglicher Gewinn</span><b>${eur(ws.openWin)}</b></div></div>` : ''}<div class="blist">${open.length ? open.map(betCard).join('') : '<div class="empty">Keine Wette offen. Scanne deinen Wettschein oder trag eine Wette ein.</div>'}</div>`;
+      return `<div class="osum"><div><span>Im Spiel</span><b>${eur(ws.open)}</b></div><div><span>Möglicher Gewinn</span><b>${eur(ws.openWin)}</b></div></div><div class="blist">${open.map(ticketCard).join('')}</div>`;
     }
     const all = bets.filter((b) => b.status !== 'open' && b.done).sort((x, y) => settleT(y) - settleT(x));
-    if (!all.length) return '<div class="blist"><div class="empty">Noch keine Wette abgerechnet.</div></div>';
+    if (!all.length) return emptyHtml(I.check, 'Noch nichts abgerechnet', 'Sobald eine Wette entschieden ist, steht sie hier – nach Tagen sortiert, mit Plus und Minus.');
     const cnt = (v) => (v === 'all' ? all.length : all.filter((b) => b.status === v).length);
     const chips = `<div class="chips bfilt">${FILTERS.filter(([v]) => v === 'all' || cnt(v)).map(([v, l]) => `<button class="${B.filter === v ? 'on' : ''}" data-act="bfilter" data-val="${v}">${l} <small>${cnt(v)}</small></button>`).join('')}</div>`;
     const done = B.filter === 'all' ? all : all.filter((b) => b.status === B.filter);
@@ -1871,7 +1996,7 @@
     seg.style.setProperty('--k', Math.max(0, BTABS.indexOf(v)));
     $$('button', seg).forEach((x) => x.classList.toggle('on', x.dataset.val === v));
     body.innerHTML = betsBody();
-    replay(body, 'fadein');
+    stagger(revealItems(body)); // Karten kommen nacheinander herein
     pg.el._geo = null;
   }
   // nur den Inhalt unter den Reitern neu zeichnen (Filter, „Alle anzeigen“)
@@ -1888,10 +2013,10 @@
     const nDone = bets.filter((b) => b.status !== 'open').length;
     const TABS_B = [['open', 'Offen', nOpen], ['done', 'Erledigt', nDone], ['cal', 'Kalender']];
     const k = Math.max(0, BTABS.indexOf(B.tab));
-    return `${aura('bets')}<h1 class="ptitle">Wetten</h1>
+    return `<div class="ph"><h1 class="ptitle">Wetten</h1><span class="ph-a"><label class="round" aria-label="Wettschein scannen">${I.scan}<input type="file" accept="image/*" data-act="scanpic" aria-label="Wettschein scannen"></label><button class="round pri" data-act="newbet" aria-label="Wette eintragen">${I.plus}</button></span></div>
       <div class="seg s3 bseg" style="--k:${k}"><span class="ind"></span>${TABS_B.map(([v, l, n]) => `<button class="${B.tab === v ? 'on' : ''}" data-act="btab" data-val="${v}">${l}${n ? `<small>${n}</small>` : ''}</button>`).join('')}</div>
       <div class="bbody">${betsBody()}</div>
-      <p class="foot">Wetten mit erkanntem Spiel prüft Wettbuch nach dem Abpfiff selbst – mit dem echten Endstand nach 90 Minuten. Alles andere rechnest du mit einem Tipp ab.<br>${RG_TEXT}</p>`;
+      <p class="foot">${RG_TEXT}</p>`;
   }
 
   // ------------------------------------------------------------------ KI-Zentrale: was im Hintergrund für dich arbeitet, mit Protokoll
@@ -1980,7 +2105,7 @@
     return '';
   }
   function vKI() {
-    const head = aura('ki') + '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was im Hintergrund für dich arbeitet – jeder Schritt wird hier protokolliert.</p>';
+    const head = '<h1 class="ptitle">KI-Zentrale</h1><p class="psub">Was im Hintergrund für dich arbeitet – jeder Schritt wird hier protokolliert.</p>';
     const upd = Z.st && Z.st.ok && !newServer()
       ? '<div class="notice ki-upd"><b>Server-Update fehlt</b><p>Der Cloudflare-Server läuft noch mit dem alten Code. Scannen geht trotzdem, aber nur ein Wettschein pro Bild. Für ganze Listen („Meine Wetten“), den Spielplan-Zeitgeber und Konten muss der neue Code einmal bei Cloudflare eingefügt werden.</p></div>' : '';
     const logs = kiAll().map((e) => Object.assign({ t: new Date(e.at).toISOString(), key: e.id }, e));
@@ -1994,7 +2119,7 @@
     const tiles = [
       [sum(today.filter((e) => e.kind === 'scan'), () => 1), 'Scans heute', 'scan', 'v'],
       [sum(today.filter((e) => e.kind === 'scan'), (e) => e.n), 'Wetten erkannt heute', 'receipt', 'o'],
-      [sum(week.filter((e) => e.kind === 'settle'), (e) => e.n), 'selbst abgerechnet (7 Tage)', 'check', 'g'],
+      [sum(week.filter((e) => e.kind === 'settle'), (e) => e.n), 'abgerechnet (7 Tage)', 'check', 'g'],
       [G.data ? G.data.games.length : 'k. A.', 'Spiele im Plan', 'cal', 'b'],
     ].map(([v, l, ic, c]) => `<div class="kt kt-${c}"><span class="kt-i">${I[ic]}</span><b>${v}</b><span>${l}</span></div>`).join('');
     // 7 Tage: Wetten, um die sich die KI gekümmert hat (gelesen + abgerechnet), darunter die Spielplan-Läufe
@@ -2005,7 +2130,8 @@
       days.push({ s0, n: sum(es.filter((e) => e.kind !== 'games'), (e) => e.n), runs: es.filter((e) => e.kind === 'games').length });
     }
     const mx = Math.max(1, ...days.map((x) => x.n));
-    const chart = `<div class="kchart">${days.map((x, i) => `<div class="kc-col${i === 6 ? ' now' : ''}"><span class="kc-v">${x.n || ''}</span><i style="height:${Math.max(4, Math.round((x.n / mx) * 92))}px"></i><span class="kc-l">${i === 6 ? 'Heute' : ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(x.s0).getDay()]}</span><span class="kc-r">${x.runs}×</span></div>`).join('')}</div>`;
+    const none = days.every((x) => !x.n); // leere Woche: Hinweis statt stummer Balken
+    const chart = `<div class="kchart${none ? ' zero' : ''}">${days.map((x, i) => `<div class="kc-col${i === 6 ? ' now' : ''}"><span class="kc-v">${x.n || ''}</span><i style="height:${Math.max(4, Math.round((x.n / mx) * 92))}px"></i><span class="kc-l">${i === 6 ? 'Heute' : ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][new Date(x.s0).getDay()]}</span><span class="kc-r">${x.runs}×</span></div>`).join('')}${none ? '<p class="kc-none">Diese Woche hat die KI noch keine Wette gelesen oder abgerechnet.</p>' : ''}</div>`;
     // Protokoll nach Tagen
     let log = '';
     let lastDay = '';
@@ -2358,26 +2484,27 @@
     } else {
       acts = `<p class="sl-dup ok">${I.check}<span>Gespeichert${d.b.status !== st ? ` · inzwischen ${esc(ST_NAME[d.b.status])}` : ''}</span><button class="link" data-act="betsgo" data-val="${d.b.status === 'open' ? 'open' : 'done'}">Ansehen</button></p><button class="link sl-new" data-act="scnew" data-id="${id}" data-i="${i}">Ist eine andere Wette – neu speichern</button>`;
     }
-    return `<article class="bcard slip ${st}"><div class="bc-top"><span class="bc-src${nLinked ? ' ai' : ''}">${nLinked ? I.spark : ''}${esc(kind)}${x.free ? ' · Gratiswette' : ''}</span><span class="bc-st ${st}">${{ won: '✓ ', lost: '✗ ' }[st] || ''}${esc(stTxt)}</span></div>
-      <div class="bc-legs">${legs}</div>
-      <div class="bc-money"><div><span>Einsatz${x.free ? ' (gratis)' : ''}</span><b>${x.stake ? eur(x.stake) : 'k. A.'}</b></div><div><span>Quote</span><b>${x.q ? nf2.format(x.q) : 'k. A.'}</b></div><div><span>${third[0]}</span><b class="${third[2]}">${third[1]}</b></div></div>
+    return `<article class="tk slip ${st}"><div class="tk-h"><span class="tk-k">${nLinked ? I.spark : ''}${esc(kind)}${x.free ? ' · Gratiswette' : ''}</span><span class="pill ${x.st ? st : ''}">${{ won: I.check, lost: I.x }[st] || ''}${esc(stTxt)}</span></div>
+      <div class="tk-legs">${legs}</div>
+      <div class="tk-cut" aria-hidden="true"></div>
+      <div class="tk-f"><div><span>Einsatz${x.free ? ' (gratis)' : ''}</span><b>${x.stake ? eur(x.stake) : 'k. A.'}</b></div><div><span>Quote</span><b>${x.q ? nf2.format(x.q) : 'k. A.'}</b></div><div class="r"><span>${third[0]}</span><b class="${third[2]}">${third[1]}</b></div></div>
       ${track ? `<p class="sl-track">${esc(track)}</p>` : ''}${x.betId ? `<p class="sl-id">Wett-ID ${esc(x.betId)}</p>` : ''}
       <div class="sl-acts">${acts}</div></article>`;
   }
   function vScanRes(id) {
     const sc = scanById(id);
-    if (!sc) return `${aura('scan')}<h1 class="ptitle">Scan</h1><div class="empty" style="margin-top:18px">Diesen Scan gibt es nicht (mehr).</div>`;
+    if (!sc) return `<h1 class="ptitle">Scan</h1><div class="empty" style="margin-top:18px">Diesen Scan gibt es nicht (mehr).</div>`;
     regTeams(sc);
     const n = sc.slips.length;
     const fresh = sc.slips.filter((x) => dupOf(x).st === 'new' && slipComplete(x)).length;
-    return `${aura('scan')}<h1 class="ptitle">${n === 1 ? '1 Wette erkannt' : `${n} Wetten erkannt`}</h1><p class="psub">${esc([agoText(sc.at), sc.bookie].filter(Boolean).join(' · '))} · Spiel falsch zugeordnet? Den Stift antippen.</p>
+    return `<h1 class="ptitle">${n === 1 ? '1 Wette erkannt' : `${n} Wetten erkannt`}</h1><p class="psub">${esc([agoText(sc.at), sc.bookie].filter(Boolean).join(' · '))} · Spiel falsch zugeordnet? Den Stift antippen.</p>
       ${sc.note ? `<div class="notice sc-note"><b>Hinweis der KI</b><p>${esc(sc.note)}</p></div>` : ''}
       ${fresh > 1 ? `<button class="btn sc-all" data-act="sctakeall" data-id="${esc(sc.id)}">Alle ${fresh} speichern</button>` : ''}
       <div class="scl">${sc.slips.map((x, i) => slipCard(sc, x, i)).join('')}</div>
       <div class="scan-more"><label class="btn soft">${I.scan}<span>Noch ein Screenshot</span><input type="file" accept="image/*" data-act="scanpic" aria-label="Noch einen Screenshot wählen"></label></div>
       <p class="foot">Die KI liest das Bild nur ab – was nicht zu sehen ist, steht als „k. A.“ da. Ob eine Wette aufgeht, prüft Wettbuch selbst mit den echten Endständen, ohne KI.<br>${RG_TEXT}</p>`;
   }
-  // Scan-Bereich (Tab): Knöpfe, was der Scan kann, zuletzt gescannt
+  // Scan-Bereich (Tab): großer Scan-Knopf, zuletzt gescannt, was der Scan kann
   function vScan() {
     const recent = scansAll();
     const feats = [[I.layers, 'Ganze Listen', 'Ein Screenshot von „Meine Wetten“: bis zu 10 Wetten auf einmal.'],
@@ -2390,16 +2517,15 @@
       const l = x.legs[0] || {};
       const more = sc.slips.length - 1;
       const title = x.legs.length > 1 ? `${x.system ? 'System' : 'Kombi'} · ${x.legs.length} Tipps` : legPick(l);
-      const ic = x.legs.length === 1 && l.home && l.away ? `<span class="duo">${crest(l.home, 30, true)}${crest(l.away, 30, true)}</span>` : `<span class="sc-ri">${I.receipt}</span>`;
-      return `<a class="row" href="#/scan/res/${esc(sc.id)}">${ic}<span class="grow"><div class="t">${esc(title)}${more > 0 ? ` <span class="muted">+${more}</span>` : ''}</div><div class="s">${esc([nBets(sc.slips.length), sc.bookie, agoText(sc.at)].filter(Boolean).join(' · '))}</div></span><span class="chev">›</span></a>`;
+      const ic = x.legs.length === 1 && l.home && l.away ? `<span class="duo">${crest(l.home, 24, true)}${crest(l.away, 24, true)}</span>` : `<span class="li-ic">${I.receipt}</span>`;
+      return `<a class="row" href="#/scan/res/${esc(sc.id)}">${ic}<span class="grow"><div class="t">${esc(title)}${more > 0 ? ` <span class="muted">+${more}</span>` : ''}</div><div class="s">${esc([nBets(sc.slips.length), sc.bookie, agoText(sc.at)].filter(Boolean).join(' · '))}</div></span><span class="chev">${I.chev}</span></a>`;
     };
-    return `${aura('scan')}<h1 class="ptitle">Scannen</h1><p class="psub">Screenshot aus deiner Wett-App rein – Wettbuch liest Einsatz, Quote und Tipps.</p>
-      <section class="scan-card sc-hero">${decoMark}${scPhone}
-        <div class="sc-text"><span class="sc-eb">${I.scan}Wettschein scannen</span><h2>Screenshot rein.<br><span>Wette drin.</span></h2><p>Ein Schein oder die ganze Liste „Meine Wetten“ – offen oder schon abgerechnet.</p></div>
+    return `<h1 class="ptitle">Scannen</h1><p class="psub">Screenshot aus deiner Wett-App – Wettbuch liest Einsatz, Quote und Tipps.</p>
+      <section class="scan-card sc-hero">${SCAN_ART}<h2>Wettschein scannen</h2><p>Ein Schein oder die ganze Liste „Meine Wetten“ – offen oder schon abgerechnet.</p>
         ${scanBtns(true)}${ipadWide() ? '<p class="sc-drop">Oder ein Bild hierher ziehen – oder mit ⌘V einfügen.</p>' : ''}</section>
-      <section class="sec"><div class="sec-h"><h2>Das kann der Scan</h2></div><div class="feat-grid">${feats.map(([ic, t, s]) => `<div class="feat"><span class="fi">${ic}</span><b>${t}</b><span>${s}</span></div>`).join('')}</div></section>
-      <div class="bet-acts one"><button class="bact" data-act="newbet">${I.pen}<span>Ohne Scan: Wette selbst eintragen</span></button></div>
+      <button class="btn soft sc-man" data-act="newbet">${I.pen}<span>Ohne Scan: selbst eintragen</span></button>
       ${recent.length ? `<section class="sec"><div class="sec-h"><h2>Zuletzt gescannt</h2></div><div class="group">${recent.map(row).join('')}</div></section>` : ''}
+      <section class="sec"><div class="sec-h"><h2>Das kann der Scan</h2></div><div class="lst feats">${feats.map(([ic, t, s], i) => `<div class="li"><span class="li-ic s${i}">${ic}</span><span class="grow"><b>${t}</b><span class="wrap2">${s}</span></span></div>`).join('')}</div></section>
       <p class="foot">Die KI sieht nur das Bild, das du scannst – an deine Wett-App oder dein Wettkonto kommt Wettbuch nie heran.<br>${RG_TEXT}</p>`;
   }
   // iPad: Bild hineinziehen oder mit ⌘V einfügen, solange der Scan-Bereich offen ist
@@ -2560,15 +2686,15 @@
     return isNaN(d) ? null : d.toISOString();
   };
   let toastT = 0;
-  function toast(msg) {
+  function toast(msg, kind) {
     let t = $('.toast');
     if (!t) {
       t = document.createElement('div');
-      t.className = 'toast';
       t.setAttribute('role', 'status');
       document.body.appendChild(t);
     }
-    t.textContent = msg;
+    t.className = `toast${kind ? ' ' + kind : ''}`;
+    t.innerHTML = `${kind === 'won' ? `<i>${I.check}</i>` : ''}<span>${esc(msg)}</span>`;
     t.classList.remove('show');
     void t.offsetWidth; // neu einblenden, auch wenn gerade schon eine Meldung steht
     t.classList.add('show');
@@ -2812,7 +2938,9 @@
   const tabbar = document.createElement('nav');
   tabbar.className = 'tabbar';
   tabbar.setAttribute('aria-label', 'Bereiche');
-  tabbar.innerHTML = `<span class="tab-ind" aria-hidden="true"></span><span class="side-brand" aria-hidden="true">${logo()}</span>` + TABS.map(([p, label, ic]) => `<button data-act="tab" data-tab="${p}"><span class="ti"><span class="o">${I[ic]}</span><span class="f">${I[ic + 'F'] || I[ic]}</span></span><span class="tl">${label}</span></button>`).join('')
+  tabbar.innerHTML = `<span class="tab-ind" aria-hidden="true"></span><span class="side-brand" aria-hidden="true">${logo()}</span>` + TABS.map(([p, label, ic]) => (p === '/scan'
+    ? `<button class="tb-scan" data-act="tab" data-tab="${p}" aria-label="${label}"><span class="ti"><span class="tb-c">${I.scanF}</span></span><span class="tl">${label}</span></button>`
+    : `<button data-act="tab" data-tab="${p}"><span class="ti"><span class="o">${I[ic]}</span><span class="f">${I[ic + 'F'] || I[ic]}</span></span><span class="tl">${label}</span></button>`)).join('')
     + `<span class="side-foot"><button class="kib" data-act="ki" aria-label="KI-Zentrale">${kiBadge()}</button>${accBtn()}<button class="round" data-act="settings" aria-label="Einstellungen">${I.gear}</button></span>`;
   document.body.appendChild(tabbar);
   function syncTabs() {
@@ -2833,7 +2961,7 @@
     S.stack = [p];
     p.el.scrollTop = S.tabScroll[path] || 0;
     syncTabs();
-    if (!reduce) p.el.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+    reveal(p);
     afterShow(p, false);
   }
   const curPath = () => (location.hash || '#/').slice(1) || '/';
@@ -3094,7 +3222,7 @@
       const mh = on.closest('.mh');
       lcPlace(on, c.xs[i], c.ys[i]);
       $('#lc-cp rect', on).setAttribute('width', f1(c.xs[i]));
-      $('.mh-n', mh).textContent = c.fmtV(c.pts[i].v);
+      setNum($('.mh-n', mh), c.pts[i].v, c.def.mode === 'pl');
       $('.mh-n', mh).className = `mh-n ${mhTone(c.def.mode, c.pts[i].v)}`;
       $('.mh-d', mh).textContent = dayShort(c.pts[i].t);
     };
@@ -3118,7 +3246,7 @@
       const mh = w.closest('.mh');
       lcPlace(w, c.lastX, c.lastY);
       $('#lc-cp rect', w).setAttribute('width', c.W);
-      $('.mh-n', mh).textContent = c.def.big;
+      setNum($('.mh-n', mh), c.def.val, c.def.mode === 'pl');
       $('.mh-n', mh).className = `mh-n ${mhTone(c.def.mode, c.def.val)}`;
       $('.mh-d', mh).innerHTML = c.def.sub;
     };
@@ -3301,14 +3429,15 @@
     else if (act === 'lgame') { const r = G.byGid[a.dataset.g]; if (d && d.leg && r) { Object.assign(d.leg, legFromRow(r)); d.leg.event = null; redrawDraft(); } }
     else if (act === 'lgclear') { if (d && d.leg) { ['g', 'slug', 't', 'comp', 'home', 'away'].forEach((k) => { delete d.leg[k]; }); d.gq = ''; redrawDraft(); } }
     // Wetten abrechnen, Cashout, löschen
-    else if (act === 'settle') settleManual(a.dataset.id, a.dataset.val);
-    else if (act === 'cashout') openCashSheet(a.dataset.id);
+    else if (act === 'betview') openBetView(a.dataset.id);
+    else if (act === 'settle') { const id = a.dataset.id; const v = a.dataset.val; afterSheet(() => settleManual(id, v)); }
+    else if (act === 'cashout') { const id = a.dataset.id; afterSheet(() => openCashSheet(id)); }
     else if (act === 'cashgo') cashGo(a.dataset.id);
-    else if (act === 'editbet') editBet(a.dataset.id);
+    else if (act === 'editbet') { const id = a.dataset.id; afterSheet(() => editBet(id)); }
     else if (act === 'delbet') {
       // zweimal tippen: erst „Wirklich löschen?“, dann weg
       if (!a.classList.contains('arm')) { a.classList.add('arm'); a.textContent = 'Wirklich löschen?'; setTimeout(() => { if (a.isConnected) { a.classList.remove('arm'); a.textContent = 'Löschen'; } }, 3000); }
-      else deleteBet(a.dataset.id);
+      else { const id = a.dataset.id; afterSheet(() => deleteBet(id)); }
     }
     // Wetten-Seite
     else if (act === 'btab') betsTab(a.dataset.val);
@@ -3417,6 +3546,7 @@
   // Eingabetaste: Code prüfen, Cashout übernehmen, Suche schließt die Tastatur
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || !e.target.dataset) return;
+    if (e.target.getAttribute && e.target.getAttribute('role') === 'button' && e.target.dataset.act) { e.preventDefault(); e.target.click(); return; }
     const act = e.target.dataset.act;
     if (act === 'invcode') { e.preventDefault(); inviteGo(); }
     else if (act === 'cashin') { const b = $('.sheet [data-act="cashgo"]'); if (b) { e.preventDefault(); cashGo(b.dataset.id); } }
@@ -3425,7 +3555,7 @@
 
   // Antippen: kurz abdunkeln statt zusammenziehen (iPhone-Regel); erst nach kurzem Halten, beim Scrollen gar nicht
   (() => {
-    const PRESS = '.bact, .bc-acts button, .bc-fa button, .bl-x, .bl-fix, .bf-add, a.row, button.row, .btn, .round, .sbtn, .seg button, .tabbar button, .chips button, .kib, .pseg button, .more, .hm-card, .htile, .h-list, .cal-nav, button.cd, .cy, .lk';
+    const PRESS = '.tk[data-act], button.li, .qa-b, .mact button, .bd-acts button, .bd-foot button, .mh-btn, .wc[data-act], .bl-x, .bl-fix, .bf-add, a.row, button.row, .btn, .round, .sbtn, .seg button, .tabbar button, .chips button, .kib, .pseg button, .more, .cal-nav, button.cd, .cy, .lk';
     let el = null;
     let t = 0;
     const off = () => { clearTimeout(t); if (el) el.classList.remove('pressed'); el = null; };
@@ -3468,7 +3598,7 @@
     clearTimeout(packT);
     packT = setTimeout(() => {
       if (!ipadWide()) return;
-      $$('.ovw, .ovg, .wrap[data-p="ki"]').forEach((box) => {
+      $$('.ovw, .ovg, .wrap[data-p="ki"], .wrap[data-p="home"], .blist.dl').forEach((box) => {
         [...box.children].forEach((c) => {
           if (getComputedStyle(c).position === 'absolute') return;
           c.style.gridRowEnd = `span ${Math.max(1, c.offsetHeight + 18)}`;
@@ -3509,7 +3639,7 @@
     const t0 = performance.now();
     Promise.race([loadGames().catch(() => {}), new Promise((r) => setTimeout(r, 1200))]).then(() => {
       refreshKib();
-      setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), reduce ? 0 : 400); }, reduce ? 0 : Math.max(60, 600 - (performance.now() - t0)));
+      setTimeout(() => { sp.classList.add('out'); reveal(curPage()); setTimeout(() => sp.remove(), reduce ? 0 : 400); }, reduce ? 0 : Math.max(60, 600 - (performance.now() - t0)));
     });
   })();
   // Konto: beim Start, alle 3 Minuten (solange die App offen ist) und wenn das Netz zurückkommt abgleichen

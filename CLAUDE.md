@@ -28,8 +28,11 @@ neuer Name, nichts mit Tipico“):
 - Bestehende Daten bleiben: Wetten, Kasse und Konto-Abgleich laufen weiter unter dem Speicher-Präfix `ra_`.
 
 **Gilt weiter (seit 03.–10.11.2026):**
-- Nur Deutsch. Design „Clean“: weißer bzw. ganz hellgrauer Hintergrund, weiße Karten, Dunkelmodus in den Einstellungen
-  (Hell · Dunkel · Automatisch), Vorbilder Apple und Revolut. **Plus grün mit +, Minus rot mit −** bei allem, was Geld ist.
+- Nur Deutsch. Design **„Clean 2“** (11.11.2026, Niklas: „viel cleaner und aufgeräumter, mehr Animationen, hochwertiger“):
+  iOS-Grau als Hintergrund (`--bg #F2F2F7`), weiße Karten ohne Rand mit weichem Schatten, große fette Titel, schwarze
+  Hauptknöpfe, Konto-Karte immer dunkel (Farbe unter Kasse → Ändern), Wettscheine als Tickets mit Abriss-Kante.
+  Dunkelmodus in den Einstellungen (Hell · Dunkel · Automatisch), Vorbilder Apple und Revolut. **Plus grün mit +, Minus rot
+  mit −** bei allem, was Geld ist.
 - **Unbekanntes ehrlich als „k. A.“**, nie erfinden. **Nie Beispieldaten ausliefern.** Ein Tipp, den die App nicht sicher
   versteht, wird nicht automatisch abgerechnet („lieber gar nicht als falsch“).
 - Ehrliche Hinweise zum Glücksspiel (`RG_TEXT`: keine Garantie, ab 18, check-dein-spiel.de, BZgA 0800 1 37 27 00).
@@ -37,12 +40,13 @@ neuer Name, nichts mit Tipico“):
 - Server-Funktionen (Scan) nur mit **Einladungscode** (schützt das Gratis-Kontingent). Konto nur mit **Benutzername + Passwort**.
 - **Tipico selbst auslesen ist abgelehnt** (Bot-Schutz, nicht umgehen). Ehrliche User-Agents, keine Bot-Schutz-Umgehung irgendwo.
 
-## Was die App kann (`web/app.js`, Stand `ra-shell-v24`)
+## Was die App kann (`web/app.js`, Stand `ra-shell-v25`)
 
 Leiste unten (`TABS`): **Start · Wetten · Scannen · Statistik · Kasse**; dazu die **KI-Zentrale** (`#/ki`, Knopf „KI“ oben) und
 Einstellungen (Zahnrad). Am iPad quer ist die Leiste links.
-- **Start:** Begrüßung, Limit-Hinweis (falls überschritten), Kontostand, Scan-Karte, offene Wetten, Diese Woche / Dieser Monat /
-  Gesamt, zuletzt abgerechnet.
+- **Start** (bewusst knapp): Begrüßung, Limit-Hinweis (falls überschritten), dunkle Konto-Karte (Kontostand, diese Woche,
+  30-Tage-Kurve, im Spiel / möglicher Gewinn / offen; antippen → Kasse), zwei Knöpfe Scannen und Eintragen, offene Wetten (3),
+  zuletzt abgerechnet (4). Ohne Wetten statt der Listen „So geht's“.
 - **Wetten:** Offen · Erledigt (Filter) · Kalender (Plus/Minus je Tag, Tag antippen). Je Wette: Gewonnen, Verloren, Cashout
   (Betrag eintragen), Storniert, Bearbeiten, Löschen (zweimal tippen).
 - **Eintragen** (Blatt): Tipps aus dem Spielplan wählen (Teamsuche, Schnellwahl 1 · X · 2 · 1X · X2 · 12 · Über/Unter ·
@@ -118,10 +122,16 @@ Am PC sah die BVB-App glatt aus, am iPhone ruckelte sie „grauenvoll“. Deshal
 - Langes Tippen ohne iOS-Menü/Textauswahl. Updates kommen beim ersten Öffnen an (Service Worker lädt am Cache vorbei, die App lädt
   bei neuer Version einmal neu).
 - Jede neue Animation **auf Niklas' iPhone prüfen lassen** – der PC-Browser zeigt diese Probleme nicht.
+- **Bewegung (seit 11.11.2026):** Zeigt sich eine Seite, gleiten die Karten nacheinander herein (`reveal()` → `stagger()`: die
+  ersten 14 bekommen `.rvi` und ihre Nummer `--r`, nach 1,3 s wieder weg; `REVEAL_IN` nennt die Behälter, deren Karten einzeln
+  kommen). Große Zahlen zählen vom zuletzt gezeigten Wert aus (`data-cu`, `countUp`), Kurven zeichnen sich einmal ein, die Leiste
+  federt beim Antippen. Auftritts-Effekte **immer unter `.rvi` hängen**, nie an feste Klassen – `redrawAll` setzt kurz `.still`,
+  sonst liefen sie bei jedem Neuzeichnen noch einmal.
 
 **iPad** (Einstellungen → Gerät, `ra_device`, `data-device` auf `<html>`): ab 700 px mehr Spalten, quer ab 960 px Leiste links
 (`ipadSide()` und CSS müssen zusammenpassen). Karten-Raster ohne Lücken mit `ipadPack()` (Zeilen von 1 px, `gridRowEnd = span
-Höhe + 18`) auf `.ovw`, `.ovg` und der KI-Zentrale – dort **immer `row-gap: 0`** und keine Außenabstände an den Karten.
+Höhe + 18`) auf `.ovw`, `.ovg`, Start, KI-Zentrale und „Erledigt“ (`.blist.dl`, jeder Tag ein Block `.dday`) – dort **immer
+`row-gap: 0`** und keine Außenabstände an den Karten.
 
 ## Arbeitsweise
 
@@ -142,6 +152,8 @@ Höhe + 18`) auf `.ovw`, `.ovg` und der KI-Zentrale – dort **immer `row-gap: 0
 
 **Umbau zu Wettbuch fertig** (`ra-shell-v24`): App, Symbol, Startbilder, Spielplan (`games.yml`), Server-Code. Im Browser geprüft
 (iPhone-Breite hell/dunkel, iPad hochkant/quer, Scan mit nachgestellter Server-Antwort, Eintragen, Cashout, Bearbeiten, Löschen).
+**Danach Redesign „Clean 2“** (`ra-shell-v25`, 11.11.2026 abends): neue Optik, aufgeräumter Start, Auftritts-Animationen –
+im Browser auf allen Seiten und Blättern geprüft (iPhone-Breite hell/dunkel, iPad hochkant/quer), Tests grün.
 
 **Offen, in dieser Reihenfolge:**
 1. **Server-Update bei Cloudflare (macht Niklas, Claude erklärt):** D1-Datenbank anlegen und als `DB` binden (falls noch nicht
@@ -150,7 +162,7 @@ Höhe + 18`) auf `.ovw`, `.ovg` und der KI-Zentrale – dort **immer `row-gap: 0
    gelöschten `tips.yml` an (harmlos, der Spielplan läuft trotzdem alle 2 Std. über GitHub).
 2. **Auf Niklas' iPhone und iPad prüfen:** App einmal vom Home-Bildschirm löschen und neu hinzufügen (neuer Name, neues Symbol),
    echte Screenshots aus der Wett-App scannen (einzelne Wette, Kombi, ganze Liste „Meine Wetten“, Cashout), Abrechnung nach dem
-   Abpfiff, Kasse und Limits.
+   Abpfiff, Kasse und Limits. Dazu die neuen Animationen von „Clean 2“: ruckelt etwas oder blitzt schwarz, sofort zurücknehmen.
 3. Ideen danach (nur nach Rückfrage): Export der Wetten als Tabelle, Erinnerung an offene Wetten, Ziele (z. B. Monatsbudget).
 
 ## Geschichte (kurz)
